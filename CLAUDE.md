@@ -136,7 +136,7 @@ com.rohit.gallery
 
 ## 8. Phases and acceptance criteria
 
-### Phase 0: Project setup
+### Phase 0: Project setup (DONE, pending on-device check)
 - App name "Gallery", package/namespace/applicationId `com.rohit.gallery`,
   root project name `Gallery`.
 - Add dependencies via the version catalog; configure Hilt, KSP, Compose
