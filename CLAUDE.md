@@ -203,48 +203,64 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
   Kotlin 2.2.10, Gradle 9.6.0, Compose BOM 2026.02.01, Hilt + KSP, Navigation Compose
   (type-safe routes), release (R8 + shrink) and `benchmark` build types, package structure,
   Material 3 dynamic-color theme, 3-tab shell (Pictures / Albums / Menu).
-- **Phase 1 (foundation), verified on my phone:** permission flow (full / partial with upgrade banner /
-  denied / permanently denied), `MediaStoreDataSource` + in-memory `MediaRepository` index with
-  debounced `ContentObserver` refresh, day-grouped timeline (sticky headers, 4 columns, video
-  duration badges), own `ThumbnailCache` + prefetch. 12 unit tests pass (repository, grouping,
-  labels, duration format). Scrolling feel confirmed good by me.
-- Release and benchmark builds compile; merged manifests contain no `INTERNET`.
+- **Phase 1 (foundation), verified on my phone:** permission flow, `MediaStoreDataSource` + in-memory
+  `MediaRepository` index with debounced `ContentObserver`, day-grouped timeline (sticky headers, video
+  badges), own `ThumbnailCache` + prefetch.
+- **Phase 2 so far (all committed on `main`; 19 unit tests pass):**
+  - **Viewer** (verified by me): pager, Telephoto zoom, shared-element open/close (photo-shaped flight element),
+    2D drag-to-dismiss (diagonal too), swipe-up opens details instantly, details panel stacked under the photo
+    (photo shrinks upward), swipe-down with details open returns to the photo, filmstrip, info with EXIF /
+    lazy `ACCESS_MEDIA_LOCATION`. Files in `feature/viewer/`.
+  - **Video** (verified by me, except item 8 of the checklist): Media3 ExoPlayer, scrubber, mute, keep-screen-on,
+    in-memory resume position.
+  - **Multi-select 4a** (built, installed, NOT yet reported on by me): long-press + drag-select with
+    auto-scroll, selection bars replacing the nav bar, Share, Favorite (toggles), Trash
+    (`createTrashRequest`). Files in `feature/selection/` and `core/domain/MediaActions.kt`.
+- Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
 
-### Not done / known gaps
-- Phase 1 leftovers: none functional. The release APK has not been run on the phone (R8 could
-  strip something Hilt/Coil needs at runtime; test `assembleRelease` on device before Phase 4).
-- Phase 2 is NOT started. Per section 9: post the Phase 2 task list and wait for my OK first.
-- Dependencies not yet added (add in the phase that needs them): Room, DataStore, WorkManager,
-  Telephoto, Media3, Turbine. Coil is on the classpath but unused until the viewer (Phase 2).
-- `ACCESS_MEDIA_LOCATION` is declared but not requested at runtime yet (needed for the info sheet).
-- Placeholders: Albums and Menu screens are empty; nav icons are `material-icons-core` stand-ins;
-  no collapsing title header yet; `contentDescription` on thumbnails is null (accessibility pass, Phase 4).
+### Waiting on my device report
+- Back-close fix (commit `d55ceac`): back button, back swipe and swipe-down should fly the photo into its
+  grid cell with no full-screen flash. Check portrait / landscape / square / video / zoomed-in.
+- 4a checklist: long-press selects the cell under the finger (hit-testing is unverified), drag-select and
+  auto-scroll, Share, Favorite toggle, Trash (system dialog, then item disappears; restorable).
+
+### Next steps (Phase 2 order I approved)
+1. **4b Move/Copy to album** (next): album list from the index (bucketId/bucketName); Move = `createWriteRequest`
+   + RELATIVE_PATH update; Copy = insert a new MediaStore row and stream-copy (original untouched); expose via the
+   "More" button in `SelectionActionBar` (currently hidden because `onMore` is null); "New album" under Pictures/<name>.
+2. **Trash screen** (restore; permanent delete via `createDeleteRequest` with confirmation).
+3. **Favorites** screen.
+4. **Albums tab + album detail** (reuse the grid and selection; viewer already takes `bucketId`).
+5. **External intents** (`ACTION_VIEW`, `com.android.camera.action.REVIEW`; must work without media permission).
+6. **Fast-scroller** with date bubble.
+7. Ask me to test on the phone after tasks 1-2. Commit after each task.
+Then Phase 3 and Phase 4 as in section 8.
+
+### Known gaps / deferred
+- Closing the viewer does not scroll the grid to the photo you ended on (optional polish).
+- Resume positions are lost on process death (needs DataStore, Phase 3).
+- Zoomed-in close snaps to the fitted view before flying to the grid (unpolished).
+- `ACCESS_MEDIA_LOCATION` runtime flow untested on device.
+- **Phase 4:** request 120 Hz (`preferredDisplayModeId`; app currently renders at 90 Hz, Motorola maps "high" to 90),
+  run `assembleRelease` / benchmark builds on the phone (R8 risk), Baseline Profile, accessibility
+  `contentDescription`s, collapsing title header, real nav icons (current ones are `material-icons-core`).
+- Not added yet (add in the phase that needs them): Room, DataStore, WorkManager, Turbine.
 
 ### Gotchas learned (do not re-learn these)
-- **Kotlin 2.2.10 compiler cannot read Kotlin 2.4 metadata.** Latest releases of coroutines (1.11),
-  kotlinx-serialization (1.13) and Coil (3.5+) fail with "incompatible version of Kotlin".
-  Pinned: coroutines 1.10.2, serialization 1.9.0, Coil 3.4.0. Check a library's Kotlin version
-  (its POM's `kotlin-stdlib`) before bumping; upgrade Kotlin/AGP together if needed.
-- `hiltViewModel` now lives in `androidx.hilt.lifecycle.viewmodel.compose`.
-- Use `@param:ApplicationContext` on constructor params (avoids a Kotlin warning).
-- Don't run `python3` in the shell here (it hangs). `.gitignore` must use `build/` (not `/build`).
-- Git commits here use `-c user.name=rohit -c user.email=rohit@localhost` (no global git identity).
+- **Kotlin 2.2.10 compiler cannot read Kotlin 2.4 metadata.** Latest coroutines (1.11), kotlinx-serialization
+  (1.13) and Coil (3.5+) fail. Pinned: coroutines 1.10.2, serialization 1.9.0, Coil 3.4.0, Telephoto 0.19.0
+  (`me.saket.telephoto.zoomable`), Media3 1.11.1. Check a library's POM `kotlin-stdlib` before bumping.
+- `hiltViewModel` lives in `androidx.hilt.lifecycle.viewmodel.compose`.
+- Use `@param:ApplicationContext` on constructor params.
+- Don't run `python`/`python3` in the shell (hangs). `.gitignore` must use `build/` (not `/build`).
+  Heredocs with backslashes lose them: use raw strings or the Write tool.
+- Git commits use `-c user.name=rohit -c user.email=rohit@localhost`.
+- Shared elements: only the tapped cell and the viewer's current page carry the shared modifier; drag-dismiss
+  disables the flight and fades instead (otherwise the grid thumbnail is stretched full screen).
 
 ### Running on my phone (Motorola Edge 60 Pro, wireless debugging)
 - adb: `"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"`. Check with `adb devices -l`.
 - The phone's IP/port changes. If it is not listed: `adb mdns services` shows the connect address
-  (`adb connect <ip:port>`). Already paired; if pairing is lost, ask me for a fresh code from
-  Developer options > Wireless debugging > Pair device with pairing code, and run `adb mdns services`
-  to read the pairing port (`_adb-tls-pairing`), then `adb pair <ip:port> <code>`.
+  (`adb connect <ip:port>`). If pairing is lost, ask me for a fresh pairing code and run `adb pair <ip:port> <code>`.
 - Install and launch: `ANDROID_SERIAL=<serial> ./gradlew.bat installDebug`, then
   `adb -s <serial> shell am start -n com.rohit.gallery/.MainActivity`.
-
-### Next steps
-1. Phase 2 task list for my approval (do not start coding before I say go). Likely order:
-   a) viewer (pager, Telephoto zoom, shared-element transition, drag-to-dismiss, info sheet),
-   b) Media3 video playback, c) Albums tab + detail, d) multi-select (drag select) with Share /
-   Favorite / Trash / Move-Copy, e) Trash screen (restore / permanent delete via
-   `createTrashRequest` / `createDeleteRequest`), f) Favorites, g) external intents
-   (`ACTION_VIEW`, camera REVIEW), h) fast-scroller with date bubble.
-2. Then Phase 3 (density pinch, editor, search, hidden albums, settings) and Phase 4 (baseline
-   profile, benchmarks, signed release), as in section 8.

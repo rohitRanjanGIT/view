@@ -95,3 +95,13 @@ Non-obvious technical choices, newest last.
   `createFavoriteRequest`. We only clear the selection and refresh when the system dialog returns RESULT_OK.
   Very large selections might exceed binder limits for the request; failure shows a toast and changes nothing.
 - **Share** uses a chooser with read-only URI grants; mime is exact for one item, `image/*` / `video/*` if uniform.
+
+## Phase 2: viewer gestures and flight (later decisions)
+
+- **Details panel is stacked, not an overlay.** It takes `InfoPanelFraction` (46%) of the height; the pager
+  shrinks upward via `layout{}`. The panel has its own scroll and gesture, as a sibling of the photo area.
+- **`SwipeMode`** (None / OpenInfo / CloseInfo / Dismiss / Ignore) is fixed when a swipe starts, so one swipe
+  never both closes the panel and dismisses the viewer. Swipe-up opens details directly with no image drag.
+- **Photo-shaped shared element** (`SharedFlightFrame`): the flight element has the photo's aspect ratio, so the
+  grid cell morphs to the true outline. Using the full-screen box stretched the cropped thumbnail across the
+  screen for a moment. It is only visible during transitions; the interactive layer is hidden meanwhile.
