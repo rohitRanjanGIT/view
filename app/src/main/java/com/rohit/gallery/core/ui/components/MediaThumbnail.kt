@@ -1,6 +1,6 @@
 package com.rohit.gallery.core.ui.components
 
-import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,29 +15,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.feature.timeline.formatDuration
 
-/** The one place grid thumbnail requests are built, so prefetching hits the same cache entries. */
-fun thumbnailRequest(context: Context, item: MediaItem, cellSizePx: Int): ImageRequest =
-    ImageRequest.Builder(context)
-        .data(MediaThumbData(item.id, item.isVideo, item.dateModifiedMs))
-        .size(cellSizePx)
-        .build()
-
 /**
- * Square grid thumbnail. Always requested at [cellSizePx] so a grid cell never decodes a
- * full-size image.
+ * Square grid thumbnail. A thumbnail already in [ThumbnailCache] is read during composition,
+ * so it is drawn in the very first frame; otherwise it loads in the background.
  */
 @Composable
 fun MediaThumbnail(
@@ -45,17 +41,25 @@ fun MediaThumbnail(
     cellSizePx: Int,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val request = remember(item.id, item.type, item.dateModifiedMs, cellSizePx) {
-        thumbnailRequest(context, item, cellSizePx)
+    val cache = LocalThumbnailCache.current
+    val key = item.thumbKey
+    var image: ImageBitmap? by remember(key) { mutableStateOf(cache.get(key)?.asImageBitmap()) }
+
+    if (image == null) {
+        LaunchedEffect(key, cellSizePx) {
+            image = runCatching { cache.load(item, cellSizePx) }.getOrNull()?.asImageBitmap()
+        }
     }
+
     Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-        AsyncImage(
-            model = request,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
+        image?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         if (item.isVideo) {
             DurationBadge(
                 durationMs = item.durationMs,
