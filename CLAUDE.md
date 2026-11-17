@@ -213,28 +213,28 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
     lazy `ACCESS_MEDIA_LOCATION`. Files in `feature/viewer/`.
   - **Video** (verified by me, except item 8 of the checklist): Media3 ExoPlayer, scrubber, mute, keep-screen-on,
     in-memory resume position.
-  - **Multi-select 4a** (built, installed, NOT yet reported on by me): long-press + drag-select with
-    auto-scroll, selection bars replacing the nav bar, Share, Favorite (toggles), Trash
-    (`createTrashRequest`). Files in `feature/selection/` and `core/domain/MediaActions.kt`.
+  - **Multi-select** (verified by me): long-press + drag-select with auto-scroll, selection bars replacing the nav
+    bar, Share, Favorite (toggles), Trash (`createTrashRequest`), Move/Copy to album under More. Shared by all
+    grids via `SelectableMediaGrid` and `SelectionActions` / `SelectionActionsBar` in `feature/selection/`.
+  - **Trash screen** (verified): Menu > Trash, open in viewer with Restore / Delete forever, select + drag-select.
+  - **Favorites** (verified): Menu > Favorites. **Albums tab + album detail** (verified): `feature/albums/`.
+  - 22 unit tests pass.
 - Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
 
 ### Waiting on my device report
 - Back-close fix (commit `d55ceac`): back button, back swipe and swipe-down should fly the photo into its
   grid cell with no full-screen flash. Check portrait / landscape / square / video / zoomed-in.
-- 4a checklist: long-press selects the cell under the finger (hit-testing is unverified), drag-select and
-  auto-scroll, Share, Favorite toggle, Trash (system dialog, then item disappears; restorable).
 
 ### Next steps (Phase 2 order I approved)
-1. DONE: 4b Move/Copy to album (copy verified on device; move confirmed by me). Trash screen DONE (built, awaiting my test).
-   + RELATIVE_PATH update; Copy = insert a new MediaStore row and stream-copy (original untouched); expose via the
-   "More" button in `SelectionActionBar` (currently hidden because `onMore` is null); "New album" under Pictures/<name>.
-2. DONE: Favorites screen. DONE: Albums tab + album detail (awaiting my test).
-3. (Trash is reached from Menu > Trash.)
-4. (Albums done; selection actions are shared via SelectionActions / SelectionActionsBar.)
-5. **External intents** (`ACTION_VIEW`, `com.android.camera.action.REVIEW`; must work without media permission).
-6. **Fast-scroller** with date bubble.
-7. Ask me to test on the phone after tasks 1-2. Commit after each task.
-Then Phase 3 and Phase 4 as in section 8.
+1. **External intents** (`ACTION_VIEW` for image/* and video/*, `com.android.camera.action.REVIEW`; must open a
+   single external URI even without media permission).
+2. **Fast-scroller** with date bubble.
+Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4 as in section 8.
+
+### Testing on my phone (rules)
+- Only test with copies, never touch originals (no restore / delete / move of real media without my approval).
+- Keep Do Not Disturb on, take a screenshot before every tap, never send blind tap chains (a stray tap once
+  started a real call).
 
 ### Known gaps / deferred
 - Closing the viewer does not scroll the grid to the photo you ended on (optional polish).

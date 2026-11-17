@@ -105,3 +105,17 @@ Non-obvious technical choices, newest last.
 - **Photo-shaped shared element** (`SharedFlightFrame`): the flight element has the photo's aspect ratio, so the
   grid cell morphs to the true outline. Using the full-screen box stretched the cropped thumbnail across the
   screen for a moment. It is only visible during transitions; the interactive layer is hidden meanwhile.
+
+## Phase 2: move/copy, trash, favorites, albums
+- **Move** = `createWriteRequest` then `ContentResolver.update(RELATIVE_PATH)`. **Copy** = insert a new row
+  (IS_PENDING=1), stream-copy, IS_PENDING=0; a failed copy deletes the half-written file. Originals are never
+  modified. Videos headed for `Pictures/...` fall back to `Movies/...`. New album = `Pictures/<name>/`.
+- **Trashed items** are queried with `QUERY_ARG_MATCH_TRASHED`; their `MediaItem.uri` carries `includeTrashed=1`
+  (`MediaStore.setIncludeTrashed` does not resolve here), otherwise thumbnails and full-size loads fail.
+- **Permanent delete** only from the Trash screen: in-app confirmation plus the system `createDeleteRequest` dialog.
+- **Shared selection code:** `SelectableMediaGrid` (tap / long-press / drag, auto-scroll) and `SelectionActions` +
+  `SelectionActionsBar` (owned by each screen's ViewModel) serve Pictures and album detail. Favorites and Trash
+  still wire their own simple actions and could move onto them later.
+- **Albums** are derived from the in-memory index (`buildAlbums`: by bucket, ordered by newest item, newest item
+  is the cover); no Room needed until custom order / hidden albums (Phase 3).
+- **Viewer scope** is set by route args: `bucketId`, `trashed`, `favoritesOnly`.
