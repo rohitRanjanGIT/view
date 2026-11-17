@@ -32,3 +32,6 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
 
 /** Favorites list, opened from the Menu tab. */
 @Serializable data object FavoritesRoute
+
+/** One album (folder), opened from the Albums tab. */
+@Serializable data class AlbumDetailRoute(val bucketId: Long)

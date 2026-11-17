@@ -61,8 +61,7 @@ import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.mediaSharedElement
 import com.rohit.gallery.core.ui.theme.GalleryMotion
-import com.rohit.gallery.feature.selection.AlbumPickerSheet
-import com.rohit.gallery.feature.selection.SelectionActionBar
+import com.rohit.gallery.feature.selection.SelectionActionsBar
 import com.rohit.gallery.feature.selection.SelectionCheck
 import com.rohit.gallery.feature.selection.SelectionState
 import com.rohit.gallery.feature.selection.SelectionTopBar
@@ -128,38 +127,6 @@ private fun SelectionBars(
     selection: SelectionState,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    // The system shows its own confirmation for trash/favorite; we only continue if it was accepted.
-    val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            selection.clear()
-            viewModel.refresh()
-        }
-    }
-    fun launchWrite(request: suspend () -> IntentSender?) {
-        scope.launch {
-            val sender = runCatching { request() }.getOrNull()
-            if (sender == null) {
-                Toast.makeText(context, "Couldn't start that action", Toast.LENGTH_SHORT).show()
-            } else {
-                writeLauncher.launch(IntentSenderRequest.Builder(sender).build())
-            }
-        }
-    }
-
-    // Moving needs its own write confirmation; the move itself runs once it is accepted.
-    val moveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) viewModel.finishMove()
-    }
-    var picker by remember { mutableStateOf<TransferKind?>(null) }
-    val albums by viewModel.albums.collectAsStateWithLifecycle()
-    val busy by viewModel.busy.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        viewModel.messages.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
-    }
-
     val allFavorite by remember(content) {
         derivedStateOf {
             selection.ids.isNotEmpty() && selection.ids.all { id ->
@@ -167,63 +134,20 @@ private fun SelectionBars(
             }
         }
     }
-    val count = selection.ids.size
 
     Box(modifier) {
         SelectionTopBar(
-            count = count,
+            count = selection.ids.size,
             onClose = selection::clear,
             onSelectAll = { selection.selectAll(content.items) },
             modifier = Modifier.align(Alignment.TopCenter),
         )
-        SelectionActionBar(
-            enabled = count > 0,
+        SelectionActionsBar(
+            controller = viewModel.selectionActions,
+            selection = selection,
             allFavorite = allFavorite,
-            onShare = {
-                val intent = viewModel.shareIntent()
-                if (intent != null) {
-                    runCatching { context.startActivity(intent) }.onFailure {
-                        Toast.makeText(context, "Couldn't share that many items at once", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-            onFavorite = { launchWrite { viewModel.favoriteRequest() } },
-            onTrash = { launchWrite { viewModel.trashRequest() } },
-            onMove = { picker = TransferKind.Move },
-            onCopy = { picker = TransferKind.Copy },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
-
-    picker?.let { kind ->
-        AlbumPickerSheet(
-            title = if (kind == TransferKind.Move) "Move to album" else "Copy to album",
-            albums = albums,
-            onDismiss = { picker = null },
-            onPick = { album, newName ->
-                picker = null
-                if (kind == TransferKind.Copy) {
-                    viewModel.copyTo(album, newName)
-                } else {
-                    scope.launch {
-                        val sender = viewModel.moveRequest(album, newName)
-                        if (sender == null) {
-                            Toast.makeText(context, "Couldn't start that action", Toast.LENGTH_SHORT).show()
-                        } else {
-                            moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
-                        }
-                    }
-                }
-            },
-        )
-    }
-    if (busy) {
-        AlertDialog(
-            onDismissRequest = {},
-            confirmButton = {},
-            title = { Text("Working…") },
-            text = { LinearProgressIndicator(Modifier.fillMaxWidth()) },
-        )
-    }
     }
 }
 
