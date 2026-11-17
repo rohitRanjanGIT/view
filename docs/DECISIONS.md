@@ -78,3 +78,20 @@ Non-obvious technical choices, newest last.
   dies. Persisting it needs DataStore (Phase 3). Positions under 3 s or within 2 s of the end are not resumed.
 - **Mute is per viewer session** (`rememberSaveable`), not per video.
 - **Player icons** (pause, volume) are vector paths in `PlayerIcons`, to avoid `material-icons-extended`.
+
+## Phase 2: multi-select (4a)
+
+- **One gesture detector for the grid** (`gridGestures`): tap, long-press, drag-after-long-press, with the cell
+  found by hit-testing the visible rows (`rowsByFirstId` + column from x). Before the long-press it only watches
+  (Main pass, so the list can claim scrolls); after it, it takes the events on the Initial pass so the list does
+  not scroll during drag-select. Cells no longer have their own `clickable`.
+- **`SelectionState` holds only ids** plus the drag anchor/base. Dragging adds the range anchor..finger; if the
+  drag started on an already-selected item it removes the range instead. Selection mode stays on at 0 selected.
+- **Auto-scroll while dragging** near the top/bottom edge; the pointer is kept in a plain holder, not state, so
+  finger movement never recomposes the grid.
+- **Nav bar is replaced by the selection action bar.** Top-level screens now receive `contentBottomPadding` and
+  use it as the list's content padding, so the action bar can sit at the true screen bottom.
+- **Writes are system-confirmed and recoverable.** Trash = `createTrashRequest` (restorable), favorite =
+  `createFavoriteRequest`. We only clear the selection and refresh when the system dialog returns RESULT_OK.
+  Very large selections might exceed binder limits for the request; failure shows a toast and changes nothing.
+- **Share** uses a chooser with read-only URI grants; mime is exact for one item, `image/*` / `video/*` if uniform.

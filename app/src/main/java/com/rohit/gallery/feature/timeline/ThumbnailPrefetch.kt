@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val ROW_KEY_PREFIX = "row-"
+internal const val ROW_KEY_PREFIX = "row-"
 private const val PREFETCH_ROWS = 10
 
 fun rowKey(row: List<MediaItem>): String = ROW_KEY_PREFIX + row.first().id

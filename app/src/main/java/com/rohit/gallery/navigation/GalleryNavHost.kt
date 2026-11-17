@@ -55,7 +55,9 @@ fun GalleryNavHost() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
-    val showBottomBar = topLevelDestinations.any { currentDestination?.hasRoute(it.route::class) == true }
+    var selectionActive by remember { mutableStateOf(false) }
+    val showBottomBar = !selectionActive &&
+        topLevelDestinations.any { currentDestination?.hasRoute(it.route::class) == true }
 
     // Content of top-level screens gets a constant bottom inset instead of Scaffold's, so the
     // grid does not resize when the bar disappears while the viewer opens.
@@ -86,7 +88,8 @@ fun GalleryNavHost() {
                                     navController.navigate(ViewerRoute(item.id))
                                 }
                             },
-                            modifier = Modifier.padding(bottom = contentBottomPadding),
+                            onSelectionModeChange = { selectionActive = it },
+                            contentBottomPadding = contentBottomPadding,
                         )
                     }
                     topLevel<AlbumsRoute> { AlbumsScreen(Modifier.padding(bottom = contentBottomPadding)) }
