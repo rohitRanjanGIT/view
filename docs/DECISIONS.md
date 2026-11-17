@@ -146,3 +146,16 @@ Non-obvious technical choices, newest last.
 - **Menu > Videos** = index filtered to `isVideo`; viewer scope via `ViewerRoute.videosOnly`.
 - **`MediaListScreen`** (feature/selection) is the shared title bar + `SelectableMediaGrid` + `SelectionActionsBar` scaffold;
   album detail and Videos use it. Favorites can move onto it (it still wires its own actions).
+
+## Phase 2: closing fixes
+- **Timeline is inset by the status bar** (`windowInsetsPadding`) instead of top content padding: sticky headers pin
+  to the viewport top and ignore content padding, so the pinned day header sat under the clock. Content no longer
+  scrolls behind the status bar.
+- **Return to the photo you ended on:** the viewer writes its current item into `ViewerReturnTarget` (a plain holder
+  provided by the nav host); the grid that reappears takes it once in its first composition and calls
+  `requestScrollToItem` if the item is not fully visible, so the first frame already has the cell for the close flight.
+  Timeline uses exact geometry (`TimelineScrollMap`, `lazyRowIndexOf`); flat grids use a row estimate.
+- **Zoomed close:** Back / back gesture / top-bar arrow call `resetZoom` (220 ms) then pop. Drag-dismiss cannot start
+  while zoomed (Telephoto consumes the pan), so it needs no change.
+- **All secondary grids share `MediaListScreen`.** Favorites now has Move/Copy too; Trash passes its own Restore /
+  Delete bar through a slot.

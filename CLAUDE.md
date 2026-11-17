@@ -1,4 +1,4 @@
-# Gallery: Master Project Brief
+﻿# Gallery: Master Project Brief
 
 ## 1. Mission
 Build a fast, polished, offline gallery app for Android, inspired by the UX of
@@ -65,32 +65,32 @@ Show the grid as soon as the first query returns; target under 500 ms for
 
 ```
 com.rohit.gallery
-├── GalleryApp.kt                 // @HiltAndroidApp, Coil ImageLoader config
-├── MainActivity.kt               // edge-to-edge, nav host, intent handling
-├── core
-│   ├── model/                    // MediaItem, Album, MediaType, DateGroup
-│   ├── data
-│   │   ├── mediastore/           // MediaStoreDataSource, queries, ContentObserver
-│   │   ├── repository/           // MediaRepository, AlbumRepository
-│   │   ├── db/                   // Room database, DAOs, entities
-│   │   └── prefs/                // DataStore settings
-│   ├── domain/                   // use cases: TrashMedia, ToggleFavorite, Share...
-│   ├── permissions/              // permission state + request helpers
-│   ├── di/                       // Hilt modules
-│   └── ui
-│       ├── theme/                // color, type, shapes, motion specs
-│       └── components/           // shared composables (thumbnail, scrollbar...)
-├── feature
-│   ├── timeline/                 // Pictures tab: date-grouped grid
-│   ├── albums/                   // Albums tab + album detail
-│   ├── viewer/                   // full-screen pager, zoom, video, info sheet
-│   ├── selection/                // multi-select state + action bar
-│   ├── trash/                    // recycle bin
-│   ├── favorites/
-│   ├── search/                   // Phase 3
-│   ├── editor/                   // Phase 3
-│   └── settings/
-└── navigation/                   // routes, nav graph
+â”œâ”€â”€ GalleryApp.kt                 // @HiltAndroidApp, Coil ImageLoader config
+â”œâ”€â”€ MainActivity.kt               // edge-to-edge, nav host, intent handling
+â”œâ”€â”€ core
+â”‚   â”œâ”€â”€ model/                    // MediaItem, Album, MediaType, DateGroup
+â”‚   â”œâ”€â”€ data
+â”‚   â”‚   â”œâ”€â”€ mediastore/           // MediaStoreDataSource, queries, ContentObserver
+â”‚   â”‚   â”œâ”€â”€ repository/           // MediaRepository, AlbumRepository
+â”‚   â”‚   â”œâ”€â”€ db/                   // Room database, DAOs, entities
+â”‚   â”‚   â””â”€â”€ prefs/                // DataStore settings
+â”‚   â”œâ”€â”€ domain/                   // use cases: TrashMedia, ToggleFavorite, Share...
+â”‚   â”œâ”€â”€ permissions/              // permission state + request helpers
+â”‚   â”œâ”€â”€ di/                       // Hilt modules
+â”‚   â””â”€â”€ ui
+â”‚       â”œâ”€â”€ theme/                // color, type, shapes, motion specs
+â”‚       â””â”€â”€ components/           // shared composables (thumbnail, scrollbar...)
+â”œâ”€â”€ feature
+â”‚   â”œâ”€â”€ timeline/                 // Pictures tab: date-grouped grid
+â”‚   â”œâ”€â”€ albums/                   // Albums tab + album detail
+â”‚   â”œâ”€â”€ viewer/                   // full-screen pager, zoom, video, info sheet
+â”‚   â”œâ”€â”€ selection/                // multi-select state + action bar
+â”‚   â”œâ”€â”€ trash/                    // recycle bin
+â”‚   â”œâ”€â”€ favorites/
+â”‚   â”œâ”€â”€ search/                   // Phase 3
+â”‚   â”œâ”€â”€ editor/                   // Phase 3
+â”‚   â””â”€â”€ settings/
+â””â”€â”€ navigation/                   // routes, nav graph
 ```
 
 ## 5. Permissions and system integration
@@ -223,7 +223,7 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
     filmstrip, Back returns to the caller, file:// single item shows, unreadable URI closes with a toast.
   - **Fast-scroller** (commit `7840cd0`): handle on the timeline's right edge while scrolling, drag with a
     "Month Year" bubble. Checked by adb screenshots; feel not yet confirmed by me.
-  - 32 unit tests pass.
+  - 33 unit tests pass.
 - Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
 
 ### Waiting on my device report
@@ -233,12 +233,11 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
   WhatsApp, a video, and opening a file with media permission revoked.
 
 ### Next steps (Phase 2 order I approved)
-(Videos page done in `e2ebacb`, not yet tested on the phone: it was locked.)
-1. Pinned day header draws under the status bar; fix it.
-2. Closing the viewer scrolls the grid to the photo you ended on.
-3. Zoomed-in close flies from the zoomed view (no snap to fit first).
-4. Move Favorites and Trash onto the shared `SelectionActions` / `MediaListScreen`.
-Then my full-day test closes Phase 2.
+All Phase 2 code is done (last: `80e78b6`, `dcee7f5`, `7e90075`). Remaining, all on my phone:
+1. Check: Videos page; header no longer under the clock; closing the viewer lands on the photo you ended on
+   (swipe a few photos away first); zoomed-in close zooms out then flies; Favorites/Trash look and work as before.
+2. Decide on the camera thumbnail opening Google Photos (parked).
+3. Full-day test closes Phase 2. Then Phase 3 starts with pinch grid density.
 Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4 as in section 8.
 
 ### Testing on my phone (rules)
@@ -248,9 +247,7 @@ Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4
 
 ### Known gaps / deferred
 - Camera thumbnail opens Google Photos, not Gallery (reported 2026-11-17; parked by me, revisit later).
-- Closing the viewer does not scroll the grid to the photo you ended on (optional polish).
 - Resume positions are lost on process death (needs DataStore, Phase 3).
-- Zoomed-in close snaps to the fitted view before flying to the grid (unpolished).
 - `ACCESS_MEDIA_LOCATION` runtime flow untested on device.
 - **Phase 4:** request 120 Hz (`preferredDisplayModeId`; app currently renders at 90 Hz, Motorola maps "high" to 90),
   run `assembleRelease` / benchmark builds on the phone (R8 risk), Baseline Profile, accessibility
