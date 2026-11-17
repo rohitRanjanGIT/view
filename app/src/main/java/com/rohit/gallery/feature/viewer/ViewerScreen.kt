@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.runtime.snapshotFlow
 import me.saket.telephoto.zoomable.rememberZoomableImageState
+import me.saket.telephoto.zoomable.ZoomableImageState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
@@ -91,6 +92,9 @@ private val UpSwipeOpenDistance = 48.dp
 
 /** Share of the screen height the details panel takes; the photo gets the rest. */
 private const val InfoPanelFraction = 0.46f
+
+/** Zoom-out before closing a zoomed photo. */
+private const val ZOOM_OUT_MS = 220
 
 @Composable
 fun ViewerScreen(
@@ -195,6 +199,24 @@ private fun ViewerContent(
     val infoProgress by animateFloatAsState(if (showInfo) 1f else 0f, GalleryMotion.snappy(), label = "info")
     BackHandler(enabled = showInfo) { showInfo = false }
 
+    // Closing while zoomed in: animate the zoom out first, then close, so the flight back to the grid
+    // starts from the fitted photo instead of jumping to it. Plain holder: set by the current image page.
+    val currentZoom = remember { object { var state: ZoomableImageState? = null; var closing = false } }
+    fun close() {
+        if (currentZoom.closing) return
+        val zoomState = currentZoom.state
+        if (zoomed && zoomState != null) {
+            currentZoom.closing = true
+            scope.launch {
+                runCatching { zoomState.zoomableState.resetZoom(tween(ZOOM_OUT_MS)) }
+                onBack()
+            }
+        } else {
+            onBack()
+        }
+    }
+    BackHandler(enabled = zoomed && !showInfo) { close() }
+
     Box(
         modifier
             .fillMaxSize()
@@ -278,6 +300,7 @@ private fun ViewerContent(
                     sharedElement = !dismissed,
                     dragLayer = if (isCurrent) dragLayer else null,
                     onZoomedChange = { zoomed = it },
+                    onZoomState = { state -> currentZoom.state = state },
                     onTap = { if (showInfo) showInfo = false else chromeVisible = !chromeVisible },
                 )
             }
@@ -290,7 +313,7 @@ private fun ViewerContent(
             ) {
                 ViewerTopBar(
                     item = currentItem,
-                    onBack = onBack,
+                    onBack = ::close,
                     onInfo = { showInfo = !showInfo },
                     modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
                 )
@@ -364,6 +387,7 @@ private fun ImagePage(
     sharedElement: Boolean,
     dragLayer: (GraphicsLayerScope.() -> Unit)?,
     onZoomedChange: (Boolean) -> Unit,
+    onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
 ) {
     val cache = LocalThumbnailCache.current
@@ -380,6 +404,10 @@ private fun ImagePage(
     if (isCurrent) {
         LaunchedEffect(zoomState) {
             snapshotFlow { (zoomState.zoomableState.zoomFraction ?: 0f) > 0.02f }.collect(onZoomedChange)
+        }
+        DisposableEffect(zoomState) {
+            onZoomState(zoomState)
+            onDispose { onZoomState(null) }
         }
     }
     val transitionActive = rememberSharedTransitionActive()
@@ -465,12 +493,13 @@ private fun ViewerPage(
     sharedElement: Boolean,
     dragLayer: (GraphicsLayerScope.() -> Unit)?,
     onZoomedChange: (Boolean) -> Unit,
+    onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
 ) {
     if (item.isVideo) {
         VideoPage(item, isCurrent, playback, sharedElement, dragLayer, onTap)
     } else {
-        ImagePage(item, isCurrent, sharedElement, dragLayer, onZoomedChange, onTap)
+        ImagePage(item, isCurrent, sharedElement, dragLayer, onZoomedChange, onZoomState, onTap)
     }
 }
 
