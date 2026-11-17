@@ -47,3 +47,21 @@ Non-obvious technical choices, newest last.
   `shouldShowRequestPermissionRationale` is false (kept in `rememberSaveable`, not persisted).
 - **Verified:** debug, release (R8 + resource shrinking) and benchmark builds pass; no `INTERNET`
   permission in any merged manifest. Release/benchmark APKs have NOT been run on the device yet.
+
+## Phase 2
+
+- **Viewer is a nav destination** (`ViewerRoute(mediaId, bucketId?)`) with its own `ViewerViewModel`
+  reading the in-memory index; `bucketId` will scope the pager to an album later.
+- **Telephoto 0.19.0** (`zoomable-image-coil3`) compiles against Kotlin 2.1.21, so it is safe with our
+  2.2.10 compiler. `androidx.exifinterface` pinned to stable 1.4.2 (1.5.0 is beta).
+- **Shared element only on one grid cell.** `LocalSharedMediaId` tags the tapped cell (and, while in the
+  viewer, the current page) so the other ~40 visible cells do not carry the modifier. Navigation starts
+  one frame after tagging so both ends exist when the transition begins.
+- **No Scaffold for the nav host.** Top-level screens get a constant bottom padding (80dp + nav inset)
+  and the bottom bar is an overlay hidden on the viewer, so the grid does not resize while the viewer opens.
+- **Drag gestures:** one vertical `draggable` over the pager: down = dismiss (distance or fling),
+  up = info sheet. Telephoto consumes pan gestures when zoomed, so this only triggers when not zoomed.
+- **Info sheet** loads details (file name, folder, EXIF, GPS) on IO via `MediaInfoLoader`. GPS needs
+  `ACCESS_MEDIA_LOCATION` (requested once, the first time the sheet opens) plus `MediaStore.setRequireOriginal`.
+- **Known gaps:** video pages show a still frame until Media3 lands (task 2); closing the viewer does not
+  scroll the grid to the photo you ended on; shared element morphs square to fit (no crop-matching yet).
