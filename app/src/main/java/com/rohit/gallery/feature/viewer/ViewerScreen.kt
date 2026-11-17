@@ -81,6 +81,7 @@ import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 
 private const val DISMISS_VELOCITY = 1800f
 private val DismissDistance = 120.dp
+private val UpSwipeOpenDistance = 48.dp
 
 @Composable
 fun ViewerScreen(
@@ -147,6 +148,9 @@ private fun ViewerContent(
     // Videos do not zoom; make sure a previous photo's zoom state cannot block the dismiss gesture.
     LaunchedEffect(currentItem.isVideo) { if (currentItem.isVideo) zoomed = false }
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
+    val upSwipeOpenPx = with(LocalDensity.current) { UpSwipeOpenDistance.toPx() }
+    // Plain holder (not state): per-gesture bookkeeping that must not trigger recomposition.
+    val upSwipe = remember { object { var active: Boolean? = null; var travel = 0f } }
     val progress = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
     val dismissAlpha by animateFloatAsState(if (dismissed) 0f else 1f, tween(160), label = "dismissAlpha")
     val exitProgress by animateFloatAsState(if (dismissed) 1f else 0f, tween(180), label = "exit")
@@ -175,25 +179,35 @@ private fun ViewerContent(
             .verticalDismissGestures(
                 enabled = { !zoomed && !dismissed },
                 onDrag = { delta ->
-                    dragX += delta.x
-                    // Resist upward travel; the sheet only needs a small nudge to feel connected.
-                    dragY += if (dragY + delta.y < 0) delta.y * 0.4f else delta.y
+                    if (upSwipe.active == null) upSwipe.active = delta.y < 0
+                    if (upSwipe.active == true) {
+                        // Swipe up: no image movement, just open the details as soon as it is clearly a swipe.
+                        upSwipe.travel -= delta.y
+                        if (upSwipe.travel > upSwipeOpenPx && !showInfo) showInfo = true
+                    } else {
+                        dragX += delta.x
+                        dragY = (dragY + delta.y).coerceAtLeast(0f)
+                    }
                 },
                 onEnd = { _, _, velocityY ->
+                    val wasUp = upSwipe.active == true
+                    upSwipe.active = null
+                    upSwipe.travel = 0f
                     when {
+                        wasUp -> if (velocityY < -DISMISS_VELOCITY) showInfo = true
                         dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY -> {
                             dismissed = true
                             onCurrentItemChanged(null)
                             onBack()
                         }
-                        dragY < -dismissDistancePx * 0.4f || velocityY < -DISMISS_VELOCITY -> {
-                            showInfo = true
-                            settle(GalleryMotion.standard())
-                        }
                         else -> settle(GalleryMotion.standard())
                     }
                 },
-                onCancel = { settle(GalleryMotion.standard()) },
+                onCancel = {
+                    upSwipe.active = null
+                    upSwipe.travel = 0f
+                    settle(GalleryMotion.standard())
+                },
             ),
     ) {
         HorizontalPager(
