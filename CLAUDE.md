@@ -240,6 +240,7 @@ Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4
   started a real call).
 
 ### Known gaps / deferred
+- Camera thumbnail opens Google Photos, not Gallery (reported 2026-11-17; parked by me, revisit later).
 - Closing the viewer does not scroll the grid to the photo you ended on (optional polish).
 - Resume positions are lost on process death (needs DataStore, Phase 3).
 - Zoomed-in close snaps to the fitted view before flying to the grid (unpolished).
