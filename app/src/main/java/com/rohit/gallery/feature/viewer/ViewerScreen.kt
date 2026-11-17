@@ -74,7 +74,7 @@ private val DismissDistance = 120.dp
 @Composable
 fun ViewerScreen(
     onBack: () -> Unit,
-    onCurrentItemChanged: (Long) -> Unit,
+    onCurrentItemChanged: (Long?) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ViewerViewModel = hiltViewModel(),
 ) {
@@ -99,7 +99,7 @@ private fun ViewerContent(
     items: List<MediaItem>,
     startId: Long,
     onBack: () -> Unit,
-    onCurrentItemChanged: (Long) -> Unit,
+    onCurrentItemChanged: (Long?) -> Unit,
     viewModel: ViewerViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -134,6 +134,7 @@ private fun ViewerContent(
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
     val progress = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
     val dismissAlpha by animateFloatAsState(if (dismissed) 0f else 1f, tween(160), label = "dismissAlpha")
+    val exitProgress by animateFloatAsState(if (dismissed) 1f else 0f, tween(180), label = "exit")
     val chromeAlpha = dismissAlpha * (1f - (abs(dragY) / dismissDistancePx).coerceIn(0f, 1f))
 
     fun settle(spec: androidx.compose.animation.core.AnimationSpec<Float>) {
@@ -144,7 +145,8 @@ private fun ViewerContent(
     val dragLayer: GraphicsLayerScope.() -> Unit = {
         translationX = dragX
         translationY = dragY
-        val s = 1f - 0.45f * progress
+        val s = (1f - 0.45f * progress) * (1f - 0.2f * exitProgress)
+        alpha = 1f - exitProgress
         scaleX = s
         scaleY = s
         shape = RoundedCornerShape((28.dp * progress).toPx())
@@ -166,8 +168,8 @@ private fun ViewerContent(
                     when {
                         dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY -> {
                             dismissed = true
+                            onCurrentItemChanged(null)
                             onBack()
-                            settle(spring(dampingRatio = 1f, stiffness = 1200f))
                         }
                         dragY < -dismissDistancePx * 0.4f || velocityY < -DISMISS_VELOCITY -> {
                             showInfo = true
@@ -191,6 +193,7 @@ private fun ViewerContent(
             ViewerPage(
                 item = item,
                 isCurrent = isCurrent,
+                sharedElement = !dismissed,
                 dragLayer = if (isCurrent) dragLayer else null,
                 onZoomedChange = { zoomed = it },
                 onTap = { chromeVisible = !chromeVisible },
@@ -249,6 +252,7 @@ private fun ViewerContent(
 private fun ViewerPage(
     item: MediaItem,
     isCurrent: Boolean,
+    sharedElement: Boolean,
     dragLayer: (GraphicsLayerScope.() -> Unit)?,
     onZoomedChange: (Boolean) -> Unit,
     onTap: () -> Unit,
@@ -276,7 +280,7 @@ private fun ViewerPage(
         onClick = { onTap() },
         modifier = Modifier
             .fillMaxSize()
-            .then(if (isCurrent) Modifier.mediaSharedElement(item.id, force = true) else Modifier)
+            .then(if (isCurrent && sharedElement) Modifier.mediaSharedElement(item.id, force = true) else Modifier)
             // Inside the shared element: its bounds animate from the full screen while this
             // transform decays, so the flight begins where the finger released the image.
             .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier),
