@@ -8,6 +8,8 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import com.rohit.gallery.core.ui.theme.GalleryMotion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -90,10 +92,10 @@ fun GalleryNavHost() {
                     topLevel<AlbumsRoute> { AlbumsScreen(Modifier.padding(bottom = contentBottomPadding)) }
                     topLevel<MenuRoute> { MenuScreen(Modifier.padding(bottom = contentBottomPadding)) }
                     composable<ViewerRoute>(
-                        enterTransition = { fadeIn() },
-                        exitTransition = { fadeOut() },
-                        popEnterTransition = { fadeIn() },
-                        popExitTransition = { fadeOut() },
+                        enterTransition = { fadeIn(tween(GalleryMotion.FADE_MS)) },
+                        exitTransition = { fadeOut(tween(GalleryMotion.FADE_MS)) },
+                        popEnterTransition = { fadeIn(tween(GalleryMotion.FADE_MS)) },
+                        popExitTransition = { fadeOut(tween(GalleryMotion.FADE_MS)) },
                     ) {
                         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                             ViewerScreen(
@@ -107,8 +109,8 @@ fun GalleryNavHost() {
                 AnimatedVisibility(
                     visible = showBottomBar,
                     modifier = Modifier.align(Alignment.BottomCenter),
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                    enter = fadeIn(tween(GalleryMotion.FADE_MS)),
+                    exit = fadeOut(tween(GalleryMotion.FADE_MS)),
                 ) {
                     NavigationBar {
                         topLevelDestinations.forEach { dest ->
@@ -140,8 +142,8 @@ private inline fun <reified T : Any> androidx.navigation.NavGraphBuilder.topLeve
     crossinline content: @Composable () -> Unit,
 ) {
     composable<T>(
-        exitTransition = { if (targetsViewer()) ExitTransition.None else fadeOut() },
-        popEnterTransition = { if (initialIsViewer()) EnterTransition.None else fadeIn() },
+        exitTransition = { if (targetsViewer()) ExitTransition.None else fadeOut(tween(GalleryMotion.FADE_MS)) },
+        popEnterTransition = { if (initialIsViewer()) EnterTransition.None else fadeIn(tween(GalleryMotion.FADE_MS)) },
     ) {
         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) { content() }
     }

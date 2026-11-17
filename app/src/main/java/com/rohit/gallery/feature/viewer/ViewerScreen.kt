@@ -5,6 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import com.rohit.gallery.core.ui.theme.GalleryMotion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -171,8 +173,8 @@ private fun ViewerContent(
 
         AnimatedVisibility(
             visible = chromeVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(tween(GalleryMotion.FADE_MS)),
+            exit = fadeOut(tween(GalleryMotion.FADE_MS)),
             modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart),
         ) {
             ViewerTopBar(
@@ -185,8 +187,8 @@ private fun ViewerContent(
 
         AnimatedVisibility(
             visible = chromeVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(tween(GalleryMotion.FADE_MS)),
+            exit = fadeOut(tween(GalleryMotion.FADE_MS)),
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart),
         ) {
             Column(

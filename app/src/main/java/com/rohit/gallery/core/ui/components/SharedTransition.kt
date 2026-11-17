@@ -6,6 +6,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import com.rohit.gallery.core.ui.theme.GalleryMotion
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
@@ -30,6 +31,7 @@ fun Modifier.mediaSharedElement(mediaId: Long, force: Boolean = false): Modifier
         this@mediaSharedElement.sharedElement(
             sharedContentState = rememberSharedContentState(key = "media-$mediaId"),
             animatedVisibilityScope = visibilityScope,
+            boundsTransform = { _, _ -> GalleryMotion.sharedBounds() },
         )
     }
 }
