@@ -145,7 +145,7 @@ com.rohit.gallery
 - Init git with a sensible `.gitignore`; commit after each completed task.
 - **Done when:** `.\gradlew assembleDebug` passes and the app launches to an empty tabbed shell.
 
-### Phase 1: Foundation
+### Phase 1: Foundation (DONE, verified on device)
 - Permission flow (full / partial / denied / permanently denied).
 - MediaStore data source, in-memory index, ContentObserver refresh.
 - Timeline grid with Coil thumbnails, video duration badges, day headers.
@@ -191,3 +191,60 @@ com.rohit.gallery
 Read this brief, inspect the existing project (`settings.gradle.kts`,
 `gradle/libs.versions.toml`, `app/build.gradle.kts`, manifest), then propose
 the Phase 0 task list and wait for my confirmation before changing anything.
+
+---
+
+## 11. Status and handoff (update this at the end of every work session)
+
+Last updated: 2026-11-17. Read this section first in a new session, then `docs/DECISIONS.md`.
+
+### Done
+- **Phase 0 (project setup):** app "Gallery", `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin),
+  Kotlin 2.2.10, Gradle 9.6.0, Compose BOM 2026.02.01, Hilt + KSP, Navigation Compose
+  (type-safe routes), release (R8 + shrink) and `benchmark` build types, package structure,
+  Material 3 dynamic-color theme, 3-tab shell (Pictures / Albums / Menu).
+- **Phase 1 (foundation), verified on my phone:** permission flow (full / partial with upgrade banner /
+  denied / permanently denied), `MediaStoreDataSource` + in-memory `MediaRepository` index with
+  debounced `ContentObserver` refresh, day-grouped timeline (sticky headers, 4 columns, video
+  duration badges), own `ThumbnailCache` + prefetch. 12 unit tests pass (repository, grouping,
+  labels, duration format). Scrolling feel confirmed good by me.
+- Release and benchmark builds compile; merged manifests contain no `INTERNET`.
+
+### Not done / known gaps
+- Phase 1 leftovers: none functional. The release APK has not been run on the phone (R8 could
+  strip something Hilt/Coil needs at runtime; test `assembleRelease` on device before Phase 4).
+- Phase 2 is NOT started. Per section 9: post the Phase 2 task list and wait for my OK first.
+- Dependencies not yet added (add in the phase that needs them): Room, DataStore, WorkManager,
+  Telephoto, Media3, Turbine. Coil is on the classpath but unused until the viewer (Phase 2).
+- `ACCESS_MEDIA_LOCATION` is declared but not requested at runtime yet (needed for the info sheet).
+- Placeholders: Albums and Menu screens are empty; nav icons are `material-icons-core` stand-ins;
+  no collapsing title header yet; `contentDescription` on thumbnails is null (accessibility pass, Phase 4).
+
+### Gotchas learned (do not re-learn these)
+- **Kotlin 2.2.10 compiler cannot read Kotlin 2.4 metadata.** Latest releases of coroutines (1.11),
+  kotlinx-serialization (1.13) and Coil (3.5+) fail with "incompatible version of Kotlin".
+  Pinned: coroutines 1.10.2, serialization 1.9.0, Coil 3.4.0. Check a library's Kotlin version
+  (its POM's `kotlin-stdlib`) before bumping; upgrade Kotlin/AGP together if needed.
+- `hiltViewModel` now lives in `androidx.hilt.lifecycle.viewmodel.compose`.
+- Use `@param:ApplicationContext` on constructor params (avoids a Kotlin warning).
+- Don't run `python3` in the shell here (it hangs). `.gitignore` must use `build/` (not `/build`).
+- Git commits here use `-c user.name=rohit -c user.email=rohit@localhost` (no global git identity).
+
+### Running on my phone (Motorola Edge 60 Pro, wireless debugging)
+- adb: `"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"`. Check with `adb devices -l`.
+- The phone's IP/port changes. If it is not listed: `adb mdns services` shows the connect address
+  (`adb connect <ip:port>`). Already paired; if pairing is lost, ask me for a fresh code from
+  Developer options > Wireless debugging > Pair device with pairing code, and run `adb mdns services`
+  to read the pairing port (`_adb-tls-pairing`), then `adb pair <ip:port> <code>`.
+- Install and launch: `ANDROID_SERIAL=<serial> ./gradlew.bat installDebug`, then
+  `adb -s <serial> shell am start -n com.rohit.gallery/.MainActivity`.
+
+### Next steps
+1. Phase 2 task list for my approval (do not start coding before I say go). Likely order:
+   a) viewer (pager, Telephoto zoom, shared-element transition, drag-to-dismiss, info sheet),
+   b) Media3 video playback, c) Albums tab + detail, d) multi-select (drag select) with Share /
+   Favorite / Trash / Move-Copy, e) Trash screen (restore / permanent delete via
+   `createTrashRequest` / `createDeleteRequest`), f) Favorites, g) external intents
+   (`ACTION_VIEW`, camera REVIEW), h) fast-scroller with date bubble.
+2. Then Phase 3 (density pinch, editor, search, hidden albums, settings) and Phase 4 (baseline
+   profile, benchmarks, signed release), as in section 8.
