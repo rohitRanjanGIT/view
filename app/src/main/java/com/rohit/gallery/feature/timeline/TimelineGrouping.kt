@@ -51,6 +51,10 @@ fun dayLabel(epochDay: Long, today: LocalDate, locale: Locale = Locale.getDefaul
     }
 }
 
+/** "November 2026": the fast-scroll bubble's label. */
+fun monthLabel(epochDay: Long, locale: Locale = Locale.getDefault()): String =
+    LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("MMMM yyyy", locale))
+
 /** 83_000 -> "1:23", 3_723_000 -> "1:02:03". */
 fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000

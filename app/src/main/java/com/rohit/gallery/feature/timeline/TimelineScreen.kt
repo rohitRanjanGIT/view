@@ -24,6 +24,11 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.snapshotFlow
+import com.rohit.gallery.core.ui.components.FastScroller
+import java.util.Locale
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -211,6 +216,7 @@ private fun TimelineGrid(
         }
     }
 
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
         modifier = Modifier
@@ -257,6 +263,79 @@ private fun TimelineGrid(
             }
         }
     }
+    TimelineFastScroller(
+        listState = listState,
+        days = content.days,
+        fallbackRowPx = cellSizePx + gapPx,
+        bottomPadding = contentBottomPadding,
+        modifier = Modifier.align(Alignment.TopEnd),
+    )
+    }
+}
+
+/** Fast-scroll handle for the timeline, with the month under the handle in a bubble while dragging. */
+@Composable
+private fun TimelineFastScroller(
+    listState: LazyListState,
+    days: List<TimelineDay>,
+    fallbackRowPx: Int,
+    bottomPadding: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    // Header and row heights are measured from the list (they follow font scale and cell size).
+    var headerPx by remember { mutableIntStateOf(with(density) { 40.dp.roundToPx() }) }
+    var rowPx by remember(fallbackRowPx) { mutableIntStateOf(fallbackRowPx) }
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            visible.firstOrNull { it.contentType == "header" }?.size to
+                visible.firstOrNull { it.contentType == "row" }?.size
+        }.collect { (header, row) ->
+            if (header != null && header > 0) headerPx = header
+            if (row != null && row > 0) rowPx = row
+        }
+    }
+    val map = remember(days, headerPx, rowPx) { TimelineScrollMap(days, headerPx, rowPx) }
+
+    // Scrollable distance: content height minus the part of the viewport inside the paddings.
+    fun maxScrollPx(): Long {
+        val info = listState.layoutInfo
+        val visibleContent = info.viewportSize.height - info.beforeContentPadding - info.afterContentPadding
+        return (map.totalPx - visibleContent).coerceAtLeast(1L)
+    }
+
+    // Only worth it when the timeline is several screens long.
+    val longEnough by remember(map) {
+        derivedStateOf { map.totalPx > 4L * listState.layoutInfo.viewportSize.height.coerceAtLeast(1) }
+    }
+    if (!longEnough) return
+
+    // Drags are conflated: only the latest target is scrolled to, at most once per frame.
+    var target by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(map) {
+        snapshotFlow { target }.collect { fraction ->
+            if (fraction != null) {
+                val (index, offset) = map.positionAt((fraction * maxScrollPx()).toLong())
+                listState.scrollToItem(index, offset)
+            }
+        }
+    }
+
+    val locale = remember { Locale.getDefault() }
+    FastScroller(
+        scrollFraction = {
+            map.offsetOf(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset).toFloat() / maxScrollPx()
+        },
+        isScrolling = listState.isScrollInProgress,
+        onDragTo = { target = it },
+        labelAt = { fraction ->
+            map.epochDayAt((fraction * maxScrollPx()).toLong())?.let { monthLabel(it, locale) }.orEmpty()
+        },
+        topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+        bottomPadding = bottomPadding,
+        modifier = modifier,
+    )
 }
 
 @Composable

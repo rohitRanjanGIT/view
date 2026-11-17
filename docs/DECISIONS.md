@@ -131,3 +131,13 @@ Non-obvious technical choices, newest last.
   `externalUri`, using only the intent's read grant (works without media permission). Unreadable URI: toast and close.
 - **Synthetic id** = negative hash of the URI, so thumbnail cache and resume positions never mix two external files.
 - Info panel uses `OpenableColumns` and skips `setRequireOriginal` for non-MediaStore URIs; unknown date/size are hidden.
+
+## Phase 2: fast-scroller
+- **Exact geometry, no measuring off-screen items.** `TimelineScrollMap` (pure, unit-tested) knows each day is a header
+  plus equal-height rows, so offset <-> (lazy index, offset) <-> day is computed with binary searches. Header and row
+  heights are measured from visible items (font scale, cell size); the map rebuilds when they change.
+- **Drags are conflated:** the handle sets a target fraction; one `snapshotFlow` collector calls `scrollToItem`, so a fast
+  drag never queues scroll calls. The thumb follows the finger while dragging and the list position otherwise.
+- `FastScroller` (core/ui/components) is generic: fraction in, fraction out, label lambda. Shown while scrolling, hidden
+  1.5 s after; only on timelines longer than 4 screens. Bubble shows "Month Year"; haptic tick when the month changes.
+- Only the Pictures timeline has it for now; album/favorites grids are flat `LazyVerticalGrid`s and could reuse it.
