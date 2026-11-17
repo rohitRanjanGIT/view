@@ -225,11 +225,11 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
   auto-scroll, Share, Favorite toggle, Trash (system dialog, then item disappears; restorable).
 
 ### Next steps (Phase 2 order I approved)
-1. **4b Move/Copy to album** (next): album list from the index (bucketId/bucketName); Move = `createWriteRequest`
+1. DONE: 4b Move/Copy to album (copy verified on device; move confirmed by me). Trash screen DONE (built, awaiting my test).
    + RELATIVE_PATH update; Copy = insert a new MediaStore row and stream-copy (original untouched); expose via the
    "More" button in `SelectionActionBar` (currently hidden because `onMore` is null); "New album" under Pictures/<name>.
-2. **Trash screen** (restore; permanent delete via `createDeleteRequest` with confirmation).
-3. **Favorites** screen.
+2. **Favorites** screen (next).
+3. (Trash is reached from Menu > Trash.)
 4. **Albums tab + album detail** (reuse the grid and selection; viewer already takes `bucketId`).
 5. **External intents** (`ACTION_VIEW`, `com.android.camera.action.REVIEW`; must work without media permission).
 6. **Fast-scroller** with date bubble.
