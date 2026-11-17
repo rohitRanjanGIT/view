@@ -7,7 +7,6 @@ import android.util.LruCache
 import android.util.Size
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.rohit.gallery.core.model.MediaItem
-import com.rohit.gallery.core.model.mediaContentUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -65,7 +64,7 @@ class ThumbnailCache @Inject constructor(
     }
 
     private suspend fun loadFromMediaStore(item: MediaItem, cellSizePx: Int): Bitmap {
-        val uri = mediaContentUri(item.id, item.isVideo)
+        val uri = item.uri
         val box = boxSize(item, cellSizePx)
         return suspendCancellableCoroutine { cont ->
             val signal = CancellationSignal()

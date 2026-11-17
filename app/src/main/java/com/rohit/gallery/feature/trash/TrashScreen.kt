@@ -7,7 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,11 +43,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.ui.components.mediaSharedElement
 import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.feature.selection.ActionItem
 import com.rohit.gallery.feature.selection.SelectionCheck
@@ -57,10 +63,17 @@ private const val COLUMNS = 4
 
 /** Recycle bin: restore items, or delete them permanently after an explicit confirmation. */
 @Composable
-fun TrashScreen(onBack: () -> Unit, viewModel: TrashViewModel = hiltViewModel()) {
+fun TrashScreen(
+    onBack: () -> Unit,
+    onOpenMedia: (MediaItem) -> Unit,
+    viewModel: TrashViewModel = hiltViewModel(),
+) {
+    // Coming back from the viewer after a restore or delete.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
     val items by viewModel.items.collectAsStateWithLifecycle()
     val selection = viewModel.selection
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
 
@@ -128,7 +141,14 @@ fun TrashScreen(onBack: () -> Unit, viewModel: TrashViewModel = hiltViewModel())
                         Box(
                             Modifier
                                 .aspectRatio(1f)
-                                .clickable { selection.toggle(item.id) },
+                                .mediaSharedElement(item.id)
+                                .combinedClickable(
+                                    onClick = { if (selection.isSelecting) selection.toggle(item.id) else onOpenMedia(item) },
+                                    onLongClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selection.toggle(item.id)
+                                    },
+                                ),
                         ) {
                             MediaThumbnail(item, cellPx, Modifier.fillMaxSize())
                             if (selection.isSelecting) {

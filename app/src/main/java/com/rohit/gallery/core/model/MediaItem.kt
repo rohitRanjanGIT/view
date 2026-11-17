@@ -27,13 +27,15 @@ data class MediaItem(
     val bucketName: String,
     val isFavorite: Boolean,
     val sizeBytes: Long,
+    /** True for items listed from the trash; their URI must say so to be readable. */
+    val isTrashed: Boolean = false,
 ) {
     /** Date used for sorting and grouping: when it was taken, else when the file was modified. */
     val sortDateMs: Long get() = if (dateTakenMs > 0) dateTakenMs else dateModifiedMs
 
     val isVideo: Boolean get() = type == MediaType.Video
 
-    val uri: Uri get() = mediaContentUri(id, isVideo)
+    val uri: Uri get() = mediaContentUri(id, isVideo).let { if (isTrashed) it.buildUpon().appendQueryParameter("includeTrashed", "1").build() else it }
 }
 
 fun mediaContentUri(id: Long, isVideo: Boolean): Uri = ContentUris.withAppendedId(

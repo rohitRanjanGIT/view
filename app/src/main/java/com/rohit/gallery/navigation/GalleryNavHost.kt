@@ -100,7 +100,18 @@ fun GalleryNavHost() {
                             modifier = Modifier.padding(bottom = contentBottomPadding),
                         )
                     }
-                    composable<TrashRoute> { TrashScreen(onBack = { navController.popBackStack() }) }
+                    topLevel<TrashRoute> {
+                        TrashScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenMedia = { item ->
+                                sharedMediaId = item.id
+                                scope.launch {
+                                    androidx.compose.runtime.withFrameNanos { }
+                                    navController.navigate(ViewerRoute(item.id, trashed = true))
+                                }
+                            },
+                        )
+                    }
                     composable<ViewerRoute>(
                         enterTransition = { fadeIn(tween(GalleryMotion.FADE_MS)) },
                         exitTransition = { fadeOut(tween(GalleryMotion.FADE_MS)) },

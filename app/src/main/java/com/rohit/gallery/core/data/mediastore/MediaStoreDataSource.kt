@@ -88,6 +88,7 @@ class MediaStoreDataSource @Inject constructor(
                     bucketName = it.getStringOrNull(bucketNameCol).orEmpty(),
                     isFavorite = it.getLongOrNull(favoriteCol) == 1L,
                     sizeBytes = it.getLongOrNull(sizeCol) ?: 0L,
+                    isTrashed = trashed,
                 )
             }
             out

@@ -144,6 +144,8 @@ private fun ViewerContent(
     SystemBarsEffect(visible = chromeVisible)
     var muted by rememberSaveable { mutableStateOf(false) }
     val playback = rememberPlayback(currentItem, muted, viewModel.playbackPositions)
+    val trashActions = rememberTrashViewerActions(viewModel)
+    TrashViewerDialog(trashActions, currentItem)
 
     // Drag down (any diagonal) to dismiss, drag up to open the info sheet. The image follows the
     // finger in both axes; the transform is applied inside the shared element (see ViewerPage) so
@@ -301,6 +303,9 @@ private fun ViewerContent(
                         .navigationBarsPadding()
                         .padding(vertical = 12.dp),
                 ) {
+                    if (viewModel.isTrash) {
+                        TrashViewerBar(onRestore = { trashActions.restore(currentItem) }, onDelete = trashActions::askDelete)
+                    }
                     if (playback != null) {
                         VideoControls(playback, onToggleMute = { muted = !muted })
                     }
