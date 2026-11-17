@@ -43,6 +43,16 @@ class MediaActions @Inject constructor(
         withContext(Dispatchers.IO) {
             MediaStore.createFavoriteRequest(context.contentResolver, items.map { it.uri }, favorite).intentSender
         }
+
+    /** System confirmation to bring [items] back out of the trash. */
+    suspend fun restoreRequest(items: List<MediaItem>): IntentSender = withContext(Dispatchers.IO) {
+        MediaStore.createTrashRequest(context.contentResolver, items.map { it.uri }, false).intentSender
+    }
+
+    /** System confirmation to delete [items] for good. Only the Trash screen offers this. */
+    suspend fun deleteRequest(items: List<MediaItem>): IntentSender = withContext(Dispatchers.IO) {
+        MediaStore.createDeleteRequest(context.contentResolver, items.map { it.uri }).intentSender
+    }
 }
 
 /** The mime type to advertise when sharing: exact for one item, image or video wildcard if uniform, else the generic wildcard. */

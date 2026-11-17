@@ -42,6 +42,7 @@ import com.rohit.gallery.core.ui.components.LocalSharedMediaId
 import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
 import com.rohit.gallery.feature.albums.AlbumsScreen
 import com.rohit.gallery.feature.settings.MenuScreen
+import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.timeline.TimelineScreen
 import com.rohit.gallery.feature.viewer.ViewerScreen
 import kotlinx.coroutines.launch
@@ -93,7 +94,13 @@ fun GalleryNavHost() {
                         )
                     }
                     topLevel<AlbumsRoute> { AlbumsScreen(Modifier.padding(bottom = contentBottomPadding)) }
-                    topLevel<MenuRoute> { MenuScreen(Modifier.padding(bottom = contentBottomPadding)) }
+                    topLevel<MenuRoute> {
+                        MenuScreen(
+                            onOpenTrash = { navController.navigate(TrashRoute) },
+                            modifier = Modifier.padding(bottom = contentBottomPadding),
+                        )
+                    }
+                    composable<TrashRoute> { TrashScreen(onBack = { navController.popBackStack() }) }
                     composable<ViewerRoute>(
                         enterTransition = { fadeIn(tween(GalleryMotion.FADE_MS)) },
                         exitTransition = { fadeOut(tween(GalleryMotion.FADE_MS)) },

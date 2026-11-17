@@ -1,8 +1,10 @@
 package com.rohit.gallery.core.data.mediastore
 
+import android.content.ContentResolver
 import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -26,20 +28,33 @@ class MediaStoreDataSource @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : MediaSource {
 
-    override suspend fun queryAll(): List<MediaItem> = withContext(Dispatchers.IO) {
+    override suspend fun queryAll(): List<MediaItem> = query(trashed = false)
+
+    /** Items currently in the system trash (restorable). */
+    suspend fun queryTrashed(): List<MediaItem> = query(trashed = true)
+
+    private suspend fun query(trashed: Boolean): List<MediaItem> = withContext(Dispatchers.IO) {
         val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
-        val selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (?, ?)"
-        val args = arrayOf(
-            MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
-            MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
-        )
-        val cursor = context.contentResolver.query(
-            filesUri,
-            PROJECTION,
-            selection,
-            args,
-            "${MediaStore.MediaColumns.DATE_TAKEN} DESC",
-        ) ?: return@withContext emptyList()
+        val queryArgs = Bundle().apply {
+            putString(
+                ContentResolver.QUERY_ARG_SQL_SELECTION,
+                "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (?, ?)",
+            )
+            putStringArray(
+                ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
+                arrayOf(
+                    MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+                    MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
+                ),
+            )
+            putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "${MediaStore.MediaColumns.DATE_TAKEN} DESC")
+            putInt(
+                MediaStore.QUERY_ARG_MATCH_TRASHED,
+                if (trashed) MediaStore.MATCH_ONLY else MediaStore.MATCH_EXCLUDE,
+            )
+        }
+        val cursor = context.contentResolver.query(filesUri, PROJECTION, queryArgs, null)
+            ?: return@withContext emptyList()
 
         cursor.use {
             val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)

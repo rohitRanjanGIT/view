@@ -107,7 +107,7 @@ fun SelectionActionBar(
 }
 
 @Composable
-private fun ActionItem(
+internal fun ActionItem(
     icon: ImageVector,
     label: String,
     enabled: Boolean,

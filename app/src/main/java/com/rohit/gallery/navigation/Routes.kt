@@ -26,3 +26,6 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
 
 /** Full-screen viewer. [bucketId] limits the pager to one album; null means the whole timeline. */
 @Serializable data class ViewerRoute(val mediaId: Long, val bucketId: Long? = null)
+
+/** The recycle bin, opened from the Menu tab. */
+@Serializable data object TrashRoute

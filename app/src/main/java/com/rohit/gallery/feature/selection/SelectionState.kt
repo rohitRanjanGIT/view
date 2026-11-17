@@ -61,6 +61,12 @@ class SelectionState {
         ids = items.mapTo(HashSet(items.size)) { it.id }
     }
 
+    /** Drops selected ids that are not in [present] (items removed elsewhere). */
+    fun retainOnly(present: Set<Long>) {
+        if (ids.all { it in present }) return
+        ids = ids.filterTo(HashSet()) { it in present }
+    }
+
     fun clear() {
         isSelecting = false
         ids = emptySet()
