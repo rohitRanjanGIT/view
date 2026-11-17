@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.timeline
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,22 +35,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.mediaSharedElement
 import java.time.LocalDate
 
 private val CellGap = 2.dp
 
 @Composable
 fun TimelineScreen(
+    onOpenMedia: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel = hiltViewModel(),
 ) {
     MediaAccessGate(modifier.fillMaxSize()) {
-        TimelineContent(viewModel)
+        TimelineContent(viewModel, onOpenMedia)
     }
 }
 
 @Composable
-private fun TimelineContent(viewModel: TimelineViewModel) {
+private fun TimelineContent(viewModel: TimelineViewModel, onOpenMedia: (MediaItem) -> Unit) {
     // Also covers first load, permission changes and returning from the photo picker.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
@@ -59,12 +62,12 @@ private fun TimelineContent(viewModel: TimelineViewModel) {
         TimelineUiState.Empty -> Box(Modifier.fillMaxSize(), Alignment.Center) {
             Text("No photos or videos yet", style = MaterialTheme.typography.titleMedium)
         }
-        is TimelineUiState.Content -> TimelineGrid(s)
+        is TimelineUiState.Content -> TimelineGrid(s, onOpenMedia)
     }
 }
 
 @Composable
-private fun TimelineGrid(content: TimelineUiState.Content) {
+private fun TimelineGrid(content: TimelineUiState.Content, onOpenMedia: (MediaItem) -> Unit) {
     val columns = content.columns
     val density = LocalDensity.current
     val windowWidthPx = LocalWindowInfo.current.containerSize.width
@@ -89,7 +92,7 @@ private fun TimelineGrid(content: TimelineUiState.Content) {
                 key = { row -> rowKey(row) },
                 contentType = { "row" },
             ) { row ->
-                ThumbnailRow(row, columns, cellSizePx)
+                ThumbnailRow(row, columns, cellSizePx, onOpenMedia)
             }
         }
     }
@@ -107,7 +110,7 @@ private fun DayHeader(label: String) {
 }
 
 @Composable
-private fun ThumbnailRow(row: List<MediaItem>, columns: Int, cellSizePx: Int) {
+private fun ThumbnailRow(row: List<MediaItem>, columns: Int, cellSizePx: Int, onOpenMedia: (MediaItem) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -120,7 +123,9 @@ private fun ThumbnailRow(row: List<MediaItem>, columns: Int, cellSizePx: Int) {
                 cellSizePx = cellSizePx,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(1f),
+                    .aspectRatio(1f)
+                    .mediaSharedElement(item.id)
+                    .clickable { onOpenMedia(item) },
             )
         }
         repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }

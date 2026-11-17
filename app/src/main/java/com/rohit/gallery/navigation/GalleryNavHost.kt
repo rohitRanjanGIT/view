@@ -1,58 +1,154 @@
 package com.rohit.gallery.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.rohit.gallery.core.ui.components.LocalAnimatedVisibilityScope
+import com.rohit.gallery.core.ui.components.LocalSharedMediaId
+import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
 import com.rohit.gallery.feature.albums.AlbumsScreen
 import com.rohit.gallery.feature.settings.MenuScreen
 import com.rohit.gallery.feature.timeline.TimelineScreen
+import com.rohit.gallery.feature.viewer.ViewerScreen
+import kotlinx.coroutines.launch
 
+/** Height of the M3 navigation bar, without the system navigation-bar inset. */
+private val NavigationBarHeight = 80.dp
+
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun GalleryNavHost() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val showBottomBar = topLevelDestinations.any { currentDestination?.hasRoute(it.route::class) == true }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                topLevelDestinations.forEach { dest ->
-                    NavigationBarItem(
-                        selected = currentDestination?.hasRoute(dest.route::class) == true,
-                        onClick = {
-                            navController.navigate(dest.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(dest.icon, contentDescription = null) },
-                        label = { Text(dest.label) },
-                    )
+    // Content of top-level screens gets a constant bottom inset instead of Scaffold's, so the
+    // grid does not resize when the bar disappears while the viewer opens.
+    val contentBottomPadding = NavigationBarHeight +
+        with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() }
+
+    var sharedMediaId by remember { mutableStateOf<Long?>(null) }
+    val scope = rememberCoroutineScope()
+
+    SharedTransitionLayout {
+        CompositionLocalProvider(
+            LocalSharedTransitionScope provides this,
+            LocalSharedMediaId provides sharedMediaId,
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                NavHost(
+                    navController = navController,
+                    startDestination = PicturesRoute,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    topLevel<PicturesRoute> {
+                        TimelineScreen(
+                            onOpenMedia = { item ->
+                                // Tag the grid cell first so the shared element exists on both sides.
+                                sharedMediaId = item.id
+                                scope.launch {
+                                    androidx.compose.runtime.withFrameNanos { }
+                                    navController.navigate(ViewerRoute(item.id))
+                                }
+                            },
+                            modifier = Modifier.padding(bottom = contentBottomPadding),
+                        )
+                    }
+                    topLevel<AlbumsRoute> { AlbumsScreen(Modifier.padding(bottom = contentBottomPadding)) }
+                    topLevel<MenuRoute> { MenuScreen(Modifier.padding(bottom = contentBottomPadding)) }
+                    composable<ViewerRoute>(
+                        enterTransition = { fadeIn() },
+                        exitTransition = { fadeOut() },
+                        popEnterTransition = { fadeIn() },
+                        popExitTransition = { fadeOut() },
+                    ) {
+                        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                            ViewerScreen(
+                                onBack = { navController.popBackStack() },
+                                onCurrentItemChanged = { sharedMediaId = it },
+                            )
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = showBottomBar,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    NavigationBar {
+                        topLevelDestinations.forEach { dest ->
+                            NavigationBarItem(
+                                selected = currentDestination?.hasRoute(dest.route::class) == true,
+                                onClick = {
+                                    navController.navigate(dest.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = { Icon(dest.icon, contentDescription = null) },
+                                label = { Text(dest.label) },
+                            )
+                        }
+                    }
                 }
             }
-        },
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = PicturesRoute,
-            modifier = Modifier.padding(innerPadding),
-        ) {
-            composable<PicturesRoute> { TimelineScreen() }
-            composable<AlbumsRoute> { AlbumsScreen() }
-            composable<MenuRoute> { MenuScreen() }
         }
     }
 }
+
+/**
+ * A bottom-bar destination. The outgoing/incoming screen stays put (no fade) while the viewer
+ * opens or closes, so the grid remains visible behind the shared-element flight.
+ */
+private inline fun <reified T : Any> androidx.navigation.NavGraphBuilder.topLevel(
+    crossinline content: @Composable () -> Unit,
+) {
+    composable<T>(
+        exitTransition = { if (targetsViewer()) ExitTransition.None else fadeOut() },
+        popEnterTransition = { if (initialIsViewer()) EnterTransition.None else fadeIn() },
+    ) {
+        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) { content() }
+    }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.targetsViewer() =
+    targetState.destination.hasRoute<ViewerRoute>()
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.initialIsViewer() =
+    initialState.destination.hasRoute<ViewerRoute>()

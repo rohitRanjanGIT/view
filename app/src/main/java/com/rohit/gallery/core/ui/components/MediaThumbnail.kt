@@ -40,6 +40,7 @@ fun MediaThumbnail(
     item: MediaItem,
     cellSizePx: Int,
     modifier: Modifier = Modifier,
+    showBadge: Boolean = true,
 ) {
     val cache = LocalThumbnailCache.current
     val key = item.thumbKey
@@ -60,7 +61,7 @@ fun MediaThumbnail(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        if (item.isVideo) {
+        if (showBadge && item.isVideo) {
             DurationBadge(
                 durationMs = item.durationMs,
                 modifier = Modifier
