@@ -59,15 +59,18 @@ fun Modifier.gridGestures(
             null -> {
                 // Timed out with the finger still down and still: a long press.
                 longPress(down.position)
-                while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    val change = event.changes.firstOrNull { it.id == down.id }
-                    if (change == null || !change.pressed) {
-                        dragEnd()
-                        break
+                // finally: even if the gesture is cancelled mid-drag, the drag (and its edge
+                // auto-scroll) must end, or the list keeps scrolling by itself.
+                try {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        if (change == null || !change.pressed) break
+                        change.consume()
+                        drag(change.position)
                     }
-                    change.consume()
-                    drag(change.position)
+                } finally {
+                    dragEnd()
                 }
             }
         }

@@ -32,6 +32,7 @@ import com.rohit.gallery.core.ui.components.FastScroller
 import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.util.Locale
+import kotlinx.coroutines.channels.Channel
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -348,14 +349,19 @@ private fun TimelineFastScroller(
     }
     if (!longEnough) return
 
-    // Drags are conflated: only the latest target is scrolled to, at most once per frame.
-    var target by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(map) {
-        snapshotFlow { target }.collect { fraction ->
-            if (fraction != null) {
-                val (index, offset) = map.positionAt((fraction * maxScrollPx()).toLong())
-                listState.scrollToItem(index, offset)
-            }
+    // Drag positions go through a conflated channel: each is scrolled to once (latest wins during a fast
+    // drag). Not state: a kept "last target" was re-applied whenever the map changed (any library change),
+    // jumping the list back to where the handle was last released.
+    val latestMap by rememberUpdatedState(map)
+    val targets = remember { Channel<Float>(Channel.CONFLATED) }
+    LaunchedEffect(listState) {
+        for (fraction in targets) {
+            val current = latestMap
+            val info = listState.layoutInfo
+            val visibleContent = info.viewportSize.height - info.beforeContentPadding - info.afterContentPadding
+            val maxScroll = (current.totalPx - visibleContent).coerceAtLeast(1L)
+            val (index, offset) = current.positionAt((fraction * maxScroll).toLong())
+            listState.scrollToItem(index, offset)
         }
     }
 
@@ -365,7 +371,7 @@ private fun TimelineFastScroller(
             map.offsetOf(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset).toFloat() / maxScrollPx()
         },
         isScrolling = listState.isScrollInProgress,
-        onDragTo = { target = it },
+        onDragTo = { targets.trySend(it) },
         labelAt = { fraction ->
             map.epochDayAt((fraction * maxScrollPx()).toLong())?.let { monthLabel(it, locale) }.orEmpty()
         },
