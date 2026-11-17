@@ -10,11 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,17 +40,17 @@ private val DateTimeFormat: DateTimeFormatter =
 fun formatDateTime(epochMs: Long): String = DateTimeFormat.format(Instant.ofEpochMilli(epochMs))
 
 /**
- * Details sheet. Asks for ACCESS_MEDIA_LOCATION the first time it is opened (tracked by the
+ * Details panel, stacked under the photo. Asks for ACCESS_MEDIA_LOCATION the first time it is opened (tracked by the
  * caller via [askedForLocation]) because GPS tags are hidden from apps without it.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
-fun InfoSheet(
+fun InfoPanel(
     item: MediaItem,
     askedForLocation: Boolean,
     onAskedForLocation: () -> Unit,
     loadDetails: suspend (MediaItem) -> MediaDetails,
-    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var locationGranted by remember {
@@ -68,12 +68,17 @@ fun InfoSheet(
 
     val details by produceState<MediaDetails?>(null, item.id, locationGranted) { value = loadDetails(item) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+    ) {
         Column(
             modifier = Modifier
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
+                .padding(top = 24.dp)
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

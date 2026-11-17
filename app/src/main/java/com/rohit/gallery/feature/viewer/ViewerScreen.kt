@@ -3,6 +3,10 @@ package com.rohit.gallery.feature.viewer
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,6 +86,9 @@ import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 private const val DISMISS_VELOCITY = 1800f
 private val DismissDistance = 120.dp
 private val UpSwipeOpenDistance = 48.dp
+
+/** Share of the screen height the details panel takes; the photo gets the rest. */
+private const val InfoPanelFraction = 0.46f
 
 @Composable
 fun ViewerScreen(
@@ -172,112 +179,136 @@ private fun ViewerContent(
         clip = progress > 0f
     }
 
+    // Details: the photo shrinks upward into the area above an inline panel (stacked, not overlapping).
+    val infoProgress by animateFloatAsState(if (showInfo) 1f else 0f, GalleryMotion.snappy(), label = "info")
+    BackHandler(enabled = showInfo) { showInfo = false }
+
     Box(
         modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = dismissAlpha * (1f - 0.85f * progress)))
-            .verticalDismissGestures(
-                enabled = { !zoomed && !dismissed },
-                onDrag = { delta ->
-                    if (upSwipe.active == null) upSwipe.active = delta.y < 0
-                    if (upSwipe.active == true) {
-                        // Swipe up: no image movement, just open the details as soon as it is clearly a swipe.
-                        upSwipe.travel -= delta.y
-                        if (upSwipe.travel > upSwipeOpenPx && !showInfo) showInfo = true
-                    } else {
-                        dragX += delta.x
-                        dragY = (dragY + delta.y).coerceAtLeast(0f)
-                    }
-                },
-                onEnd = { _, _, velocityY ->
-                    val wasUp = upSwipe.active == true
-                    upSwipe.active = null
-                    upSwipe.travel = 0f
-                    when {
-                        wasUp -> if (velocityY < -DISMISS_VELOCITY) showInfo = true
-                        dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY -> {
-                            dismissed = true
-                            onCurrentItemChanged(null)
-                            onBack()
-                        }
-                        else -> settle(GalleryMotion.standard())
-                    }
-                },
-                onCancel = {
-                    upSwipe.active = null
-                    upSwipe.travel = 0f
-                    settle(GalleryMotion.standard())
-                },
-            ),
+            .background(Color.Black.copy(alpha = dismissAlpha * (1f - 0.85f * progress))),
     ) {
-        HorizontalPager(
-            state = pagerState,
-            key = { page -> latestItems.getOrNull(page)?.id ?: page },
-            beyondViewportPageCount = 1,
-            pageSpacing = 12.dp,
-            modifier = Modifier.fillMaxSize(),
-        ) { page ->
-            val item = items.getOrNull(page) ?: return@HorizontalPager
-            val isCurrent = page == pagerState.currentPage
-            ViewerPage(
-                item = item,
-                isCurrent = isCurrent,
-                playback = if (isCurrent) playback else null,
-                sharedElement = !dismissed,
-                dragLayer = if (isCurrent) dragLayer else null,
-                onZoomedChange = { zoomed = it },
-                onTap = { chromeVisible = !chromeVisible },
-            )
-        }
-
-        AnimatedVisibility(
-            visible = chromeVisible,
-            enter = fadeIn(tween(GalleryMotion.FADE_MS)),
-            exit = fadeOut(tween(GalleryMotion.FADE_MS)),
-            modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart),
+        Box(
+            Modifier
+                .fillMaxSize()
+                .verticalDismissGestures(
+                    enabled = { !zoomed && !dismissed },
+                    onDrag = { delta ->
+                        if (upSwipe.active == null) upSwipe.active = delta.y < 0
+                        if (upSwipe.active == true) {
+                            // Swipe up: no image movement, just open the details as soon as it is clearly a swipe.
+                            upSwipe.travel -= delta.y
+                            if (upSwipe.travel > upSwipeOpenPx && !showInfo) showInfo = true
+                        } else if (showInfo) {
+                            // Swipe down while the details are open closes them, not the viewer.
+                            upSwipe.travel += delta.y
+                            if (upSwipe.travel > upSwipeOpenPx) showInfo = false
+                        } else {
+                            dragX += delta.x
+                            dragY = (dragY + delta.y).coerceAtLeast(0f)
+                        }
+                    },
+                    onEnd = { _, _, velocityY ->
+                        val wasUp = upSwipe.active == true
+                        upSwipe.active = null
+                        upSwipe.travel = 0f
+                        when {
+                            wasUp -> if (velocityY < -DISMISS_VELOCITY) showInfo = true
+                            showInfo -> if (velocityY > DISMISS_VELOCITY) showInfo = false
+                            dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY -> {
+                                dismissed = true
+                                onCurrentItemChanged(null)
+                                onBack()
+                            }
+                            else -> settle(GalleryMotion.standard())
+                        }
+                    },
+                    onCancel = {
+                        upSwipe.active = null
+                        upSwipe.travel = 0f
+                        settle(GalleryMotion.standard())
+                    },
+                ),
         ) {
-            ViewerTopBar(
-                item = currentItem,
-                onBack = onBack,
-                onInfo = { showInfo = true },
-                modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
-            )
-        }
-
-        AnimatedVisibility(
-            visible = chromeVisible,
-            enter = fadeIn(tween(GalleryMotion.FADE_MS)),
-            exit = fadeOut(tween(GalleryMotion.FADE_MS)),
-            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart),
-        ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer { alpha = chromeAlpha }
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))
-                    .navigationBarsPadding()
-                    .padding(vertical = 12.dp),
-            ) {
-                if (playback != null) {
-                    VideoControls(playback, onToggleMute = { muted = !muted })
-                }
-                ViewerFilmstrip(
-                    items = items,
-                    currentIndex = currentIndex,
-                    onSelect = { index -> scope.launch { pagerState.scrollToPage(index) } },
+            HorizontalPager(
+                state = pagerState,
+                key = { page -> latestItems.getOrNull(page)?.id ?: page },
+                beyondViewportPageCount = 1,
+                pageSpacing = 12.dp,
+                modifier = Modifier.layout { measurable, constraints ->
+                    // The pager gets the screen minus the panel, kept at the top.
+                    val height = (constraints.maxHeight * (1f - InfoPanelFraction * infoProgress)).roundToInt()
+                    val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                },
+            ) { page ->
+                val item = items.getOrNull(page) ?: return@HorizontalPager
+                val isCurrent = page == pagerState.currentPage
+                ViewerPage(
+                    item = item,
+                    isCurrent = isCurrent,
+                    playback = if (isCurrent) playback else null,
+                    sharedElement = !dismissed,
+                    dragLayer = if (isCurrent) dragLayer else null,
+                    onZoomedChange = { zoomed = it },
+                    onTap = { if (showInfo) showInfo = false else chromeVisible = !chromeVisible },
                 )
             }
-        }
-    }
 
-    if (showInfo) {
-        InfoSheet(
-            item = currentItem,
-            askedForLocation = askedForLocation,
-            onAskedForLocation = { askedForLocation = true },
-            loadDetails = viewModel::loadDetails,
-            onDismiss = { showInfo = false },
-        )
+            AnimatedVisibility(
+                visible = chromeVisible,
+                enter = fadeIn(tween(GalleryMotion.FADE_MS)),
+                exit = fadeOut(tween(GalleryMotion.FADE_MS)),
+                modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart),
+            ) {
+                ViewerTopBar(
+                    item = currentItem,
+                    onBack = onBack,
+                    onInfo = { showInfo = !showInfo },
+                    modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
+                )
+            }
+
+            // Filmstrip and video controls give way to the details panel.
+            AnimatedVisibility(
+                visible = chromeVisible && !showInfo,
+                enter = fadeIn(tween(GalleryMotion.FADE_MS)),
+                exit = fadeOut(tween(GalleryMotion.FADE_MS)),
+                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart),
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer { alpha = chromeAlpha }
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))
+                        .navigationBarsPadding()
+                        .padding(vertical = 12.dp),
+                ) {
+                    if (playback != null) {
+                        VideoControls(playback, onToggleMute = { muted = !muted })
+                    }
+                    ViewerFilmstrip(
+                        items = items,
+                        currentIndex = currentIndex,
+                        onSelect = { index -> scope.launch { pagerState.scrollToPage(index) } },
+                    )
+                }
+            }
+        }
+
+        if (showInfo || infoProgress > 0.001f) {
+            InfoPanel(
+                item = currentItem,
+                askedForLocation = askedForLocation,
+                onAskedForLocation = { askedForLocation = true },
+                loadDetails = viewModel::loadDetails,
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(InfoPanelFraction)
+                    .graphicsLayer { translationY = (1f - infoProgress) * size.height },
+            )
+        }
     }
 }
 
