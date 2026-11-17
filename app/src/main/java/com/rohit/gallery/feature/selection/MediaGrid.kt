@@ -31,9 +31,16 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.platform.LocalWindowInfo
 import com.rohit.gallery.core.ui.components.mediaSharedElement
 
 const val GRID_COLUMNS = 4
+
+/** Rough height of a secondary screen's title bar, for deciding whether a returned item is on screen. */
+private val ReturnChromeHeight = 64.dp
 
 private class GridHit(val item: MediaItem, val index: Int)
 
@@ -51,6 +58,23 @@ fun SelectableMediaGrid(
     val currentList by rememberUpdatedState(list)
     val indexById = remember(list) { HashMap<Long, Int>(list.size * 2).also { m -> list.forEachIndexed { i, it -> m[it.id] = i } } }
     val currentIndex by rememberUpdatedState(indexById)
+
+    // Back from the viewer: bring the item it ended on into view before the first frame (see ViewerReturnTarget).
+    val returnTarget = LocalViewerReturnTarget.current
+    val density = LocalDensity.current
+    val windowHeightPx = LocalWindowInfo.current.containerSize.height
+    val statusBarPx = WindowInsets.statusBars.getTop(density)
+    remember {
+        val id = returnTarget.take() ?: return@remember
+        val gridIndex = (indexById[id] ?: return@remember) + if (header != null) 1 else 0
+        // Rows that fit fully between the title bar and the bottom padding (an estimate is enough here).
+        val chromePx = with(density) { (ReturnChromeHeight + 96.dp).roundToPx() } + statusBarPx
+        val fullRows = ((windowHeightPx - chromePx) / cellPx.coerceAtLeast(1) - 1).coerceAtLeast(1)
+        val first = gridState.firstVisibleItemIndex
+        if (gridIndex < first || gridIndex >= first + fullRows * GRID_COLUMNS) {
+            gridState.requestScrollToItem((gridIndex - GRID_COLUMNS * (fullRows / 2)).coerceAtLeast(0))
+        }
+    }
 
     fun itemAt(position: Offset): GridHit? {
         val info = gridState.layoutInfo.visibleItemsInfo.firstOrNull { cell ->

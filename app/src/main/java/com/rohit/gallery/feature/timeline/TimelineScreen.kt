@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +29,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.snapshotFlow
 import com.rohit.gallery.core.ui.components.FastScroller
+import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
+import androidx.compose.runtime.saveable.rememberSaveable
 import java.util.Locale
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -175,6 +178,27 @@ private fun TimelineGrid(
     val listState = rememberLazyListState()
     PrefetchThumbnails(listState, content.days, cellSizePx)
 
+    // Header and row heights, measured from the list (they follow font scale and cell size). Saved so a
+    // screen coming back from the viewer has the real values before its first layout.
+    var headerPx by rememberSaveable { mutableIntStateOf(with(density) { 40.dp.roundToPx() }) }
+    var rowPx by rememberSaveable(cellSizePx) { mutableIntStateOf(cellSizePx + gapPx) }
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            visible.firstOrNull { it.contentType == "header" }?.size to
+                visible.firstOrNull { it.contentType == "row" }?.size
+        }.collect { (header, row) ->
+            if (header != null && header > 0) headerPx = header
+            if (row != null && row > 0) rowPx = row
+        }
+    }
+    val scrollMap = remember(content.days, headerPx, rowPx) { TimelineScrollMap(content.days, headerPx, rowPx) }
+
+    // Height of the list area that shows content: below the status bar, above the bottom bar.
+    val visiblePx = LocalWindowInfo.current.containerSize.height -
+        WindowInsets.statusBars.getTop(density) - with(density) { contentBottomPadding.roundToPx() }
+    ScrollToReturnedItem(listState, content, scrollMap, headerPx, rowPx, visiblePx)
+
     val currentContent by rememberUpdatedState(content)
     val haptic = LocalHapticFeedback.current
 
@@ -197,7 +221,8 @@ private fun TimelineGrid(
     // lives in a plain holder (not state) so moving the finger never recomposes the grid.
     val pointer = remember { object { var position: Offset? = null } }
     var dragActive by remember { mutableStateOf(false) }
-    val topEdgePx = with(density) { WindowInsets.statusBars.getTop(this).toFloat() + AutoScrollEdge.toPx() }
+    // Pointer positions are relative to the list, which already starts below the status bar.
+    val topEdgePx = with(density) { AutoScrollEdge.toPx() }
     val bottomEdgePx = with(density) { (contentBottomPadding + AutoScrollEdge).toPx() }
     LaunchedEffect(dragActive) {
         while (dragActive) {
@@ -221,6 +246,9 @@ private fun TimelineGrid(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
+            // The list starts below the status bar (not top content padding): a pinned day header
+            // sits at the viewport top, and with padding it slid under the clock.
+            .windowInsetsPadding(WindowInsets.statusBars)
             .gridGestures(
                 onTap = { pos ->
                     itemAt(pos)?.let { hit ->
@@ -245,10 +273,7 @@ private fun TimelineGrid(
                     selection.endDrag()
                 },
             ),
-        contentPadding = PaddingValues(
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = contentBottomPadding,
-        ),
+        contentPadding = PaddingValues(bottom = contentBottomPadding),
     ) {
         content.days.forEach { day ->
             stickyHeader(key = "day-${day.epochDay}", contentType = "header") {
@@ -265,11 +290,40 @@ private fun TimelineGrid(
     }
     TimelineFastScroller(
         listState = listState,
-        days = content.days,
-        fallbackRowPx = cellSizePx + gapPx,
+        map = scrollMap,
         bottomPadding = contentBottomPadding,
         modifier = Modifier.align(Alignment.TopEnd),
     )
+    }
+}
+
+/**
+ * When this grid reappears after the viewer closes, scrolls the photo the viewer ended on into view
+ * (centered) unless it is already fully visible. Runs once, during the first composition, through
+ * [LazyListState.requestScrollToItem], so the very first frame is already in place for the close flight.
+ */
+@Composable
+private fun ScrollToReturnedItem(
+    listState: LazyListState,
+    content: TimelineUiState.Content,
+    map: TimelineScrollMap,
+    headerPx: Int,
+    rowPx: Int,
+    visiblePx: Int,
+) {
+    val returnTarget = LocalViewerReturnTarget.current
+    remember {
+        val id = returnTarget.take() ?: return@remember
+        val itemIndex = content.indexById[id] ?: return@remember
+        val rowIndex = lazyRowIndexOf(content.days, itemIndex) ?: return@remember
+        val rowTop = map.offsetOf(rowIndex, 0)
+        val top = map.offsetOf(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+        // The pinned day header covers the top of the list.
+        val fullyVisible = rowTop >= top + headerPx && rowTop + rowPx <= top + visiblePx
+        if (!fullyVisible) {
+            val (index, offset) = map.positionAt((rowTop - (visiblePx - rowPx) / 2).coerceAtLeast(0L))
+            listState.requestScrollToItem(index, offset)
+        }
     }
 }
 
@@ -277,27 +331,10 @@ private fun TimelineGrid(
 @Composable
 private fun TimelineFastScroller(
     listState: LazyListState,
-    days: List<TimelineDay>,
-    fallbackRowPx: Int,
+    map: TimelineScrollMap,
     bottomPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
-    // Header and row heights are measured from the list (they follow font scale and cell size).
-    var headerPx by remember { mutableIntStateOf(with(density) { 40.dp.roundToPx() }) }
-    var rowPx by remember(fallbackRowPx) { mutableIntStateOf(fallbackRowPx) }
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            val visible = listState.layoutInfo.visibleItemsInfo
-            visible.firstOrNull { it.contentType == "header" }?.size to
-                visible.firstOrNull { it.contentType == "row" }?.size
-        }.collect { (header, row) ->
-            if (header != null && header > 0) headerPx = header
-            if (row != null && row > 0) rowPx = row
-        }
-    }
-    val map = remember(days, headerPx, rowPx) { TimelineScrollMap(days, headerPx, rowPx) }
-
     // Scrollable distance: content height minus the part of the viewport inside the paddings.
     fun maxScrollPx(): Long {
         val info = listState.layoutInfo

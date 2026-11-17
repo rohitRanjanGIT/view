@@ -41,6 +41,8 @@ import androidx.navigation.toRoute
 import com.rohit.gallery.core.ui.components.LocalAnimatedVisibilityScope
 import com.rohit.gallery.core.ui.components.LocalSharedMediaId
 import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
+import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
+import com.rohit.gallery.core.ui.components.ViewerReturnTarget
 import com.rohit.gallery.feature.albums.AlbumDetailScreen
 import com.rohit.gallery.feature.albums.AlbumsScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
@@ -73,12 +75,14 @@ fun GalleryNavHost(
         with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() }
 
     var sharedMediaId by remember { mutableStateOf<Long?>(null) }
+    val returnTarget = remember { ViewerReturnTarget() }
     val scope = rememberCoroutineScope()
 
     SharedTransitionLayout {
         CompositionLocalProvider(
             LocalSharedTransitionScope provides this,
             LocalSharedMediaId provides sharedMediaId,
+            LocalViewerReturnTarget provides returnTarget,
         ) {
             Box(Modifier.fillMaxSize()) {
                 NavHost(
@@ -174,7 +178,11 @@ fun GalleryNavHost(
                             ViewerScreen(
                                 // The external viewer is the whole back stack: closing it returns to the caller.
                                 onBack = { if (external) onExitExternal() else navController.popBackStack() },
-                                onCurrentItemChanged = { sharedMediaId = it },
+                                onCurrentItemChanged = {
+                                    sharedMediaId = it
+                                    // Null means a drag-dismiss turned off the flight; the grid should still land on it.
+                                    if (it != null) returnTarget.mediaId = it
+                                },
                             )
                         }
                     }

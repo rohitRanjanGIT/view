@@ -5,6 +5,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 
@@ -19,6 +20,20 @@ val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> 
  * stay as cheap as before.
  */
 val LocalSharedMediaId = compositionLocalOf<Long?> { null }
+
+/**
+ * The last item the viewer showed, for the grid that reappears when it closes: that grid scrolls the
+ * item into view before its first frame, so you land on the photo you ended on (and the close flight
+ * has a cell to fly to). A plain holder, not state: written by the viewer, taken once by the grid.
+ */
+class ViewerReturnTarget {
+    var mediaId: Long? = null
+
+    /** Returns the id and clears it, so only the first grid composed after the viewer uses it. */
+    fun take(): Long? = mediaId.also { mediaId = null }
+}
+
+val LocalViewerReturnTarget = staticCompositionLocalOf { ViewerReturnTarget() }
 
 /** Marks this composable as the shared element for [mediaId] if a transition is in progress for it. */
 @OptIn(ExperimentalSharedTransitionApi::class)

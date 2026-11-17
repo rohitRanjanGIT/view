@@ -1,6 +1,23 @@
 package com.rohit.gallery.feature.timeline
 
 /**
+ * The lazy-list index of the row holding the item at [itemIndex] of the flattened timeline (each day is a
+ * header followed by its rows), or null if out of range.
+ */
+fun lazyRowIndexOf(days: List<TimelineDay>, itemIndex: Int): Int? {
+    if (itemIndex < 0) return null
+    var lazyIndex = 0
+    var remaining = itemIndex
+    for (day in days) {
+        val count = day.rows.sumOf { it.size }
+        if (remaining < count) return lazyIndex + 1 + remaining / day.rows.first().size
+        lazyIndex += 1 + day.rows.size
+        remaining -= count
+    }
+    return null
+}
+
+/**
  * Pixel geometry of the timeline list, for the fast-scroller. The list is, per day, one header
  * ([headerPx] tall) followed by that day's rows ([rowPx] tall each), so the offset of any position
  * can be computed exactly without measuring off-screen items. Pure Kotlin, so it is unit-tested.
