@@ -41,6 +41,7 @@ import com.rohit.gallery.core.ui.components.LocalAnimatedVisibilityScope
 import com.rohit.gallery.core.ui.components.LocalSharedMediaId
 import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
 import com.rohit.gallery.feature.albums.AlbumsScreen
+import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.settings.MenuScreen
 import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.timeline.TimelineScreen
@@ -96,8 +97,21 @@ fun GalleryNavHost() {
                     topLevel<AlbumsRoute> { AlbumsScreen(Modifier.padding(bottom = contentBottomPadding)) }
                     topLevel<MenuRoute> {
                         MenuScreen(
+                            onOpenFavorites = { navController.navigate(FavoritesRoute) },
                             onOpenTrash = { navController.navigate(TrashRoute) },
                             modifier = Modifier.padding(bottom = contentBottomPadding),
+                        )
+                    }
+                    topLevel<FavoritesRoute> {
+                        FavoritesScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenMedia = { item ->
+                                sharedMediaId = item.id
+                                scope.launch {
+                                    androidx.compose.runtime.withFrameNanos { }
+                                    navController.navigate(ViewerRoute(item.id, favoritesOnly = true))
+                                }
+                            },
                         )
                     }
                     topLevel<TrashRoute> {

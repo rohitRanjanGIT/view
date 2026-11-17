@@ -52,7 +52,11 @@ class ViewerViewModel @Inject constructor(
                 when (state) {
                     MediaIndexState.Loading -> null
                     is MediaIndexState.Ready ->
-                        route.bucketId?.let { bucket -> state.items.filter { it.bucketId == bucket } } ?: state.items
+                        when {
+                            route.favoritesOnly -> state.items.filter { it.isFavorite }
+                            route.bucketId != null -> state.items.filter { it.bucketId == route.bucketId }
+                            else -> state.items
+                        }
                 }
             }
             .flowOn(Dispatchers.Default)

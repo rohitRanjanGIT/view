@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,9 +20,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun MenuScreen(onOpenTrash: () -> Unit, modifier: Modifier = Modifier) {
+fun MenuScreen(onOpenFavorites: () -> Unit, onOpenTrash: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxSize().statusBarsPadding()) {
         Text("Menu", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(24.dp))
+        MenuRow(Icons.Filled.Favorite, "Favorites", onOpenFavorites)
         MenuRow(Icons.Filled.Delete, "Trash", onOpenTrash)
     }
 }

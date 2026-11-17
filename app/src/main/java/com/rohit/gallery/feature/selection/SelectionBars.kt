@@ -74,8 +74,8 @@ fun SelectionActionBar(
     onShare: () -> Unit,
     onFavorite: () -> Unit,
     onTrash: () -> Unit,
-    onMove: () -> Unit,
-    onCopy: () -> Unit,
+    onMove: (() -> Unit)? = null,
+    onCopy: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
@@ -94,12 +94,14 @@ fun SelectionActionBar(
                 Modifier.weight(1f),
             )
             ActionItem(Icons.Filled.Delete, "Trash", enabled, onTrash, Modifier.weight(1f))
-            var menuOpen by remember { mutableStateOf(false) }
-            Box(Modifier.weight(1f)) {
-                ActionItem(Icons.Filled.MoreVert, "More", enabled, { menuOpen = true }, Modifier.fillMaxWidth())
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(text = { Text("Move to album") }, onClick = { menuOpen = false; onMove() })
-                    DropdownMenuItem(text = { Text("Copy to album") }, onClick = { menuOpen = false; onCopy() })
+            if (onMove != null && onCopy != null) {
+                var menuOpen by remember { mutableStateOf(false) }
+                Box(Modifier.weight(1f)) {
+                    ActionItem(Icons.Filled.MoreVert, "More", enabled, { menuOpen = true }, Modifier.fillMaxWidth())
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("Move to album") }, onClick = { menuOpen = false; onMove() })
+                        DropdownMenuItem(text = { Text("Copy to album") }, onClick = { menuOpen = false; onCopy() })
+                    }
                 }
             }
         }
