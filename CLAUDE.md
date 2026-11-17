@@ -218,17 +218,20 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
     grids via `SelectableMediaGrid` and `SelectionActions` / `SelectionActionsBar` in `feature/selection/`.
   - **Trash screen** (verified): Menu > Trash, open in viewer with Restore / Delete forever, select + drag-select.
   - **Favorites** (verified): Menu > Favorites. **Albums tab + album detail** (verified): `feature/albums/`.
-  - 22 unit tests pass.
+  - **External intents** (commit `5875a71`): ACTION_VIEW + camera REVIEW open straight into the viewer; indexed
+    MediaStore URIs get the full pager, others a single item. Verified by adb: REVIEW opens the right photo with the
+    filmstrip, Back returns to the caller, file:// single item shows, unreadable URI closes with a toast.
+  - 26 unit tests pass.
 - Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
 
 ### Waiting on my device report
 - Back-close fix (commit `d55ceac`): back button, back swipe and swipe-down should fly the photo into its
   grid cell with no full-screen flash. Check portrait / landscape / square / video / zoomed-in.
+- External intents: tapping the Motorola camera's thumbnail (does it offer/open Gallery?), "Open with" from Files /
+  WhatsApp, a video, and opening a file with media permission revoked.
 
 ### Next steps (Phase 2 order I approved)
-1. **External intents** (`ACTION_VIEW` for image/* and video/*, `com.android.camera.action.REVIEW`; must open a
-   single external URI even without media permission).
-2. **Fast-scroller** with date bubble.
+1. **Fast-scroller** with date bubble.
 Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4 as in section 8.
 
 ### Testing on my phone (rules)

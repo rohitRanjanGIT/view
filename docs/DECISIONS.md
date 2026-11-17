@@ -119,3 +119,15 @@ Non-obvious technical choices, newest last.
 - **Albums** are derived from the in-memory index (`buildAlbums`: by bucket, ordered by newest item, newest item
   is the cover); no Room needed until custom order / hidden albums (Phase 3).
 - **Viewer scope** is set by route args: `bucketId`, `trashed`, `favoritesOnly`.
+
+## Phase 2: external intents
+- **Same activity, viewer as start destination.** `MainActivity` turns `ACTION_VIEW`, `com.android.camera.action.REVIEW`
+  and `android.provider.action.REVIEW` (image/*, video/*, content/file) into a `ViewerRoute(externalUri, externalMime)`
+  and the nav host starts there, so no permission gate or timeline is composed. Default `launchMode`: the viewer runs in
+  the caller's task; Back / drag-dismiss call `finish()`. `onNewIntent` re-keys the nav host for a new file.
+  `REVIEW_SECURE` (lock-screen camera) is not handled.
+- **Decided once per open:** a MediaStore URI (`mediaStoreIdOf`) whose id appears in the index (refresh + wait up to 2 s)
+  opens the normal timeline pager at that item; anything else is shown alone as a synthetic `MediaItem` with
+  `externalUri`, using only the intent's read grant (works without media permission). Unreadable URI: toast and close.
+- **Synthetic id** = negative hash of the URI, so thumbnail cache and resume positions never mix two external files.
+- Info panel uses `OpenableColumns` and skips `setRequireOriginal` for non-MediaStore URIs; unknown date/size are hidden.
