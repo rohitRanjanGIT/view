@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +30,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,7 +74,8 @@ fun SelectionActionBar(
     onShare: () -> Unit,
     onFavorite: () -> Unit,
     onTrash: () -> Unit,
-    onMore: (() -> Unit)? = null,
+    onMove: () -> Unit,
+    onCopy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
@@ -87,7 +94,14 @@ fun SelectionActionBar(
                 Modifier.weight(1f),
             )
             ActionItem(Icons.Filled.Delete, "Trash", enabled, onTrash, Modifier.weight(1f))
-            if (onMore != null) ActionItem(Icons.Filled.MoreVert, "More", enabled, onMore, Modifier.weight(1f))
+            var menuOpen by remember { mutableStateOf(false) }
+            Box(Modifier.weight(1f)) {
+                ActionItem(Icons.Filled.MoreVert, "More", enabled, { menuOpen = true }, Modifier.fillMaxWidth())
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(text = { Text("Move to album") }, onClick = { menuOpen = false; onMove() })
+                    DropdownMenuItem(text = { Text("Copy to album") }, onClick = { menuOpen = false; onCopy() })
+                }
+            }
         }
     }
 }

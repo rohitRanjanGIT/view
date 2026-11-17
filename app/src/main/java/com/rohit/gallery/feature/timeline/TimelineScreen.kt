@@ -25,7 +25,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,6 +61,7 @@ import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.mediaSharedElement
 import com.rohit.gallery.core.ui.theme.GalleryMotion
+import com.rohit.gallery.feature.selection.AlbumPickerSheet
 import com.rohit.gallery.feature.selection.SelectionActionBar
 import com.rohit.gallery.feature.selection.SelectionCheck
 import com.rohit.gallery.feature.selection.SelectionState
@@ -146,6 +149,17 @@ private fun SelectionBars(
         }
     }
 
+    // Moving needs its own write confirmation; the move itself runs once it is accepted.
+    val moveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) viewModel.finishMove()
+    }
+    var picker by remember { mutableStateOf<TransferKind?>(null) }
+    val albums by viewModel.albums.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    }
+
     val allFavorite by remember(content) {
         derivedStateOf {
             selection.ids.isNotEmpty() && selection.ids.all { id ->
@@ -175,8 +189,41 @@ private fun SelectionBars(
             },
             onFavorite = { launchWrite { viewModel.favoriteRequest() } },
             onTrash = { launchWrite { viewModel.trashRequest() } },
+            onMove = { picker = TransferKind.Move },
+            onCopy = { picker = TransferKind.Copy },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+    picker?.let { kind ->
+        AlbumPickerSheet(
+            title = if (kind == TransferKind.Move) "Move to album" else "Copy to album",
+            albums = albums,
+            onDismiss = { picker = null },
+            onPick = { album, newName ->
+                picker = null
+                if (kind == TransferKind.Copy) {
+                    viewModel.copyTo(album, newName)
+                } else {
+                    scope.launch {
+                        val sender = viewModel.moveRequest(album, newName)
+                        if (sender == null) {
+                            Toast.makeText(context, "Couldn't start that action", Toast.LENGTH_SHORT).show()
+                        } else {
+                            moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
+                        }
+                    }
+                }
+            },
+        )
+    }
+    if (busy) {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {},
+            title = { Text("Working…") },
+            text = { LinearProgressIndicator(Modifier.fillMaxWidth()) },
+        )
+    }
     }
 }
 

@@ -11,6 +11,8 @@ fun testItem(
     dateTakenMs: Long = 0L,
     dateModifiedMs: Long = 0L,
     type: MediaType = MediaType.Image,
+    bucketId: Long = 1L,
+    bucketName: String = "Camera",
 ) = MediaItem(
     id = id,
     type = type,
@@ -20,8 +22,8 @@ fun testItem(
     width = 100,
     height = 100,
     durationMs = 0L,
-    bucketId = 1L,
-    bucketName = "Camera",
+    bucketId = bucketId,
+    bucketName = bucketName,
     isFavorite = false,
     sizeBytes = 1L,
 )
