@@ -31,6 +31,7 @@ fun Modifier.verticalDismissGestures(
     onDrag: (delta: Offset) -> Unit,
     onEnd: (total: Offset, velocityX: Float, velocityY: Float) -> Unit,
     onCancel: () -> Unit,
+    downOnly: Boolean = false,
 ): Modifier = pointerInput(Unit) {
     val slop = viewConfiguration.touchSlop
     awaitEachGesture {
@@ -66,7 +67,7 @@ fun Modifier.verticalDismissGestures(
                     val dx = abs(total.x)
                     val dy = abs(total.y)
                     val vertical = if (total.y > 0) dy >= dx * DOWN_RATIO else dy > dx * UP_RATIO
-                    if (!vertical) return@awaitEachGesture
+                    if (!vertical || (downOnly && total.y < 0)) return@awaitEachGesture
                     claimed = true
                     onDrag(total)
                     change.consume()

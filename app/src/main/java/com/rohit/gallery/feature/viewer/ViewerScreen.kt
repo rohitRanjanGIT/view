@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateFloatAsState
@@ -157,7 +158,8 @@ private fun ViewerContent(
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
     val upSwipeOpenPx = with(LocalDensity.current) { UpSwipeOpenDistance.toPx() }
     // Plain holder (not state): per-gesture bookkeeping that must not trigger recomposition.
-    val upSwipe = remember { object { var active: Boolean? = null; var travel = 0f } }
+    val swipe = remember { object { var mode = SwipeMode.None; var travel = 0f } }
+    val infoScroll = rememberScrollState()
     val progress = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
     val dismissAlpha by animateFloatAsState(if (dismissed) 0f else 1f, tween(160), label = "dismissAlpha")
     val exitProgress by animateFloatAsState(if (dismissed) 1f else 0f, tween(180), label = "exit")
@@ -194,38 +196,53 @@ private fun ViewerContent(
                 .verticalDismissGestures(
                     enabled = { !zoomed && !dismissed },
                     onDrag = { delta ->
-                        if (upSwipe.active == null) upSwipe.active = delta.y < 0
-                        if (upSwipe.active == true) {
-                            // Swipe up: no image movement, just open the details as soon as it is clearly a swipe.
-                            upSwipe.travel -= delta.y
-                            if (upSwipe.travel > upSwipeOpenPx && !showInfo) showInfo = true
-                        } else if (showInfo) {
-                            // Swipe down while the details are open closes them, not the viewer.
-                            upSwipe.travel += delta.y
-                            if (upSwipe.travel > upSwipeOpenPx) showInfo = false
-                        } else {
-                            dragX += delta.x
-                            dragY = (dragY + delta.y).coerceAtLeast(0f)
+                        // What a swipe does is decided once, when it starts, and never changes mid-swipe
+                        // (otherwise closing the details could carry on into closing the viewer).
+                        if (swipe.mode == SwipeMode.None) {
+                            swipe.mode = when {
+                                delta.y < 0 -> if (showInfo) SwipeMode.Ignore else SwipeMode.OpenInfo
+                                showInfo -> SwipeMode.CloseInfo
+                                else -> SwipeMode.Dismiss
+                            }
+                        }
+                        when (swipe.mode) {
+                            SwipeMode.OpenInfo -> {
+                                // No image movement; open as soon as it is clearly a swipe up.
+                                swipe.travel -= delta.y
+                                if (swipe.travel > upSwipeOpenPx) showInfo = true
+                            }
+                            SwipeMode.CloseInfo -> {
+                                swipe.travel += delta.y
+                                if (swipe.travel > upSwipeOpenPx) showInfo = false
+                            }
+                            SwipeMode.Dismiss -> {
+                                dragX += delta.x
+                                dragY = (dragY + delta.y).coerceAtLeast(0f)
+                            }
+                            else -> Unit
                         }
                     },
                     onEnd = { _, _, velocityY ->
-                        val wasUp = upSwipe.active == true
-                        upSwipe.active = null
-                        upSwipe.travel = 0f
-                        when {
-                            wasUp -> if (velocityY < -DISMISS_VELOCITY) showInfo = true
-                            showInfo -> if (velocityY > DISMISS_VELOCITY) showInfo = false
-                            dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY -> {
-                                dismissed = true
-                                onCurrentItemChanged(null)
-                                onBack()
-                            }
-                            else -> settle(GalleryMotion.standard())
+                        val mode = swipe.mode
+                        swipe.mode = SwipeMode.None
+                        swipe.travel = 0f
+                        when (mode) {
+                            SwipeMode.OpenInfo -> if (velocityY < -DISMISS_VELOCITY) showInfo = true
+                            SwipeMode.CloseInfo -> if (velocityY > DISMISS_VELOCITY) showInfo = false
+                            SwipeMode.Dismiss ->
+                                if (dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY) {
+                                    dismissed = true
+                                    onCurrentItemChanged(null)
+                                    onBack()
+                                } else {
+                                    settle(GalleryMotion.standard())
+                                }
+                            else -> Unit
                         }
                     },
                     onCancel = {
-                        upSwipe.active = null
-                        upSwipe.travel = 0f
+                        swipe.mode = SwipeMode.None
+                        swipe.travel = 0f
                         settle(GalleryMotion.standard())
                     },
                 ),
@@ -302,11 +319,26 @@ private fun ViewerContent(
                 askedForLocation = askedForLocation,
                 onAskedForLocation = { askedForLocation = true },
                 loadDetails = viewModel::loadDetails,
+                scrollState = infoScroll,
                 modifier = Modifier
                     .align(androidx.compose.ui.Alignment.BottomCenter)
                     .fillMaxWidth()
                     .fillMaxHeight(InfoPanelFraction)
-                    .graphicsLayer { translationY = (1f - infoProgress) * size.height },
+                    .graphicsLayer { translationY = (1f - infoProgress) * size.height }
+                    // Swiping down on the panel (when scrolled to its top) closes it and returns to the photo.
+                    .verticalDismissGestures(
+                        enabled = { infoScroll.value == 0 },
+                        downOnly = true,
+                        onDrag = { delta ->
+                            swipe.travel += delta.y
+                            if (swipe.travel > upSwipeOpenPx) showInfo = false
+                        },
+                        onEnd = { _, _, velocityY ->
+                            swipe.travel = 0f
+                            if (velocityY > DISMISS_VELOCITY) showInfo = false
+                        },
+                        onCancel = { swipe.travel = 0f },
+                    ),
             )
         }
     }
@@ -482,3 +514,6 @@ private fun VideoPage(
 }
 
 private const val THUMBNAIL_FALLBACK_PX = 512
+
+/** What the current vertical swipe on the photo does; fixed at the start of the swipe. */
+private enum class SwipeMode { None, OpenInfo, CloseInfo, Dismiss, Ignore }
