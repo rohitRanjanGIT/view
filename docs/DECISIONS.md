@@ -65,3 +65,16 @@ Non-obvious technical choices, newest last.
   `ACCESS_MEDIA_LOCATION` (requested once, the first time the sheet opens) plus `MediaStore.setRequireOriginal`.
 - **Known gaps:** video pages show a still frame until Media3 lands (task 2); closing the viewer does not
   scroll the grid to the photo you ended on; shared element morphs square to fit (no crop-matching yet).
+
+## Phase 2: video playback
+
+- **Media3 1.11.1** (`exoplayer` + `ui-compose`): its POM uses kotlin-stdlib 2.2.10, matching our compiler.
+  Media3 1.12 is still beta. No `media3-ui` (Views) and no custom-controls library; controls are our own.
+- **One ExoPlayer, for the current page only.** Created when a video becomes the current page, released when
+  the page changes or the viewer closes (`rememberPlayback`). Other video pages show the cached thumbnail with
+  a play badge. Autoplays; pauses on `ON_STOP`; `keepScreenOn` only while playing; audio focus handled by ExoPlayer.
+- **TextureView, not SurfaceView**, so the drag-to-dismiss scale / corner rounding / fade also apply to video.
+- **Resume position is in memory only** (`PlaybackPositionStore`, singleton). It is dropped when the app process
+  dies. Persisting it needs DataStore (Phase 3). Positions under 3 s or within 2 s of the end are not resumed.
+- **Mute is per viewer session** (`rememberSaveable`), not per video.
+- **Player icons** (pause, volume) are vector paths in `PlayerIcons`, to avoid `material-icons-extended`.

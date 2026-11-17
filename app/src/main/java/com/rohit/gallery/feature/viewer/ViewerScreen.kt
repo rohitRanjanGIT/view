@@ -13,7 +13,18 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import com.rohit.gallery.core.ui.theme.GalleryMotion
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.media3.ui.compose.ContentFrame
+import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -122,6 +133,8 @@ private fun ViewerContent(
     var showInfo by rememberSaveable { mutableStateOf(false) }
     var askedForLocation by rememberSaveable { mutableStateOf(false) }
     SystemBarsEffect(visible = chromeVisible)
+    var muted by rememberSaveable { mutableStateOf(false) }
+    val playback = rememberPlayback(currentItem, muted, viewModel.playbackPositions)
 
     // Drag down (any diagonal) to dismiss, drag up to open the info sheet. The image follows the
     // finger in both axes; the transform is applied inside the shared element (see ViewerPage) so
@@ -131,6 +144,8 @@ private fun ViewerContent(
     var dragY by remember { mutableFloatStateOf(0f) }
     var dismissed by remember { mutableStateOf(false) }
     var zoomed by remember { mutableStateOf(false) }
+    // Videos do not zoom; make sure a previous photo's zoom state cannot block the dismiss gesture.
+    LaunchedEffect(currentItem.isVideo) { if (currentItem.isVideo) zoomed = false }
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
     val progress = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
     val dismissAlpha by animateFloatAsState(if (dismissed) 0f else 1f, tween(160), label = "dismissAlpha")
@@ -193,6 +208,7 @@ private fun ViewerContent(
             ViewerPage(
                 item = item,
                 isCurrent = isCurrent,
+                playback = if (isCurrent) playback else null,
                 sharedElement = !dismissed,
                 dragLayer = if (isCurrent) dragLayer else null,
                 onZoomedChange = { zoomed = it },
@@ -228,6 +244,9 @@ private fun ViewerContent(
                     .navigationBarsPadding()
                     .padding(vertical = 12.dp),
             ) {
+                if (playback != null) {
+                    VideoControls(playback, onToggleMute = { muted = !muted })
+                }
                 ViewerFilmstrip(
                     items = items,
                     currentIndex = currentIndex,
@@ -249,7 +268,7 @@ private fun ViewerContent(
 }
 
 @Composable
-private fun ViewerPage(
+private fun ImagePage(
     item: MediaItem,
     isCurrent: Boolean,
     sharedElement: Boolean,
@@ -342,3 +361,79 @@ private fun SystemBarsEffect(visible: Boolean) {
         else controller.hide(WindowInsetsCompat.Type.systemBars())
     }
 }
+
+@Composable
+private fun ViewerPage(
+    item: MediaItem,
+    isCurrent: Boolean,
+    playback: PlaybackState?,
+    sharedElement: Boolean,
+    dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    onZoomedChange: (Boolean) -> Unit,
+    onTap: () -> Unit,
+) {
+    if (item.isVideo) {
+        VideoPage(item, isCurrent, playback, sharedElement, dragLayer, onTap)
+    } else {
+        ImagePage(item, isCurrent, sharedElement, dragLayer, onZoomedChange, onTap)
+    }
+}
+
+/** A video page: the cached thumbnail until the first frame is drawn, then the player surface. */
+@Composable
+private fun VideoPage(
+    item: MediaItem,
+    isCurrent: Boolean,
+    playback: PlaybackState?,
+    sharedElement: Boolean,
+    dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    onTap: () -> Unit,
+) {
+    val cache = LocalThumbnailCache.current
+    var thumbnail by remember(item.id) { mutableStateOf(cache.get(item.thumbKey)?.asImageBitmap()) }
+    if (thumbnail == null) {
+        LaunchedEffect(item.id) {
+            thumbnail = runCatching { cache.load(item, THUMBNAIL_FALLBACK_PX) }.getOrNull()?.asImageBitmap()
+        }
+    }
+    val shutter: @Composable () -> Unit = {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            thumbnail?.let {
+                Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .then(if (isCurrent && sharedElement) Modifier.mediaSharedElement(item.id, force = true) else Modifier)
+            .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTap() },
+    ) {
+        if (playback != null) {
+            // TextureView (not SurfaceView) so the drag-to-dismiss scale, rounding and fade apply to the video.
+            ContentFrame(
+                player = playback.player,
+                modifier = Modifier.fillMaxSize(),
+                surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
+                contentScale = ContentScale.Fit,
+                keepContentOnReset = true,
+                shutter = shutter,
+            )
+        } else {
+            shutter()
+            Icon(
+                Icons.Filled.PlayArrow,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(56.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                    .padding(10.dp),
+            )
+        }
+    }
+}
+
+private const val THUMBNAIL_FALLBACK_PX = 512

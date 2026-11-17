@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.coil.gif)
     implementation(libs.telephoto.zoomable.image.coil)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui.compose)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)

@@ -24,6 +24,7 @@ class ViewerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     repository: MediaRepository,
     private val infoLoader: MediaInfoLoader,
+    val playbackPositions: PlaybackPositionStore,
 ) : ViewModel() {
 
     private val route = savedStateHandle.toRoute<ViewerRoute>()
