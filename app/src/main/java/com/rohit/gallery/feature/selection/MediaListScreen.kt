@@ -29,7 +29,7 @@ import com.rohit.gallery.core.model.MediaItem
 
 /**
  * A secondary screen showing [items] as a selectable grid under a back/title bar, with the shared
- * selection actions (Share, Favorite, Trash, Move/Copy). Used by album detail and Videos.
+ * selection actions (Share, Favorite, Trash, Move/Copy). Used by album detail, Favorites and Videos.
  * [items] null means still loading.
  */
 @Composable
@@ -42,15 +42,35 @@ fun MediaListScreen(
     onBack: () -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
 ) {
-    BackHandler(enabled = selection.isSelecting) { selection.clear() }
-
-    val cellPx = LocalWindowInfo.current.containerSize.width / GRID_COLUMNS
     val allFavorite by remember(items) {
         derivedStateOf {
             val ids = selection.ids
             ids.isNotEmpty() && items.orEmpty().filter { it.id in ids }.let { sel -> sel.isNotEmpty() && sel.all { it.isFavorite } }
         }
     }
+    MediaListScreen(title, emptyText, items, selection, onBack, onOpenMedia) { modifier ->
+        SelectionActionsBar(selectionActions, selection, modifier, allFavorite = allFavorite)
+    }
+}
+
+/**
+ * The same screen with its own bottom bar for a selection (Trash: Restore / Delete). [gridHeader] is a
+ * note shown above the grid.
+ */
+@Composable
+fun MediaListScreen(
+    title: String,
+    emptyText: String,
+    items: List<MediaItem>?,
+    selection: SelectionState,
+    onBack: () -> Unit,
+    onOpenMedia: (MediaItem) -> Unit,
+    gridHeader: String? = null,
+    selectionBar: @Composable (Modifier) -> Unit,
+) {
+    BackHandler(enabled = selection.isSelecting) { selection.clear() }
+
+    val cellPx = LocalWindowInfo.current.containerSize.width / GRID_COLUMNS
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -69,18 +89,11 @@ fun MediaListScreen(
                 items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text(emptyText, style = MaterialTheme.typography.titleMedium)
                 }
-                else -> SelectableMediaGrid(items, selection, cellPx, onOpenMedia)
+                else -> SelectableMediaGrid(items, selection, cellPx, onOpenMedia, header = gridHeader)
             }
         }
 
-        if (selection.isSelecting) {
-            SelectionActionsBar(
-                controller = selectionActions,
-                selection = selection,
-                allFavorite = allFavorite,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
+        if (selection.isSelecting) selectionBar(Modifier.align(Alignment.BottomCenter))
     }
 }
 

@@ -1,13 +1,14 @@
 package com.rohit.gallery.feature.favorites
 
-import android.content.Intent
-import android.content.IntentSender
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rohit.gallery.core.data.repository.AlbumRepository
 import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
 import com.rohit.gallery.core.domain.MediaActions
+import com.rohit.gallery.core.domain.MediaTransfer
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.feature.selection.SelectionActions
 import com.rohit.gallery.feature.selection.SelectionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -20,8 +21,10 @@ import kotlinx.coroutines.flow.stateIn
 
 @HiltViewModel
 class FavoritesViewModel @Inject constructor(
-    private val repository: MediaRepository,
-    private val actions: MediaActions,
+    repository: MediaRepository,
+    actions: MediaActions,
+    transfer: MediaTransfer,
+    albumRepository: AlbumRepository,
 ) : ViewModel() {
 
     val selection = SelectionState()
@@ -37,22 +40,14 @@ class FavoritesViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private fun selected(): List<MediaItem> {
-        val ids = selection.ids
-        return items.value.orEmpty().filter { it.id in ids }
-    }
-
-    fun shareIntent(): Intent? = selected().takeIf { it.isNotEmpty() }?.let(actions::shareIntent)
-
-    suspend fun unfavoriteRequest(): IntentSender? =
-        selected().takeIf { it.isNotEmpty() }?.let { actions.favoriteRequest(it, favorite = false) }
-
-    suspend fun trashRequest(): IntentSender? =
-        selected().takeIf { it.isNotEmpty() }?.let { actions.trashRequest(it) }
-
-    /** After a favorite change or trash went through. */
-    fun onChanged() {
-        selection.clear()
-        repository.refresh()
-    }
+    /** Everything here is a favorite, so the Favorite action removes the mark. */
+    val selectionActions = SelectionActions(
+        scope = viewModelScope,
+        selection = selection,
+        allItems = { items.value.orEmpty() },
+        actions = actions,
+        transfer = transfer,
+        repository = repository,
+        albumRepository = albumRepository,
+    )
 }
