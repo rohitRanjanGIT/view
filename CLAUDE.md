@@ -233,11 +233,11 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
   WhatsApp, a video, and opening a file with media permission revoked.
 
 ### Next steps (Phase 2 order I approved)
-1. **Videos page** under Menu (brief lists Favorites, Trash, Videos, Settings).
-2. Pinned day header draws under the status bar; fix it.
-3. Closing the viewer scrolls the grid to the photo you ended on.
-4. Zoomed-in close flies from the zoomed view (no snap to fit first).
-5. Move Favorites and Trash onto the shared `SelectionActions`.
+(Videos page done in `e2ebacb`, not yet tested on the phone: it was locked.)
+1. Pinned day header draws under the status bar; fix it.
+2. Closing the viewer scrolls the grid to the photo you ended on.
+3. Zoomed-in close flies from the zoomed view (no snap to fit first).
+4. Move Favorites and Trash onto the shared `SelectionActions` / `MediaListScreen`.
 Then my full-day test closes Phase 2.
 Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4 as in section 8.
 
