@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import androidx.compose.runtime.Immutable
 import androidx.exifinterface.media.ExifInterface
 import com.rohit.gallery.core.model.MediaItem
@@ -49,7 +50,7 @@ class MediaInfoLoader @Inject constructor(
         } else {
             runCatching {
                 // setRequireOriginal gives access to the GPS tags, which are redacted otherwise.
-                val uri = if (canReadLocation) MediaStore.setRequireOriginal(item.uri) else item.uri
+                val uri = if (canReadLocation && item.isMediaStoreUri) MediaStore.setRequireOriginal(item.uri) else item.uri
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     val exif = ExifInterface(stream)
                     camera = listOfNotNull(exif.getAttribute(ExifInterface.TAG_MAKE), exif.getAttribute(ExifInterface.TAG_MODEL))
@@ -73,13 +74,25 @@ class MediaInfoLoader @Inject constructor(
     }
 
     private fun queryNameAndFolder(item: MediaItem): Pair<String?, String?> {
-        val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.RELATIVE_PATH)
+        val uri = item.uri
+        if (uri.scheme == "file") return uri.lastPathSegment to null
+        // Other apps' providers usually only know OpenableColumns; RELATIVE_PATH is MediaStore's.
+        val projection = if (item.isMediaStoreUri) {
+            arrayOf(MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.RELATIVE_PATH)
+        } else {
+            arrayOf(OpenableColumns.DISPLAY_NAME)
+        }
         return runCatching {
-            context.contentResolver.query(item.uri, projection, null, null, null)?.use { c ->
-                if (c.moveToFirst()) c.getString(0) to c.getString(1) else null
+            context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) to c.getStringOrNull(1) else null
             }
         }.getOrNull() ?: (null to null)
     }
+
+    private val MediaItem.isMediaStoreUri: Boolean get() = uri.authority == MEDIA_STORE_AUTHORITY
+
+    private fun android.database.Cursor.getStringOrNull(index: Int): String? =
+        if (index < columnCount && !isNull(index)) getString(index) else null
 
     private fun videoLocation(item: MediaItem): String? {
         val retriever = MediaMetadataRetriever()

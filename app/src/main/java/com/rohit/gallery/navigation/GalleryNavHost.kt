@@ -37,6 +37,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.rohit.gallery.core.ui.components.LocalAnimatedVisibilityScope
 import com.rohit.gallery.core.ui.components.LocalSharedMediaId
 import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
@@ -54,7 +55,10 @@ private val NavigationBarHeight = 80.dp
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun GalleryNavHost() {
+fun GalleryNavHost(
+    externalStart: ViewerRoute? = null,
+    onExitExternal: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -78,7 +82,8 @@ fun GalleryNavHost() {
             Box(Modifier.fillMaxSize()) {
                 NavHost(
                     navController = navController,
-                    startDestination = PicturesRoute,
+                    // Opened by another app: only the viewer, no permission gate or timeline underneath.
+                    startDestination = externalStart ?: PicturesRoute,
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     topLevel<PicturesRoute> {
@@ -149,10 +154,12 @@ fun GalleryNavHost() {
                         exitTransition = { fadeOut(tween(GalleryMotion.FADE_MS)) },
                         popEnterTransition = { fadeIn(tween(GalleryMotion.FADE_MS)) },
                         popExitTransition = { fadeOut(tween(GalleryMotion.FADE_MS)) },
-                    ) {
+                    ) { entry ->
+                        val external = entry.toRoute<ViewerRoute>().externalUri != null
                         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                             ViewerScreen(
-                                onBack = { navController.popBackStack() },
+                                // The external viewer is the whole back stack: closing it returns to the caller.
+                                onBack = { if (external) onExitExternal() else navController.popBackStack() },
                                 onCurrentItemChanged = { sharedMediaId = it },
                             )
                         }

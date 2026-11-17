@@ -85,9 +85,10 @@ fun InfoPanel(
         ) {
             val d = details
             Text(d?.fileName ?: "Details", style = MaterialTheme.typography.titleLarge)
-            InfoRow("Date", formatDateTime(item.sortDateMs))
+            // Files opened from other apps may have no date or size.
+            if (item.sortDateMs > 0) InfoRow("Date", formatDateTime(item.sortDateMs))
             d?.folder?.let { InfoRow("Folder", it) }
-            InfoRow("Size", formatFileSize(item.sizeBytes))
+            if (item.sizeBytes > 0) InfoRow("Size", formatFileSize(item.sizeBytes))
             if (item.width > 0 && item.height > 0) {
                 InfoRow("Resolution", "${item.width} × ${item.height} (${megapixels(item)})")
             }

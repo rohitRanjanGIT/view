@@ -24,8 +24,19 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
     TopLevelDestination(MenuRoute, "Menu", Icons.Filled.Menu),
 )
 
-/** Full-screen viewer. [bucketId] limits the pager to one album; null means the whole timeline. [trashed] pages through the recycle bin instead. */
-@Serializable data class ViewerRoute(val mediaId: Long, val bucketId: Long? = null, val trashed: Boolean = false, val favoritesOnly: Boolean = false)
+/**
+ * Full-screen viewer. [bucketId] limits the pager to one album; null means the whole timeline. [trashed] pages
+ * through the recycle bin instead. [externalUri] is set when another app asked us to show a file (ACTION_VIEW,
+ * camera review); [mediaId] is then unused and [externalMime] is the type the intent declared, if any.
+ */
+@Serializable data class ViewerRoute(
+    val mediaId: Long,
+    val bucketId: Long? = null,
+    val trashed: Boolean = false,
+    val favoritesOnly: Boolean = false,
+    val externalUri: String? = null,
+    val externalMime: String? = null,
+)
 
 /** The recycle bin, opened from the Menu tab. */
 @Serializable data object TrashRoute

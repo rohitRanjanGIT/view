@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.viewer
 
+import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
@@ -102,6 +103,13 @@ fun ViewerScreen(
     val list = items
     if (list == null) {
         Box(modifier.fillMaxSize().background(Color.Black))
+    } else if (list.isEmpty() && viewModel.isExternal) {
+        val context = LocalContext.current
+        Box(modifier.fillMaxSize().background(Color.Black))
+        LaunchedEffect(Unit) {
+            Toast.makeText(context, "Can't open this file", Toast.LENGTH_SHORT).show()
+            onBack()
+        }
     } else {
         ViewerContent(
             items = list,
@@ -411,7 +419,8 @@ private fun ViewerTopBar(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
         }
         Text(
-            formatDateTime(item.sortDateMs),
+            // Files from other apps may carry no date at all.
+            if (item.sortDateMs > 0) formatDateTime(item.sortDateMs) else "",
             style = MaterialTheme.typography.titleSmall,
             color = Color.White,
             modifier = Modifier.weight(1f),
