@@ -35,3 +35,14 @@ fun Modifier.mediaSharedElement(mediaId: Long, force: Boolean = false): Modifier
         )
     }
 }
+
+/**
+ * True while a shared-element transition is running. The viewer draws a plain, photo-shaped copy
+ * of the image for the flight and hides its (full-screen, interactive) image meanwhile.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun rememberSharedTransitionActive(): () -> Boolean {
+    val scope = LocalSharedTransitionScope.current
+    return androidx.compose.runtime.remember(scope) { { scope?.isTransitionActive == true } }
+}

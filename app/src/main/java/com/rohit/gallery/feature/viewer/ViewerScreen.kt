@@ -78,7 +78,7 @@ import coil3.request.ImageRequest
 import coil3.request.placeholder
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.LocalThumbnailCache
-import com.rohit.gallery.core.ui.components.mediaSharedElement
+import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
 import com.rohit.gallery.core.ui.components.thumbKey
 import kotlin.math.abs
 import kotlinx.coroutines.launch
@@ -369,18 +369,22 @@ private fun ImagePage(
             snapshotFlow { (zoomState.zoomableState.zoomFraction ?: 0f) > 0.02f }.collect(onZoomedChange)
         }
     }
-    ZoomableAsyncImage(
-        model = request,
-        contentDescription = null,
-        state = zoomState,
-        onClick = { onTap() },
-        modifier = Modifier
-            .fillMaxSize()
-            .then(if (isCurrent && sharedElement) Modifier.mediaSharedElement(item.id, force = true) else Modifier)
-            // Inside the shared element: its bounds animate from the full screen while this
-            // transform decays, so the flight begins where the finger released the image.
-            .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier),
-    )
+    val transitionActive = rememberSharedTransitionActive()
+    val flightEnabled = isCurrent && sharedElement
+    Box(Modifier.fillMaxSize()) {
+        if (flightEnabled) SharedFlightFrame(item, rememberThumbnail(item), transitionActive)
+        ZoomableAsyncImage(
+            model = request,
+            contentDescription = null,
+            state = zoomState,
+            onClick = { onTap() },
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier)
+                // The photo-shaped copy flies during transitions; this interactive one waits.
+                .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f },
+        )
+    }
 }
 @Composable
 private fun ViewerTopBar(
@@ -466,13 +470,9 @@ private fun VideoPage(
     dragLayer: (GraphicsLayerScope.() -> Unit)?,
     onTap: () -> Unit,
 ) {
-    val cache = LocalThumbnailCache.current
-    var thumbnail by remember(item.id) { mutableStateOf(cache.get(item.thumbKey)?.asImageBitmap()) }
-    if (thumbnail == null) {
-        LaunchedEffect(item.id) {
-            thumbnail = runCatching { cache.load(item, THUMBNAIL_FALLBACK_PX) }.getOrNull()?.asImageBitmap()
-        }
-    }
+    val thumbnail = rememberThumbnail(item)
+    val transitionActive = rememberSharedTransitionActive()
+    val flightEnabled = isCurrent && sharedElement
     val shutter: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             thumbnail?.let {
@@ -480,10 +480,12 @@ private fun VideoPage(
             }
         }
     }
+    Box(Modifier.fillMaxSize()) {
+    if (flightEnabled) SharedFlightFrame(item, thumbnail, transitionActive)
     Box(
         Modifier
             .fillMaxSize()
-            .then(if (isCurrent && sharedElement) Modifier.mediaSharedElement(item.id, force = true) else Modifier)
+            .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f }
             .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTap() },
     ) {
@@ -511,9 +513,9 @@ private fun VideoPage(
             )
         }
     }
+    }
 }
 
-private const val THUMBNAIL_FALLBACK_PX = 512
 
 /** What the current vertical swipe on the photo does; fixed at the start of the swipe. */
 private enum class SwipeMode { None, OpenInfo, CloseInfo, Dismiss, Ignore }
