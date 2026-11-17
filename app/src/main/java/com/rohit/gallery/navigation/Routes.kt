@@ -34,6 +34,7 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
     val bucketId: Long? = null,
     val trashed: Boolean = false,
     val favoritesOnly: Boolean = false,
+    val videosOnly: Boolean = false,
     val externalUri: String? = null,
     val externalMime: String? = null,
 )
@@ -43,6 +44,9 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
 
 /** Favorites list, opened from the Menu tab. */
 @Serializable data object FavoritesRoute
+
+/** All videos, opened from the Menu tab. */
+@Serializable data object VideosRoute
 
 /** One album (folder), opened from the Albums tab. */
 @Serializable data class AlbumDetailRoute(val bucketId: Long)

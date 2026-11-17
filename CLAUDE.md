@@ -221,7 +221,9 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
   - **External intents** (commit `5875a71`): ACTION_VIEW + camera REVIEW open straight into the viewer; indexed
     MediaStore URIs get the full pager, others a single item. Verified by adb: REVIEW opens the right photo with the
     filmstrip, Back returns to the caller, file:// single item shows, unreadable URI closes with a toast.
-  - 26 unit tests pass.
+  - **Fast-scroller** (commit `7840cd0`): handle on the timeline's right edge while scrolling, drag with a
+    "Month Year" bubble. Checked by adb screenshots; feel not yet confirmed by me.
+  - 32 unit tests pass.
 - Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
 
 ### Waiting on my device report
@@ -231,7 +233,12 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
   WhatsApp, a video, and opening a file with media permission revoked.
 
 ### Next steps (Phase 2 order I approved)
-1. **Fast-scroller** with date bubble.
+1. **Videos page** under Menu (brief lists Favorites, Trash, Videos, Settings).
+2. Pinned day header draws under the status bar; fix it.
+3. Closing the viewer scrolls the grid to the photo you ended on.
+4. Zoomed-in close flies from the zoomed view (no snap to fit first).
+5. Move Favorites and Trash onto the shared `SelectionActions`.
+Then my full-day test closes Phase 2.
 Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4 as in section 8.
 
 ### Testing on my phone (rules)

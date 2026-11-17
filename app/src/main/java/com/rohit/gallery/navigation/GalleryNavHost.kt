@@ -48,6 +48,7 @@ import com.rohit.gallery.feature.settings.MenuScreen
 import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.timeline.TimelineScreen
 import com.rohit.gallery.feature.viewer.ViewerScreen
+import com.rohit.gallery.feature.videos.VideosScreen
 import kotlinx.coroutines.launch
 
 /** Height of the M3 navigation bar, without the system navigation-bar inset. */
@@ -121,6 +122,7 @@ fun GalleryNavHost(
                     topLevel<MenuRoute> {
                         MenuScreen(
                             onOpenFavorites = { navController.navigate(FavoritesRoute) },
+                            onOpenVideos = { navController.navigate(VideosRoute) },
                             onOpenTrash = { navController.navigate(TrashRoute) },
                             modifier = Modifier.padding(bottom = contentBottomPadding),
                         )
@@ -133,6 +135,18 @@ fun GalleryNavHost(
                                 scope.launch {
                                     androidx.compose.runtime.withFrameNanos { }
                                     navController.navigate(ViewerRoute(item.id, favoritesOnly = true))
+                                }
+                            },
+                        )
+                    }
+                    topLevel<VideosRoute> {
+                        VideosScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenMedia = { item ->
+                                sharedMediaId = item.id
+                                scope.launch {
+                                    androidx.compose.runtime.withFrameNanos { }
+                                    navController.navigate(ViewerRoute(item.id, videosOnly = true))
                                 }
                             },
                         )

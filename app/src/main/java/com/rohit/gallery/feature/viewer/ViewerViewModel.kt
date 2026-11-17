@@ -98,6 +98,7 @@ class ViewerViewModel @Inject constructor(
                 is MediaIndexState.Ready ->
                     when {
                         route.favoritesOnly -> state.items.filter { it.isFavorite }
+                        route.videosOnly -> state.items.filter { it.isVideo }
                         route.bucketId != null -> state.items.filter { it.bucketId == route.bucketId }
                         else -> state.items
                     }

@@ -141,3 +141,8 @@ Non-obvious technical choices, newest last.
 - `FastScroller` (core/ui/components) is generic: fraction in, fraction out, label lambda. Shown while scrolling, hidden
   1.5 s after; only on timelines longer than 4 screens. Bubble shows "Month Year"; haptic tick when the month changes.
 - Only the Pictures timeline has it for now; album/favorites grids are flat `LazyVerticalGrid`s and could reuse it.
+
+## Phase 2: Videos
+- **Menu > Videos** = index filtered to `isVideo`; viewer scope via `ViewerRoute.videosOnly`.
+- **`MediaListScreen`** (feature/selection) is the shared title bar + `SelectableMediaGrid` + `SelectionActionsBar` scaffold;
+  album detail and Videos use it. Favorites can move onto it (it still wires its own actions).
