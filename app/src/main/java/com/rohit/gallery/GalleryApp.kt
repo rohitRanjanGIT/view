@@ -7,6 +7,8 @@ import coil3.SingletonImageLoader
 import coil3.gif.AnimatedImageDecoder
 import coil3.memory.MemoryCache
 import coil3.video.VideoFrameDecoder
+import com.rohit.gallery.core.ui.components.MediaThumbFetcher
+import com.rohit.gallery.core.ui.components.MediaThumbKeyer
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -15,14 +17,16 @@ class GalleryApp : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components {
+                add(MediaThumbKeyer())
+                add(MediaThumbFetcher.Factory())
                 add(VideoFrameDecoder.Factory())
                 add(AnimatedImageDecoder.Factory())
             }
-            // Roughly three screens of grid thumbnails (about 36 cells of ~270px at 4 bytes per pixel each).
+            // About 330 thumbnails (~290 KB each at 270px), well over three screens of the grid.
             .memoryCache { MemoryCache.Builder().maxSizeBytes(MEMORY_CACHE_BYTES).build() }
             .build()
 
     private companion object {
-        const val MEMORY_CACHE_BYTES = 48L * 1024 * 1024
+        const val MEMORY_CACHE_BYTES = 96L * 1024 * 1024
     }
 }

@@ -33,9 +33,10 @@ data class MediaItem(
 
     val isVideo: Boolean get() = type == MediaType.Video
 
-    val uri: Uri
-        get() = ContentUris.withAppendedId(
-            if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            id,
-        )
+    val uri: Uri get() = mediaContentUri(id, isVideo)
 }
+
+fun mediaContentUri(id: Long, isVideo: Boolean): Uri = ContentUris.withAppendedId(
+    if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+    id,
+)

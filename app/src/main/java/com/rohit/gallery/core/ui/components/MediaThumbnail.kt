@@ -1,5 +1,6 @@
 package com.rohit.gallery.core.ui.components
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,13 @@ import coil3.request.ImageRequest
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.feature.timeline.formatDuration
 
+/** The one place grid thumbnail requests are built, so prefetching hits the same cache entries. */
+fun thumbnailRequest(context: Context, item: MediaItem, cellSizePx: Int): ImageRequest =
+    ImageRequest.Builder(context)
+        .data(MediaThumbData(item.id, item.isVideo, item.dateModifiedMs))
+        .size(cellSizePx)
+        .build()
+
 /**
  * Square grid thumbnail. Always requested at [cellSizePx] so a grid cell never decodes a
  * full-size image.
@@ -38,11 +46,8 @@ fun MediaThumbnail(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val request = remember(item.id, item.type, cellSizePx) {
-        ImageRequest.Builder(context)
-            .data(item.uri)
-            .size(cellSizePx)
-            .build()
+    val request = remember(item.id, item.type, item.dateModifiedMs, cellSizePx) {
+        thumbnailRequest(context, item, cellSizePx)
     }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
         AsyncImage(

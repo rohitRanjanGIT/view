@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -71,7 +72,11 @@ private fun TimelineGrid(content: TimelineUiState.Content) {
     val cellSizePx = (windowWidthPx - gapPx * (columns - 1)) / columns
     val today = remember { LocalDate.now() }
 
+    val listState = rememberLazyListState()
+    PrefetchThumbnails(listState, content.days, cellSizePx)
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
     ) {
@@ -81,7 +86,7 @@ private fun TimelineGrid(content: TimelineUiState.Content) {
             }
             items(
                 items = day.rows,
-                key = { row -> "row-${row.first().id}" },
+                key = { row -> rowKey(row) },
                 contentType = { "row" },
             ) { row ->
                 ThumbnailRow(row, columns, cellSizePx)
