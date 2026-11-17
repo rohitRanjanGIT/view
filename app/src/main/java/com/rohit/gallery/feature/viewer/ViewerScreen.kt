@@ -3,14 +3,17 @@ package com.rohit.gallery.feature.viewer
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.runtime.snapshotFlow
+import me.saket.telephoto.zoomable.rememberZoomableImageState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,33 +123,60 @@ private fun ViewerContent(
     var askedForLocation by rememberSaveable { mutableStateOf(false) }
     SystemBarsEffect(visible = chromeVisible)
 
-    // Drag down to dismiss, drag up to open the info sheet.
+    // Drag down (any diagonal) to dismiss, drag up to open the info sheet. The image follows the
+    // finger in both axes; the transform is applied inside the shared element (see ViewerPage) so
+    // the close flight starts exactly where the finger let go.
     val scope = rememberCoroutineScope()
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    var dragX by remember { mutableFloatStateOf(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    var dismissed by remember { mutableStateOf(false) }
+    var zoomed by remember { mutableStateOf(false) }
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
-    val dragState = rememberDraggableState { delta ->
-        // Resist upward travel; the sheet only needs a small nudge to feel connected.
-        offsetY += if (offsetY + delta < 0) delta * 0.4f else delta
+    val progress = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
+    val dismissAlpha by animateFloatAsState(if (dismissed) 0f else 1f, tween(160), label = "dismissAlpha")
+    val chromeAlpha = dismissAlpha * (1f - (abs(dragY) / dismissDistancePx).coerceIn(0f, 1f))
+
+    fun settle(spec: androidx.compose.animation.core.AnimationSpec<Float>) {
+        scope.launch { animate(dragX, 0f, animationSpec = spec) { v, _ -> dragX = v } }
+        scope.launch { animate(dragY, 0f, animationSpec = spec) { v, _ -> dragY = v } }
     }
-    val progress = (abs(offsetY) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
+
+    val dragLayer: GraphicsLayerScope.() -> Unit = {
+        translationX = dragX
+        translationY = dragY
+        val s = 1f - 0.45f * progress
+        scaleX = s
+        scaleY = s
+        shape = RoundedCornerShape((28.dp * progress).toPx())
+        clip = progress > 0f
+    }
 
     Box(
         modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 1f - 0.7f * progress))
-            .draggable(
-                state = dragState,
-                orientation = Orientation.Vertical,
-                onDragStopped = { velocity ->
+            .background(Color.Black.copy(alpha = dismissAlpha * (1f - 0.85f * progress)))
+            .verticalDismissGestures(
+                enabled = { !zoomed && !dismissed },
+                onDrag = { delta ->
+                    dragX += delta.x
+                    // Resist upward travel; the sheet only needs a small nudge to feel connected.
+                    dragY += if (dragY + delta.y < 0) delta.y * 0.4f else delta.y
+                },
+                onEnd = { _, _, velocityY ->
                     when {
-                        offsetY > dismissDistancePx || velocity > DISMISS_VELOCITY -> onBack()
-                        offsetY < -dismissDistancePx * 0.4f || velocity < -DISMISS_VELOCITY -> {
-                            showInfo = true
-                            scope.launch { animate(offsetY, 0f) { v, _ -> offsetY = v } }
+                        dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY -> {
+                            dismissed = true
+                            onBack()
+                            settle(spring(dampingRatio = 1f, stiffness = 1200f))
                         }
-                        else -> scope.launch { animate(offsetY, 0f) { v, _ -> offsetY = v } }
+                        dragY < -dismissDistancePx * 0.4f || velocityY < -DISMISS_VELOCITY -> {
+                            showInfo = true
+                            settle(GalleryMotion.standard())
+                        }
+                        else -> settle(GalleryMotion.standard())
                     }
                 },
+                onCancel = { settle(GalleryMotion.standard()) },
             ),
     ) {
         HorizontalPager(
@@ -154,19 +184,15 @@ private fun ViewerContent(
             key = { page -> latestItems.getOrNull(page)?.id ?: page },
             beyondViewportPageCount = 1,
             pageSpacing = 12.dp,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationY = offsetY
-                    val s = 1f - 0.25f * progress
-                    scaleX = s
-                    scaleY = s
-                },
+            modifier = Modifier.fillMaxSize(),
         ) { page ->
             val item = items.getOrNull(page) ?: return@HorizontalPager
+            val isCurrent = page == pagerState.currentPage
             ViewerPage(
                 item = item,
-                isCurrent = page == pagerState.currentPage,
+                isCurrent = isCurrent,
+                dragLayer = if (isCurrent) dragLayer else null,
+                onZoomedChange = { zoomed = it },
                 onTap = { chromeVisible = !chromeVisible },
             )
         }
@@ -181,7 +207,7 @@ private fun ViewerContent(
                 item = currentItem,
                 onBack = onBack,
                 onInfo = { showInfo = true },
-                modifier = Modifier.graphicsLayer { alpha = 1f - progress },
+                modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
             )
         }
 
@@ -194,7 +220,7 @@ private fun ViewerContent(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .graphicsLayer { alpha = 1f - progress }
+                    .graphicsLayer { alpha = chromeAlpha }
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))
                     .navigationBarsPadding()
                     .padding(vertical = 12.dp),
@@ -223,6 +249,8 @@ private fun ViewerContent(
 private fun ViewerPage(
     item: MediaItem,
     isCurrent: Boolean,
+    dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    onZoomedChange: (Boolean) -> Unit,
     onTap: () -> Unit,
 ) {
     val cache = LocalThumbnailCache.current
@@ -235,16 +263,25 @@ private fun ViewerPage(
             .placeholder(cache.get(item.thumbKey)?.asImage())
             .build()
     }
+    val zoomState = rememberZoomableImageState()
+    if (isCurrent) {
+        LaunchedEffect(zoomState) {
+            snapshotFlow { (zoomState.zoomableState.zoomFraction ?: 0f) > 0.02f }.collect(onZoomedChange)
+        }
+    }
     ZoomableAsyncImage(
         model = request,
         contentDescription = null,
+        state = zoomState,
         onClick = { onTap() },
         modifier = Modifier
             .fillMaxSize()
-            .then(if (isCurrent) Modifier.mediaSharedElement(item.id, force = true) else Modifier),
+            .then(if (isCurrent) Modifier.mediaSharedElement(item.id, force = true) else Modifier)
+            // Inside the shared element: its bounds animate from the full screen while this
+            // transform decays, so the flight begins where the finger released the image.
+            .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier),
     )
 }
-
 @Composable
 private fun ViewerTopBar(
     item: MediaItem,
