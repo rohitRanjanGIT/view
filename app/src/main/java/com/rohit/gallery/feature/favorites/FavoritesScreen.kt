@@ -16,8 +16,8 @@ fun FavoritesScreen(
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     MediaListScreen(
-        title = "Favorites",
-        emptyText = "No favorites yet",
+        title = "Favourites",
+        emptyText = "No favourites yet",
         items = items,
         selection = viewModel.selection,
         selectionActions = viewModel.selectionActions,

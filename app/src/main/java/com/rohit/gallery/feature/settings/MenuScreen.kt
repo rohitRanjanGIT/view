@@ -31,7 +31,7 @@ fun MenuScreen(
 ) {
     Column(modifier.fillMaxSize().statusBarsPadding()) {
         Text("Menu", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(24.dp))
-        MenuRow(Icons.Filled.Favorite, "Favorites", onOpenFavorites)
+        MenuRow(Icons.Filled.Favorite, "Favourites", onOpenFavorites)
         MenuRow(Icons.Filled.PlayArrow, "Videos", onOpenVideos)
         MenuRow(Icons.Filled.Delete, "Trash", onOpenTrash)
         MenuRow(Icons.Filled.Settings, "Settings", onOpenSettings)

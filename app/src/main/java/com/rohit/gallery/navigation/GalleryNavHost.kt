@@ -1,5 +1,9 @@
 package com.rohit.gallery.navigation
 
+import kotlin.math.abs
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -234,7 +238,34 @@ fun GalleryNavHost(
                     enter = fadeIn(tween(GalleryMotion.FADE_MS)),
                     exit = fadeOut(tween(GalleryMotion.FADE_MS)),
                 ) {
-                    NavigationBar {
+                    // Swiping sideways on the bar moves one tab: left goes to the next tab, right to the previous.
+                    val currentTab = topLevelDestinations.indexOfFirst { currentDestination?.hasRoute(it.route::class) == true }
+                    val latestTab by rememberUpdatedState(currentTab)
+                    fun goToTab(index: Int) {
+                        val dest = topLevelDestinations.getOrNull(index) ?: return
+                        navController.navigate(dest.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    val swipePx = with(LocalDensity.current) { TabSwipeDistance.toPx() }
+                    NavigationBar(
+                        Modifier.pointerInput(Unit) {
+                            var total = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { total = 0f },
+                                onDragEnd = {
+                                    val from = latestTab
+                                    if (from >= 0 && abs(total) > swipePx) goToTab(if (total < 0) from + 1 else from - 1)
+                                },
+                                onHorizontalDrag = { change, amount ->
+                                    change.consume()
+                                    total += amount
+                                },
+                            )
+                        },
+                    ) {
                         topLevelDestinations.forEach { dest ->
                             NavigationBarItem(
                                 selected = currentDestination?.hasRoute(dest.route::class) == true,
@@ -255,6 +286,9 @@ fun GalleryNavHost(
         }
     }
 }
+
+/** How far a sideways swipe on the bottom bar must travel to change tab. */
+private val TabSwipeDistance = 48.dp
 
 /**
  * A bottom-bar destination. The outgoing/incoming screen stays put (no fade) while the viewer

@@ -88,7 +88,7 @@ fun SelectionActionBar(
             ActionItem(Icons.Filled.Share, "Share", enabled, onShare, Modifier.weight(1f))
             ActionItem(
                 if (allFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                if (allFavorite) "Unfavorite" else "Favorite",
+                if (allFavorite) "Unfavourite" else "Favourite",
                 enabled,
                 onFavorite,
                 Modifier.weight(1f),
