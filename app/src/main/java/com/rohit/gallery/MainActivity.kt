@@ -5,7 +5,14 @@ import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import android.graphics.Color
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rohit.gallery.core.data.prefs.AppPreferences
+import com.rohit.gallery.core.data.prefs.ThemeMode
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -27,6 +34,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var thumbnailCache: ThumbnailCache
 
+    @Inject
+    lateinit var preferences: AppPreferences
+
     /** Non-null when another app asked us to show one file; the app then opens straight in the viewer. */
     private var externalStart by mutableStateOf<ViewerRoute?>(null)
 
@@ -35,8 +45,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         externalStart = externalViewerRoute(intent)
         setContent {
+            // Settings load in a few ms; until then nothing is drawn (the window background shows), so the app
+            // never flashes the wrong theme.
+            val settings = preferences.settings.collectAsStateWithLifecycle(initialValue = null).value
+                ?: return@setContent
+            val dark = when (settings.theme) {
+                ThemeMode.System -> isSystemInDarkTheme()
+                ThemeMode.Light -> false
+                ThemeMode.Dark -> true
+            }
+            // Status and navigation bar icons follow the chosen theme, not only the system one.
+            LaunchedEffect(dark) {
+                val style = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
             CompositionLocalProvider(LocalThumbnailCache provides thumbnailCache) {
-                GalleryTheme {
+                GalleryTheme(darkTheme = dark, dynamicColor = settings.wallpaperColors) {
                     // There is no root Surface, so text and icons would default to black even in dark mode.
                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                         // A new external file (onNewIntent) starts a fresh back stack.

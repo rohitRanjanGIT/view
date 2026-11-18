@@ -58,5 +58,8 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
 /** Search the library, opened from the Pictures tab. */
 @Serializable data object SearchRoute
 
+/** App settings, opened from the Menu tab. */
+@Serializable data object SettingsRoute
+
 /** Pin, hide and reorder albums, opened from the Albums tab menu. */
 @Serializable data object EditAlbumsRoute

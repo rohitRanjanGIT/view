@@ -23,11 +23,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import com.rohit.gallery.feature.timeline.GridLevel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.feature.timeline.GroupedLibrary
 import com.rohit.gallery.feature.timeline.TimelineGrid
 import com.rohit.gallery.feature.timeline.TimelineUiState
@@ -36,7 +35,6 @@ import com.rohit.gallery.feature.timeline.toUiState
 import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
@@ -88,9 +86,10 @@ fun MediaListScreen(
 ) {
     BackHandler(enabled = selection.isSelecting) { selection.clear() }
 
-    // Kept per screen for now; remembered across launches once Settings / DataStore land.
-    var columns by rememberSaveable { mutableIntStateOf(GRID_COLUMNS) }
-    var level by rememberSaveable { mutableStateOf(GridLevel.Default) }
+    // Remembered across launches: one level for album / Favorites / Videos timelines, Trash's columns.
+    val sizes: GridSizeViewModel = hiltViewModel()
+    val level by sizes.level.collectAsStateWithLifecycle()
+    val columns by sizes.trashColumns.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -109,8 +108,11 @@ fun MediaListScreen(
                 items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text(emptyText, style = MaterialTheme.typography.titleMedium)
                 }
-                asTimeline -> MediaTimeline(items, selection, level, { level = it }, onOpenMedia)
-                else -> SelectableMediaGrid(items, selection, columns, { columns = it }, onOpenMedia, header = gridHeader)
+                // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
+                asTimeline -> level?.let { MediaTimeline(items, selection, it, sizes::setLevel, onOpenMedia) }
+                else -> columns?.let {
+                    SelectableMediaGrid(items, selection, it, sizes::setTrashColumns, onOpenMedia, header = gridHeader)
+                }
             }
         }
 

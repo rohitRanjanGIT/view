@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <!-- Special access, off until the user turns it on in Settings: trash / favourite without a pop-up each time. -->
+    <uses-permission android:name="android.permission.MANAGE_MEDIA" />
 
     <application
         android:name=".GalleryApp"

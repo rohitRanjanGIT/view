@@ -306,3 +306,16 @@ Non-obvious technical choices, newest last.
   the same drag / back-gesture transform as the photo.
 - Test samples live in `Pictures/Gallery test` on the phone (a generated GIF, a generated motion photo whose clip
   is a short screen recording of that GIF, and a copy of an Ultra HDR camera photo). Kept until I say otherwise.
+
+### Settings (Phase 3)
+- One DataStore file (`AppPreferences`): theme (system / light / dark), wallpaper colours, start videos muted, motion
+  photo autoplay, Ultra HDR on/off, remembered grid sizes (Pictures level; one level shared by album / Favorites /
+  Videos; Trash columns) and video resume positions (100 most recent, `id:ms` pairs).
+- `MainActivity` draws nothing until settings are read (a few ms; cold start measured 478-491 ms), so the app never
+  flashes the wrong theme; system bar icons follow the chosen theme via `enableEdgeToEdge(SystemBarStyle.auto)`.
+- Grid sizes change in memory first (a pinch switches mid-gesture) and are written in the background; screens show
+  nothing until the saved size is read rather than the default first.
+- "Skip confirmation pop-ups" is the `MANAGE_MEDIA` special access (declared, off until the user grants it in the
+  system screen). With it, MediaStore trash / favourite requests complete without the system dialog; permanent
+  delete still has the app's own confirmation in Trash.
+- The Settings screen UI was written by a helper agent in parallel (new files only), then reviewed and built here.

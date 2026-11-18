@@ -167,7 +167,8 @@ com.rohit.gallery
   Edit button hands the photo to Google Photos' editor with read-only access, so it can only save a copy.)
 - [x] Search: by date, album, file name, media type (in memory). ML Kit labels/text skipped for now (my call).
 - [x] Hidden albums, pinned albums, custom album order, sort options, oldest-first albums.
-- [ ] Settings screen (parked by me until later).
+- [x] Settings screen (theme, wallpaper colours, viewer options, remembered grid sizes and video positions,
+  skip-confirmation via MANAGE_MEDIA, About).
 - [x] GIF, motion-photo and HDR/Ultra HDR display support (samples in `Pictures/Gallery test` on my phone).
 
 ### Phase 4: Optimization and hardening
@@ -209,7 +210,9 @@ describes the project for GitHub; keep its Features / Status sections in step wh
   animations (screens slide; viewer photo shrinks with the grid and a gap behind it).
   Edit via Google Photos is built (`MediaActions.openInEditor`) but not yet tried on the phone.
 - **Phase 3 decisions:** no ML search for now. Settings is parked by me until later. Trash stays a flat grid.
-- **Next:** GIF / motion photo / Ultra HDR display, then Settings (parked by me). Own editor is planned for later.
+- **Next:** my idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes after
+  sharing). Proposed design in the chat of 2026-11-18; my answers on notification vs card, delay, default on/off are
+  still pending. Then Phase 4. Own editor is planned for later.
 
 ### What exists
 - **Setup:** `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin), Kotlin 2.2.10, Gradle 9.6.0, Compose BOM

@@ -106,6 +106,8 @@ import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
 import com.rohit.gallery.core.ui.components.thumbKey
 import kotlin.math.abs
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 
@@ -189,10 +191,23 @@ private fun ViewerContent(
         traits = MediaTraits.None
         traits = viewModel.traits(currentItem)
     }
-    HdrWindowEffect(enabled = traits.ultraHdr)
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    HdrWindowEffect(enabled = traits.ultraHdr && settings?.ultraHdr != false)
     // A motion photo's clip plays over it when the Motion pill is tapped, once, then the photo is back.
     var motionPlaying by remember(currentItem.id) { mutableStateOf(false) }
+    // "Play motion photos automatically": once, as soon as one is opened (and known to be one).
+    LaunchedEffect(currentItem.id, traits.motionPhoto) {
+        if (traits.motionPhoto && settings?.motionAutoplay == true) motionPlaying = true
+    }
     var muted by rememberSaveable { mutableStateOf(false) }
+    // "Start videos muted" sets the first value only; the mute button then works as usual for this visit.
+    var mutedFromSettings by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!mutedFromSettings) {
+            muted = viewModel.settings.filterNotNull().first().startMuted
+            mutedFromSettings = true
+        }
+    }
     val playback = rememberPlayback(currentItem, muted, viewModel.playbackPositions)
     val trashActions = rememberTrashViewerActions(viewModel)
     TrashViewerDialog(trashActions, currentItem)

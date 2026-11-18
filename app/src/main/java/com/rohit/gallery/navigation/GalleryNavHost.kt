@@ -59,6 +59,7 @@ import com.rohit.gallery.feature.albums.EditAlbumsScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.search.SearchScreen
 import com.rohit.gallery.feature.settings.MenuScreen
+import com.rohit.gallery.feature.settings.SettingsScreen
 import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.timeline.TimelineScreen
 import com.rohit.gallery.feature.viewer.ViewerScreen
@@ -164,6 +165,9 @@ fun GalleryNavHost(
                             onOpenMedia = { item, query -> openViewer(item, ViewerRoute(item.id, searchQuery = query)) },
                         )
                     }
+                    topLevel<SettingsRoute> {
+                        SettingsScreen(onBack = { navController.popBackStack() })
+                    }
                     topLevel<EditAlbumsRoute> {
                         EditAlbumsScreen(onBack = { navController.popBackStack() })
                     }
@@ -180,6 +184,7 @@ fun GalleryNavHost(
                             onOpenFavorites = { navController.navigate(FavoritesRoute) },
                             onOpenVideos = { navController.navigate(VideosRoute) },
                             onOpenTrash = { navController.navigate(TrashRoute) },
+                            onOpenSettings = { navController.navigate(SettingsRoute) },
                             modifier = Modifier.padding(bottom = contentBottomPadding),
                         )
                     }

@@ -11,6 +11,8 @@ import com.rohit.gallery.core.domain.MediaTransfer
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.feature.selection.SelectionState
 import com.rohit.gallery.feature.selection.SelectionActions
+import com.rohit.gallery.core.data.prefs.AppPreferences
+import com.rohit.gallery.core.data.prefs.GridSizeKey
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.ZoneId
 import javax.inject.Inject
@@ -19,9 +21,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 sealed interface TimelineUiState {
     data object Loading : TimelineUiState
@@ -50,10 +54,19 @@ class TimelineViewModel @Inject constructor(
     private val actions: MediaActions,
     private val transfer: MediaTransfer,
     albumRepository: AlbumRepository,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
-    // In memory for now; saved across launches once Settings / DataStore land.
-    private val level = MutableStateFlow(GridLevel.Default)
+    // Changed in memory at once (a pinch switches mid-gesture) and saved in the background; null until the
+    // saved level is read, so the grid never opens at the default and then jumps.
+    private val level = MutableStateFlow<GridLevel?>(null)
+
+    init {
+        viewModelScope.launch {
+            val saved = prefs.gridSize(GridSizeKey.Pictures).first()
+            level.value = GridLevel.entries.firstOrNull { it.name == saved } ?: GridLevel.Default
+        }
+    }
 
     val selection = SelectionState()
 
@@ -68,13 +81,14 @@ class TimelineViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
 
     val uiState: StateFlow<TimelineUiState> = combine(library, level) { lib, lvl ->
-        lib?.toUiState(lvl) ?: TimelineUiState.Loading
+        if (lib == null || lvl == null) TimelineUiState.Loading else lib.toUiState(lvl)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TimelineUiState.Loading)
 
     fun setLevel(newLevel: GridLevel) {
         level.value = newLevel
+        viewModelScope.launch { prefs.setGridSize(GridSizeKey.Pictures, newLevel.name) }
     }
 
     val selectionActions = SelectionActions(

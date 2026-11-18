@@ -18,34 +18,54 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.rohit.gallery.core.model.MediaItem
-import java.util.concurrent.ConcurrentHashMap
+import com.rohit.gallery.core.data.prefs.AppPreferences
+import com.rohit.gallery.core.di.ApplicationScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.delay
 import androidx.media3.common.MediaItem as PlayerMediaItem
 
 /**
- * Remembers where each video was left, so reopening it resumes there. In memory only for now:
- * surviving app restarts needs DataStore, which arrives with the Phase 3 settings work.
+ * Remembers where each video was left, so reopening it resumes there, also after the app is closed: kept in
+ * memory and written to DataStore in the background (the [MAX_SAVED] most recent videos).
  */
 @Singleton
-class PlaybackPositionStore @Inject constructor() {
-    private val positions = ConcurrentHashMap<Long, Long>()
+class PlaybackPositionStore @Inject constructor(
+    private val prefs: AppPreferences,
+    @param:ApplicationScope private val scope: CoroutineScope,
+) {
+    // Insertion order = most recently saved last. Guarded by itself.
+    private val positions = LinkedHashMap<Long, Long>()
 
-    fun resumePosition(id: Long): Long = positions[id] ?: 0L
+    init {
+        scope.launch {
+            val saved = prefs.videoPositions.first()
+            synchronized(positions) { saved.forEach { (id, pos) -> positions.putIfAbsent(id, pos) } }
+        }
+    }
+
+    fun resumePosition(id: Long): Long = synchronized(positions) { positions[id] } ?: 0L
 
     fun save(id: Long, positionMs: Long, durationMs: Long) {
-        // Near the start or the very end there is nothing worth resuming.
-        if (positionMs < MIN_RESUME_MS || (durationMs > 0 && positionMs > durationMs - END_MARGIN_MS)) {
+        val snapshot = synchronized(positions) {
             positions.remove(id)
-        } else {
-            positions[id] = positionMs
+            // Near the start or the very end there is nothing worth resuming.
+            if (positionMs >= MIN_RESUME_MS && (durationMs <= 0 || positionMs <= durationMs - END_MARGIN_MS)) {
+                positions[id] = positionMs
+            }
+            while (positions.size > MAX_SAVED) positions.remove(positions.keys.first())
+            LinkedHashMap(positions)
         }
+        scope.launch { prefs.setVideoPositions(snapshot) }
     }
 
     private companion object {
         const val MIN_RESUME_MS = 3_000L
         const val END_MARGIN_MS = 2_000L
+        const val MAX_SAVED = 100
     }
 }
 

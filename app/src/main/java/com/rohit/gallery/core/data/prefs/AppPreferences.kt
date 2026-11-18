@@ -1,6 +1,7 @@
 package com.rohit.gallery.core.data.prefs
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -54,6 +55,59 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         context.dataStore.edit { it.remove(RECENT_SEARCHES) }
     }
 
+    /** Look and viewer options from the Settings screen. */
+    val settings: Flow<AppSettings> = context.dataStore.data
+        .map { prefs ->
+            AppSettings(
+                theme = prefs[THEME]?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } } ?: ThemeMode.System,
+                wallpaperColors = prefs[WALLPAPER_COLORS] ?: true,
+                startMuted = prefs[START_MUTED] ?: false,
+                motionAutoplay = prefs[MOTION_AUTOPLAY] ?: false,
+                ultraHdr = prefs[ULTRA_HDR] ?: true,
+            )
+        }
+        .distinctUntilChanged()
+
+    suspend fun update(change: (AppSettings) -> AppSettings) {
+        context.dataStore.edit { prefs ->
+            val old = AppSettings(
+                theme = prefs[THEME]?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } } ?: ThemeMode.System,
+                wallpaperColors = prefs[WALLPAPER_COLORS] ?: true,
+                startMuted = prefs[START_MUTED] ?: false,
+                motionAutoplay = prefs[MOTION_AUTOPLAY] ?: false,
+                ultraHdr = prefs[ULTRA_HDR] ?: true,
+            )
+            val new = change(old)
+            prefs[THEME] = new.theme.name
+            prefs[WALLPAPER_COLORS] = new.wallpaperColors
+            prefs[START_MUTED] = new.startMuted
+            prefs[MOTION_AUTOPLAY] = new.motionAutoplay
+            prefs[ULTRA_HDR] = new.ultraHdr
+        }
+    }
+
+    /** Grid sizes, by name: the Pictures timeline, the album / Favorites / Videos timelines, and Trash. */
+    fun gridSize(key: GridSizeKey): Flow<String?> = context.dataStore.data.map { it[key.prefKey] }.distinctUntilChanged()
+
+    suspend fun setGridSize(key: GridSizeKey, value: String) {
+        context.dataStore.edit { it[key.prefKey] = value }
+    }
+
+    /** Where videos were left, as `id:positionMs` pairs (most recent first). */
+    val videoPositions: Flow<Map<Long, Long>> = context.dataStore.data
+        .map { prefs ->
+            prefs[VIDEO_POSITIONS].orEmpty().split(';').mapNotNull { pair ->
+                val (id, pos) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                (id.toLongOrNull() ?: return@mapNotNull null) to (pos.toLongOrNull() ?: return@mapNotNull null)
+            }.toMap()
+        }
+
+    suspend fun setVideoPositions(positions: Map<Long, Long>) {
+        context.dataStore.edit { prefs ->
+            prefs[VIDEO_POSITIONS] = positions.entries.joinToString(";") { "${it.key}:${it.value}" }
+        }
+    }
+
     suspend fun setAlbumColumns(columns: Int) {
         context.dataStore.edit { it[ALBUM_COLUMNS] = columns }
     }
@@ -71,8 +125,35 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         val ALBUM_OLDEST_FIRST = booleanPreferencesKey("album_oldest_first")
         val ALBUM_COLUMNS = intPreferencesKey("album_columns")
         val RECENT_SEARCHES = stringPreferencesKey("recent_searches")
+        val THEME = stringPreferencesKey("theme")
+        val WALLPAPER_COLORS = booleanPreferencesKey("wallpaper_colors")
+        val START_MUTED = booleanPreferencesKey("start_muted")
+        val MOTION_AUTOPLAY = booleanPreferencesKey("motion_autoplay")
+        val ULTRA_HDR = booleanPreferencesKey("ultra_hdr")
+        val VIDEO_POSITIONS = stringPreferencesKey("video_positions")
         /** Unit separator: cannot be typed, so it never appears inside a search. */
         const val SEARCH_SEPARATOR = "\u001F"
         const val MAX_RECENT_SEARCHES = 8
     }
+}
+
+enum class ThemeMode(val label: String) { System("System default"), Light("Light"), Dark("Dark") }
+
+/** The Settings screen's look and viewer options. */
+data class AppSettings(
+    val theme: ThemeMode = ThemeMode.System,
+    /** Material You colours from the wallpaper; off uses the app's own palette. */
+    val wallpaperColors: Boolean = true,
+    val startMuted: Boolean = false,
+    /** Play a motion photo's clip once as soon as it is opened. */
+    val motionAutoplay: Boolean = false,
+    /** Show Ultra HDR photos with their extra brightness. */
+    val ultraHdr: Boolean = true,
+)
+
+/** Grids whose size (column count or level) is remembered across launches. */
+enum class GridSizeKey(internal val prefKey: Preferences.Key<String>) {
+    Pictures(stringPreferencesKey("grid_pictures")),
+    Lists(stringPreferencesKey("grid_lists")),
+    Trash(stringPreferencesKey("grid_trash")),
 }
