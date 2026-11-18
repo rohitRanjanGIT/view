@@ -291,3 +291,18 @@ Non-obvious technical choices, newest last.
   current photo's cell (then there is no gap).
 - **Rounded corners while shrinking** follow the photo itself (`FittedRoundedShape`: the fitted, centred photo
   rect inside the page), not the full-screen page, so letterboxed photos visibly round.
+
+### GIF, motion photos, Ultra HDR (Phase 3)
+- **Detection** (`MediaTraitsReader`): MediaStore indexes none of this, so the viewer reads the first 256 KB of the
+  current JPEG on IO and looks for `hdrgm:Version` (Ultra HDR gain map) and `MotionPhoto="1"` / `MicroVideo="1"`
+  in the XMP; cached per item. Only for the photo on screen, never for grid cells (too many files), so the grid
+  has no motion badge. GIFs are known from the mime type, so the grid gets a "GIF" badge.
+- **Ultra HDR:** while such a photo is on screen the window is put in `COLOR_MODE_HDR` (back to default otherwise
+  and when the viewer leaves). Verified on the phone: SurfaceFlinger reports a full-screen HDR layer
+  (desired ratio 5.0). Motorola's `_HDR` / `_PCT` camera files are Ultra HDR JPEGs.
+- **GIFs** animate through Coil's `AnimatedImageDecoder` (already registered); Telephoto shows them as is.
+- **Motion photos:** a "Motion" pill plays the embedded clip once over the photo with Media3, which reads it
+  straight from the JPEG (`JpegMotionPhotoExtractor`), so no extraction code or new library. The clip layer gets
+  the same drag / back-gesture transform as the photo.
+- Test samples live in `Pictures/Gallery test` on the phone (a generated GIF, a generated motion photo whose clip
+  is a short screen recording of that GIF, and a copy of an Ultra HDR camera photo). Kept until I say otherwise.

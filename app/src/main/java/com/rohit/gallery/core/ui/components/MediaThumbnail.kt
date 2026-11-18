@@ -76,7 +76,26 @@ fun MediaThumbnail(
                     .padding(if (compact) 2.dp else 4.dp),
             )
         }
+        if (showBadge && item.mimeType.equals("image/gif", ignoreCase = true)) {
+            TextBadge("GIF", Modifier.align(Alignment.BottomEnd).padding(4.dp))
+        }
     }
+}
+
+/** A short label such as "GIF" in the corner of a cell. */
+@Composable
+private fun TextBadge(label: String, modifier: Modifier = Modifier) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.White,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+    )
 }
 
 /** Cells narrower than this show only the play icon. */

@@ -168,7 +168,7 @@ com.rohit.gallery
 - [x] Search: by date, album, file name, media type (in memory). ML Kit labels/text skipped for now (my call).
 - [x] Hidden albums, pinned albums, custom album order, sort options, oldest-first albums.
 - [ ] Settings screen (parked by me until later).
-- [ ] GIF, motion-photo and HDR/Ultra HDR display support.
+- [x] GIF, motion-photo and HDR/Ultra HDR display support (samples in `Pictures/Gallery test` on my phone).
 
 ### Phase 4: Optimization and hardening
 - Baseline Profile + Macrobenchmarks for startup, timeline scroll, viewer open.

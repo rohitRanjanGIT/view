@@ -15,6 +15,8 @@ import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
 import com.rohit.gallery.core.domain.MediaActions
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.data.mediastore.MediaTraits
+import com.rohit.gallery.core.data.mediastore.MediaTraitsReader
 import com.rohit.gallery.feature.search.SearchIndex
 import com.rohit.gallery.feature.search.parseSearchNow
 import com.rohit.gallery.navigation.ViewerRoute
@@ -51,6 +53,7 @@ class ViewerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: MediaRepository,
     private val source: MediaStoreDataSource,
+    private val traitsReader: MediaTraitsReader,
     private val actions: MediaActions,
     private val infoLoader: MediaInfoLoader,
     private val externalResolver: ExternalMediaResolver,
@@ -171,6 +174,9 @@ class ViewerViewModel @Inject constructor(
         runCatching { actions.deleteRequest(listOf(item)) }.getOrNull()
 
     suspend fun loadDetails(item: MediaItem): MediaDetails = infoLoader.load(item)
+
+    /** Ultra HDR / motion photo, from the file header (cached). */
+    suspend fun traits(item: MediaItem): MediaTraits = traitsReader.read(item)
 
     private companion object {
         /** How long an external MediaStore URI may wait for the index before it is shown on its own. */

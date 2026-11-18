@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.viewer
 
+import android.content.pm.ActivityInfo
 import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
@@ -37,11 +38,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import androidx.compose.foundation.layout.Arrangement
@@ -92,6 +99,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.placeholder
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.data.mediastore.MediaTraits
 import com.rohit.gallery.core.ui.components.LocalThumbnailCache
 import com.rohit.gallery.core.ui.components.LocalViewerBackdrop
 import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
@@ -176,6 +184,14 @@ private fun ViewerContent(
     var showInfo by rememberSaveable { mutableStateOf(false) }
     var askedForLocation by rememberSaveable { mutableStateOf(false) }
     SystemBarsEffect(visible = chromeVisible)
+    var traits by remember { mutableStateOf(MediaTraits.None) }
+    LaunchedEffect(currentItem.id, currentItem.dateModifiedMs) {
+        traits = MediaTraits.None
+        traits = viewModel.traits(currentItem)
+    }
+    HdrWindowEffect(enabled = traits.ultraHdr)
+    // A motion photo's clip plays over it when the Motion pill is tapped, once, then the photo is back.
+    var motionPlaying by remember(currentItem.id) { mutableStateOf(false) }
     var muted by rememberSaveable { mutableStateOf(false) }
     val playback = rememberPlayback(currentItem, muted, viewModel.playbackPositions)
     val trashActions = rememberTrashViewerActions(viewModel)
@@ -366,6 +382,11 @@ private fun ViewerContent(
                     onZoomedChange = { zoomed = it },
                     onZoomState = { state -> currentZoom.state = state },
                     onTap = { if (showInfo) showInfo = false else chromeVisible = !chromeVisible },
+                    motionClip = if (isCurrent && motionPlaying) {
+                        { clipModifier -> MotionClip(item, muted, onEnded = { motionPlaying = false }, modifier = clipModifier) }
+                    } else {
+                        null
+                    },
                 )
             }
 
@@ -379,6 +400,9 @@ private fun ViewerContent(
                     item = currentItem,
                     onBack = ::close,
                     onInfo = { showInfo = !showInfo },
+                    showMotion = traits.motionPhoto,
+                    motionPlaying = motionPlaying,
+                    onMotion = { motionPlaying = !motionPlaying },
                     onEdit = if (currentItem.isVideo || viewModel.isTrash) null else {
                         {
                             if (!viewModel.openInEditor(currentItem)) {
@@ -460,6 +484,7 @@ private fun ImagePage(
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
+    motionClip: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val cache = LocalThumbnailCache.current
     val context = LocalPlatformContext.current
@@ -498,6 +523,13 @@ private fun ImagePage(
                 // The photo-shaped copy flies during transitions; this interactive one waits.
                 .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f },
         )
+        // A motion photo's clip, over the photo and moved by the same gestures.
+        motionClip?.invoke(
+            Modifier
+                .fillMaxSize()
+                .then(if (dragLayer != null) Modifier.graphicsLayer { dragLayer(aspect) } else Modifier)
+                .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f },
+        )
     }
 }
 @Composable
@@ -505,6 +537,9 @@ private fun ViewerTopBar(
     item: MediaItem,
     onBack: () -> Unit,
     onInfo: () -> Unit,
+    showMotion: Boolean,
+    motionPlaying: Boolean,
+    onMotion: () -> Unit,
     onEdit: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -527,6 +562,7 @@ private fun ViewerTopBar(
             color = Color.White,
             modifier = Modifier.weight(1f),
         )
+        if (showMotion) MotionButton(motionPlaying, onMotion)
         if (onEdit != null) {
             // Editing is handed to Google Photos for now (it saves a copy); our own editor comes later.
             IconButton(onClick = onEdit) {
@@ -536,6 +572,19 @@ private fun ViewerTopBar(
         IconButton(onClick = onInfo) {
             Icon(Icons.Filled.Info, contentDescription = "Details", tint = Color.White)
         }
+    }
+}
+
+/**
+ * Puts the window in HDR mode while an Ultra HDR photo is on screen, so its gain map lifts the highlights above
+ * normal white. Back to the default mode for other photos and when the viewer goes away.
+ */
+@Composable
+private fun HdrWindowEffect(enabled: Boolean) {
+    val window = LocalActivity.current?.window ?: return
+    DisposableEffect(window, enabled) {
+        window.colorMode = if (enabled) ActivityInfo.COLOR_MODE_HDR else ActivityInfo.COLOR_MODE_DEFAULT
+        onDispose { window.colorMode = ActivityInfo.COLOR_MODE_DEFAULT }
     }
 }
 
@@ -575,11 +624,12 @@ private fun ViewerPage(
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
+    motionClip: (@Composable (Modifier) -> Unit)?,
 ) {
     if (item.isVideo) {
         VideoPage(item, isCurrent, playback, dragLayer, flightPlacement, onTap)
     } else {
-        ImagePage(item, isCurrent, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap)
+        ImagePage(item, isCurrent, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap, motionClip)
     }
 }
 
@@ -662,5 +712,62 @@ private class FittedRoundedShape(private val aspect: Float, private val radius: 
         val left = (size.width - w) / 2f
         val top = (size.height - h) / 2f
         return Outline.Rounded(RoundRect(left, top, left + w, top + h, CornerRadius(radius)))
+    }
+}
+
+/**
+ * Plays the short clip inside a motion photo once, over the photo (Media3 reads the clip straight from the
+ * JPEG), then calls [onEnded]. Until its first frame arrives it draws nothing, so the photo stays visible.
+ */
+@Composable
+private fun MotionClip(item: MediaItem, muted: Boolean, onEnded: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val latestOnEnded by rememberUpdatedState(onEnded)
+    val player = remember(item.id) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(item.uri))
+            prepare()
+            playWhenReady = true
+        }
+    }
+    LaunchedEffect(player, muted) { player.volume = if (muted) 0f else 1f }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) latestOnEnded()
+            }
+
+            override fun onPlayerError(error: PlaybackException) = latestOnEnded()
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    ContentFrame(
+        player = player,
+        modifier = modifier,
+        surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
+        contentScale = ContentScale.Fit,
+        keepContentOnReset = true,
+        shutter = {},
+    )
+}
+
+/** The "Motion" pill in the top bar: plays the clip of a motion photo. */
+@Composable
+private fun MotionButton(playing: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = if (playing) 0.35f else 0.18f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(4.dp))
+        Text("Motion", style = MaterialTheme.typography.labelLarge, color = Color.White)
     }
 }
