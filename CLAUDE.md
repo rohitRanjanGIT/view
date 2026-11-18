@@ -222,7 +222,9 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
     MediaStore URIs get the full pager, others a single item. Verified by adb: REVIEW opens the right photo with the
     filmstrip, Back returns to the caller, file:// single item shows, unreadable URI closes with a toast.
   - **Fast-scroller** (commit `7840cd0`): handle on the timeline's right edge while scrolling, drag with a
-    "Month Year" bubble. Checked by adb screenshots; feel not yet confirmed by me.
+    "Month Year" bubble. Checked by adb screenshots; feel not yet confirmed by me. Commit `cec7e0c` fixed the
+    grid freezing / jumping back after a handle drag (stale target re-applied on every library change);
+    I confirmed that was the glitch, installed on the phone 2026-11-18.
   - 33 unit tests pass.
 - Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
 
