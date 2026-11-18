@@ -161,13 +161,14 @@ com.rohit.gallery
 - Fast-scroller with date bubble.
 - **Done when:** I can replace my current gallery for a full day without missing anything.
 
-### Phase 3: Polish and power features
-- Pinch grid density + month/year views.
-- Editor: crop, rotate, flip, basic adjustments, filters; save as copy.
-- Search: by date, album, file name, media type; optional on-device ML Kit
+### Phase 3: Polish and power features (IN PROGRESS)
+- [x] Pinch grid density + month view (Pictures, album grids, Albums tab).
+- [ ] Editor: crop, rotate, flip, basic adjustments, filters; save as copy.
+- [ ] Search: by date, album, file name, media type; optional on-device ML Kit
   labels/text indexed via WorkManager (bundled models only, no network).
-- Hidden albums, custom album order, sort options, Settings screen.
-- GIF, motion-photo and HDR/Ultra HDR display support.
+- [x] Hidden albums, pinned albums, custom album order, sort options, oldest-first albums.
+- [ ] Settings screen (parked by me until later).
+- [ ] GIF, motion-photo and HDR/Ultra HDR display support.
 
 ### Phase 4: Optimization and hardening
 - Baseline Profile + Macrobenchmarks for startup, timeline scroll, viewer open.
@@ -201,16 +202,17 @@ Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/main`; push 
 describes the project for GitHub; keep its Features / Status sections in step when a phase finishes.
 
 ### Where we are
-- **Phases 0, 1 and 2 are done and verified on my phone.** Last code commit `2bb579a`; README `f57ce72`.
-  33 unit tests pass. Release and benchmark builds compile; merged manifests contain no `INTERNET`
-  (re-check each build).
-- **Phase 2 is closed by my full-day test** (I'm doing it now). If I report problems, fix those first.
-- **Next: Phase 3.** Per section 9, start by posting the Phase 3 task list and wait for my OK. Suggested order:
-  pinch grid density (3 / 4 / 7 columns + month view, animated), then settings + DataStore (also fixes resume
-  positions being lost), sort options / hidden albums / custom album order (Room), search, editor, then GIF /
-  motion photo / Ultra HDR display.
+- **Phases 0-2 done and verified on my phone. Phase 3 in progress.** Last code commit `e97e16b`. 41 unit tests pass.
+  Merged manifests contain no `INTERNET` (re-check each build; Room/DataStore add only non-network permissions).
+- **Phase 3 done so far (all verified on my phone):** pinch density, album timelines, album organisation (pin /
+  hide / sort / custom order / bulk select), Albums tab pinch, oldest-first albums.
+- **Phase 3 decisions:** no ML search for now. Settings is parked by me until later. Trash stays a flat grid.
+- **Next: search** (plan approved): add `DISPLAY_NAME` to the index (measure startup before/after), in-memory
+  query parser (dates, album, file name, type, combined words; hidden albums excluded), search screen from a button
+  on Pictures with suggestions and timeline results, recent searches. Then the editor, then GIF / motion / Ultra HDR,
+  then Settings.
 
-### What exists (Phase 0-2)
+### What exists
 - **Setup:** `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin), Kotlin 2.2.10, Gradle 9.6.0, Compose BOM
   2026.02.01, Hilt + KSP, Navigation Compose (type-safe routes in `navigation/Routes.kt`), release (R8 + shrink)
   and `benchmark` build types, Material 3 dynamic colour, tabs Pictures / Albums / Menu.
@@ -230,16 +232,24 @@ describes the project for GitHub; keep its Features / Status sections in step wh
 - **Albums, Favorites, Videos, Trash** (restore / delete forever with confirmation).
 - **External intents:** `ACTION_VIEW` + camera `REVIEW` for image/video content and file URIs open straight into
   the viewer (indexed MediaStore URI: full pager; otherwise a single item), works without media permission.
+- **Pinch density (Phase 3):** `core/ui/components/GridZoom.kt` (`GridZoomState`: live switch every 10% while
+  pinching, snapshot of the old grid cross-faded over 220 ms), `PinchToZoom.kt`, `GridZoomAnchor.kt` (keeps the cell
+  under the fingers in place for flat grids). Pictures: 2/4/6 + month (8, by month), default 4, in memory only.
+  Album / Favorites / Videos use the same `TimelineGrid` (`underStatusBar = false`); Trash is a flat 2/4/6 grid.
+- **Album organisation (Phase 3):** Room `gallery.db` (`AlbumPrefEntity`: hidden, pinnedAt, position; schema in
+  `app/schemas/`), DataStore `AppPreferences` (album sort, albums per row 2/3/4, oldest-first). Hidden albums are
+  filtered out of `MediaRepository.state` everywhere (`allState` is unfiltered, used by Move/Copy). Pins keep pin
+  order. Edit albums screen: drag to reorder, pin and eye toggles. Long-press bulk select on Albums and Edit albums.
 
 ### Known gaps / deferred
 - Camera thumbnail opens Google Photos, not Gallery (parked by me; likely the system default app setting).
-- Resume positions are lost on process death (DataStore, Phase 3).
+- Resume positions, the Pictures grid level and secondary grid sizes are lost on restart (Settings, parked).
 - `ACCESS_MEDIA_LOCATION` runtime flow untested on device.
 - **Phase 4:** request 120 Hz (`preferredDisplayModeId`; app renders at 90 Hz, Motorola maps "high" to 90),
   run `assembleRelease` / benchmark builds on the phone (R8 risk), Baseline Profile (viewer setup is
   ~140-190 ms in debug), accessibility `contentDescription`s, collapsing title header, real nav icons
   (current ones are `material-icons-core`).
-- Not added yet (add in the phase that needs them): Room, DataStore, WorkManager, Turbine.
+- Not added yet (add in the phase that needs them): WorkManager, Turbine.
 
 ### How I like to work (learned in Phase 2)
 - When I report something vague ("it glitches", "it vanishes"), first say back what you understood and ask what
@@ -269,6 +279,11 @@ describes the project for GitHub; keep its Features / Status sections in step wh
 - **Timing:** temporary `Log.d` lines read with `adb logcat -d -s <TAG>:D`; remove them before committing.
 
 ### Gotchas learned (do not re-learn these)
+- **JAVA_HOME** may be unset in the shell: `export JAVA_HOME="C:/Program Files/Android/Android Studio/jbr"`
+  before `gradlew.bat`. Write long build output to a scratchpad log and grep it.
+- **Pinch:** `calculateCentroidSize` is 0 on the frame the second finger lands; take the first non-zero span as the
+  baseline. Never read `layoutInfo` in composition (recomposes every scroll frame); use `snapshotFlow`.
+  Disable `animateItem` placement on the frame the column count changes.
 - **Kotlin 2.2.10 compiler cannot read Kotlin 2.4 metadata.** Latest coroutines (1.11), kotlinx-serialization
   (1.13) and Coil (3.5+) fail. Pinned: coroutines 1.10.2, serialization 1.9.0, Coil 3.4.0, Telephoto 0.19.0
   (`me.saket.telephoto.zoomable`), Media3 1.11.1. Check a library's POM `kotlin-stdlib` before bumping.
