@@ -89,6 +89,7 @@ import java.time.LocalDate
 import kotlinx.coroutines.launch
 
 private val CellGap = 2.dp
+private val SecondaryTitleBarHeight = 64.dp
 private val AutoScrollEdge = 96.dp
 private const val AUTO_SCROLL_MAX_PX = 36f
 
@@ -173,12 +174,13 @@ private fun SelectionBars(
 private class HitResult(val item: MediaItem, val index: Int)
 
 @Composable
-private fun TimelineGrid(
+fun TimelineGrid(
     content: TimelineUiState.Content,
     selection: SelectionState,
     contentBottomPadding: Dp,
     onOpenMedia: (MediaItem) -> Unit,
     onLevelChange: (GridLevel) -> Unit,
+    underStatusBar: Boolean = true,
 ) {
     val columns = content.columns
     val density = LocalDensity.current
@@ -208,8 +210,11 @@ private fun TimelineGrid(
     val scrollMap = remember(content.days, headerPx, rowPx) { TimelineScrollMap(content.days, headerPx, rowPx) }
 
     // Height of the list area that shows content: below the status bar, above the bottom bar.
+    // Below a title bar (secondary screens) the list starts lower; an estimate of its height is enough.
+    val topChromePx = WindowInsets.statusBars.getTop(density) +
+        if (underStatusBar) 0 else with(density) { SecondaryTitleBarHeight.roundToPx() }
     val visiblePx = LocalWindowInfo.current.containerSize.height -
-        WindowInsets.statusBars.getTop(density) - with(density) { contentBottomPadding.roundToPx() }
+        topChromePx - with(density) { contentBottomPadding.roundToPx() }
     ScrollToReturnedItem(listState, content, scrollMap, headerPx, rowPx, visiblePx)
 
     val zoom = remember { GridZoomState() }
@@ -284,7 +289,7 @@ private fun TimelineGrid(
             .fillMaxSize()
             // The list starts below the status bar (not top content padding): a pinned day header
             // sits at the viewport top, and with padding it slid under the clock.
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .then(if (underStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
             .clipToBounds()
             // Outside the scaled list, so finger positions are not affected by the scale they drive.
             .pinchToZoom(
@@ -364,6 +369,7 @@ private fun TimelineGrid(
         listState = listState,
         map = scrollMap,
         bottomPadding = contentBottomPadding,
+        underStatusBar = underStatusBar,
         modifier = Modifier.align(Alignment.TopEnd),
     )
     }
@@ -405,6 +411,7 @@ private fun TimelineFastScroller(
     listState: LazyListState,
     map: TimelineScrollMap,
     bottomPadding: Dp,
+    underStatusBar: Boolean,
     modifier: Modifier = Modifier,
 ) {
     // Scrollable distance: content height minus the part of the viewport inside the paddings.
@@ -446,7 +453,7 @@ private fun TimelineFastScroller(
         labelAt = { fraction ->
             map.epochDayAt((fraction * maxScrollPx()).toLong())?.let { monthLabel(it, locale) }.orEmpty()
         },
-        topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+        topPadding = if (underStatusBar) WindowInsets.statusBars.asPaddingValues().calculateTopPadding() else 0.dp,
         bottomPadding = bottomPadding,
         modifier = modifier,
     )

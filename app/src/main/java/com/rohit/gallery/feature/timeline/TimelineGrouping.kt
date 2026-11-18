@@ -109,3 +109,39 @@ fun formatDuration(durationMs: Long): String {
         "%d:%02d".format(minutes, seconds)
     }
 }
+
+/** A list grouped once per change into days and months; switching density only re-chunks rows. */
+class GroupedLibrary(
+    val items: List<MediaItem>,
+    val days: List<DayGroup>,
+    val months: List<DayGroup>,
+    val indexById: Map<Long, Int>,
+)
+
+/** Groups a newest-first list for the timeline grid. Runs off the main thread (date math per item). */
+fun groupLibrary(items: List<MediaItem>, zone: ZoneId): GroupedLibrary {
+    val days = groupByDay(items, zone)
+    return GroupedLibrary(
+        items = items,
+        days = days,
+        months = groupByMonth(days),
+        indexById = HashMap<Long, Int>(items.size * 2).also { map ->
+            items.forEachIndexed { i, item -> map[item.id] = i }
+        },
+    )
+}
+
+/** The grid content at [level]: Empty for an empty list. */
+fun GroupedLibrary.toUiState(level: GridLevel): TimelineUiState {
+    if (items.isEmpty()) return TimelineUiState.Empty
+    val sections = (if (level.byMonth) months else days).toTimelineDays(level.columns)
+    return TimelineUiState.Content(
+        days = sections,
+        level = level,
+        items = items,
+        indexById = indexById,
+        rowsByFirstId = HashMap<Long, List<MediaItem>>().also { map ->
+            sections.forEach { day -> day.rows.forEach { row -> map[row.first().id] = row } }
+        },
+    )
+}

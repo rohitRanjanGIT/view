@@ -210,3 +210,8 @@ Non-obvious technical choices, newest last.
   `ZoomOverlay`) and only knows column counts. `SelectableMediaGrid` (album, Favorites, Videos, Trash) pinches
   through 2 / 4 / 6 columns (no month view: no date sections there); `KeepFlatGridAnchor` scrolls with exact
   row geometry. Column count is per screen (`rememberSaveable`) until DataStore lands.
+- **Albums, Favorites and Videos use the timeline grid** (my request: dates and months in albums). `TimelineGrid` is
+  public with `underStatusBar = false` for screens under a title bar; grouping moved to `groupLibrary` /
+  `toUiState` (TimelineGrouping.kt) so the Pictures VM and `MediaListScreen` share it. `MediaListScreen` groups
+  with `produceState` on `Dispatchers.Default` (blank for a few ms rather than a spinner flash). Trash keeps the
+  flat `SelectableMediaGrid` (ordered by delete date), which still pinches 2 / 4 / 6.

@@ -44,14 +44,6 @@ sealed interface TimelineUiState {
     }
 }
 
-/** The library grouped once per change; switching density only re-chunks rows. */
-private class GroupedLibrary(
-    val items: List<MediaItem>,
-    val days: List<DayGroup>,
-    val months: List<DayGroup>,
-    val indexById: Map<Long, Int>,
-)
-
 @HiltViewModel
 class TimelineViewModel @Inject constructor(
     private val repository: MediaRepository,
@@ -70,38 +62,13 @@ class TimelineViewModel @Inject constructor(
         .map { index ->
             when (index) {
                 MediaIndexState.Loading -> null
-                is MediaIndexState.Ready -> {
-                    val days = groupByDay(index.items, ZoneId.systemDefault())
-                    GroupedLibrary(
-                        items = index.items,
-                        days = days,
-                        months = groupByMonth(days),
-                        indexById = HashMap<Long, Int>(index.items.size * 2).also { map ->
-                            index.items.forEachIndexed { i, item -> map[item.id] = i }
-                        },
-                    )
-                }
+                is MediaIndexState.Ready -> groupLibrary(index.items, ZoneId.systemDefault())
             }
         }
         .flowOn(Dispatchers.Default)
 
     val uiState: StateFlow<TimelineUiState> = combine(library, level) { lib, lvl ->
-        when {
-            lib == null -> TimelineUiState.Loading
-            lib.items.isEmpty() -> TimelineUiState.Empty
-            else -> {
-                val sections = (if (lvl.byMonth) lib.months else lib.days).toTimelineDays(lvl.columns)
-                TimelineUiState.Content(
-                    days = sections,
-                    level = lvl,
-                    items = lib.items,
-                    indexById = lib.indexById,
-                    rowsByFirstId = HashMap<Long, List<MediaItem>>().also { map ->
-                        sections.forEach { day -> day.rows.forEach { row -> map[row.first().id] = row } }
-                    },
-                )
-            }
-        }
+        lib?.toUiState(lvl) ?: TimelineUiState.Loading
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TimelineUiState.Loading)
