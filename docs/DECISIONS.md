@@ -159,7 +159,10 @@ Non-obvious technical choices, newest last.
   while zoomed (Telephoto consumes the pan), so it needs no change.
 - **Every close flies into the cell.** Drag-dismiss used to switch the flight off and fade (the photo just vanished).
   Now it keeps the flight: `SharedFlightFrame` takes the drag as layout size/offset (`FlightPlacement`), since the
-  flight starts from layout bounds, so it leaves from where the finger let go. The flight spring went from
-  stiffness 1200 (~130 ms, read as vanishing) to 450 / damping 0.95 (~300 ms, no overshoot), open and close alike.
+  flight starts from layout bounds, so it leaves from where the finger let go.
+- **Flight timing matched to Google Photos** by capturing both on the phone at 10x `animator_duration_scale`
+  (raw `screencap` loop into `/data/local/tmp`, ~0.23 s per frame, stitched into a contact sheet). Google Photos
+  flies in ~7 frames (~170 ms). Ours is now `tween(180, FastOutSlowInEasing)`, open and close alike. A stiff
+  spring (1200) read as vanishing; a soft one (450) crept slowly into the cell at the end.
 - **All secondary grids share `MediaListScreen`.** Favorites now has Move/Copy too; Trash passes its own Restore /
   Delete bar through a slot.
