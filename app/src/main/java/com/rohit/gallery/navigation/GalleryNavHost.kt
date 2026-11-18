@@ -122,6 +122,22 @@ fun GalleryNavHost(
         }
     }
 
+    // Swiping sideways on a tab screen or the bottom bar moves one tab: left goes to the next, right to the previous.
+    val currentTab = topLevelDestinations.indexOfFirst { currentDestination?.hasRoute(it.route::class) == true }
+    val latestTab by rememberUpdatedState(currentTab)
+    val latestShowBar by rememberUpdatedState(showBottomBar)
+    fun swipeTab(direction: Int) {
+        val from = latestTab
+        if (from < 0) return
+        val dest = topLevelDestinations.getOrNull(from + direction) ?: return
+        navController.navigate(dest.route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+    val swipePx = with(LocalDensity.current) { TabSwipeDistance.toPx() }
+
     SharedTransitionLayout {
         CompositionLocalProvider(
             LocalSharedTransitionScope provides this,
@@ -139,7 +155,9 @@ fun GalleryNavHost(
                     navController = navController,
                     // Opened by another app: only the viewer, no permission gate or timeline underneath.
                     startDestination = externalStart ?: PicturesRoute,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize()
+                        // Only on the three tab screens, and not while selecting.
+                        .tabSwipe(swipePx, enabled = { latestShowBar }, onSwipe = ::swipeTab),
                     // Back gesture: the screen slides away with the finger (towards the side it was swiped from)
                     // while the one underneath stays still. The viewer handles its own back gesture (see ViewerScreen).
                     predictivePopEnterTransition = { EnterTransition.None },
@@ -238,34 +256,7 @@ fun GalleryNavHost(
                     enter = fadeIn(tween(GalleryMotion.FADE_MS)),
                     exit = fadeOut(tween(GalleryMotion.FADE_MS)),
                 ) {
-                    // Swiping sideways on the bar moves one tab: left goes to the next tab, right to the previous.
-                    val currentTab = topLevelDestinations.indexOfFirst { currentDestination?.hasRoute(it.route::class) == true }
-                    val latestTab by rememberUpdatedState(currentTab)
-                    fun goToTab(index: Int) {
-                        val dest = topLevelDestinations.getOrNull(index) ?: return
-                        navController.navigate(dest.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                    val swipePx = with(LocalDensity.current) { TabSwipeDistance.toPx() }
-                    NavigationBar(
-                        Modifier.pointerInput(Unit) {
-                            var total = 0f
-                            detectHorizontalDragGestures(
-                                onDragStart = { total = 0f },
-                                onDragEnd = {
-                                    val from = latestTab
-                                    if (from >= 0 && abs(total) > swipePx) goToTab(if (total < 0) from + 1 else from - 1)
-                                },
-                                onHorizontalDrag = { change, amount ->
-                                    change.consume()
-                                    total += amount
-                                },
-                            )
-                        },
-                    ) {
+                    NavigationBar(Modifier.tabSwipe(swipePx, enabled = { true }, onSwipe = ::swipeTab)) {
                         topLevelDestinations.forEach { dest ->
                             NavigationBarItem(
                                 selected = currentDestination?.hasRoute(dest.route::class) == true,
@@ -287,7 +278,27 @@ fun GalleryNavHost(
     }
 }
 
-/** How far a sideways swipe on the bottom bar must travel to change tab. */
+/**
+ * A one-finger sideways swipe of at least [distancePx] calls [onSwipe] with +1 (swiped left: next tab) or -1.
+ * Runs after the children (normal pass), so anything that already claimed the drag, like vertical scrolling,
+ * drag-to-select or a pinch, wins and the tab stays.
+ */
+private fun Modifier.tabSwipe(distancePx: Float, enabled: () -> Boolean, onSwipe: (Int) -> Unit): Modifier =
+    pointerInput(Unit) {
+        var total = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragEnd = { if (enabled() && abs(total) > distancePx) onSwipe(if (total < 0) 1 else -1) },
+            onHorizontalDrag = { change, amount ->
+                if (enabled()) {
+                    change.consume()
+                    total += amount
+                }
+            },
+        )
+    }
+
+/** How far a sideways swipe must travel to change tab. */
 private val TabSwipeDistance = 48.dp
 
 /**
