@@ -328,3 +328,6 @@ Swiping the viewer filmstrip changes the photo live: whichever thumbnail is near
 - Details panel: big date, file name, location; camera, "MP | size | bytes | type"; ISO / shutter / aperture / focal box (`ExposureValues`); folder.
 - GIFs stay still until Play: the still frame is a plain `BitmapFactoryDecoder` decode, the animation the normal animated decoder. Both get their own memory-cache keys, because Coil's key does not include the decoder and the still frame would otherwise stand in for the animation.
 - Pause and Folder icons are drawn in `core/ui/icons/GalleryIcons.kt` instead of adding the large extended icon set.
+
+## Tabs in one pager (2026-11-19)
+Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `HomeRoute` (was three nav destinations), so a sideways swipe drags the next tab in with the finger. All three stay composed (`beyondViewportPageCount = 2`) so scroll positions survive; cold start was unchanged (460-470 ms). Snap: no-bounce spring, stiffness 900, 30% positional threshold; the same spec for bar taps and Back (Back from Albums / Menu slides to Pictures). The pager is still while selecting or when a second finger lands (pinch belongs to the grid). Dragging on the bottom bar drives the pager too (`dragsPager`).
