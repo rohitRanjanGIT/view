@@ -193,9 +193,16 @@ Non-obvious technical choices, newest last.
 - **Gesture:** `pinchToZoom` sits on a Box around the list (outside the scaled layer, so finger positions don't
   move with the scale) and consumes events in the initial pass once two fingers are down, so the list neither
   scrolls nor sees a tap/long press. The grid follows the fingers through a `graphicsLayer` scale (no
-  recomposition). On release, past 1.15x / 0.87x it switches level; otherwise it springs back.
-- **Anchor:** the cell under the fingers (or the nearest row's) is kept where the fingers were. In the first
-  composition of the new level `KeepZoomAnchor` calls `requestScrollToItem` from exact geometry, snaps the scale
-  to how big the cells looked at release (`pinchScale x newColumns / oldColumns`) and springs it to 1.
+  recomposition). It switches **while the fingers move**, each time the pinch passes 1.1x / 0.9x since the last
+  switch (tuned on the phone: one big swipe should go 2 -> month). Movement during a switch still counts towards
+  the next, so a fast pinch chains switches. On release without a switch it springs back.
+- **Switch animation:** the grid draws through a recorded `GraphicsLayer`; at a switch it is snapshotted
+  (`toImageBitmap`) and laid over the new layout. Both scale together (220 ms) so the anchor cell stays one cell,
+  while the snapshot fades out. The first try (new grid only, springing from a smaller size) showed empty edges.
+- **Anchor:** the cell under the fingers (or the nearest row's) is kept where the fingers were.
 - **Sharper thumbnails on zoom-in:** `ThumbnailCache` remembers the cell size each bitmap was decoded for.
   A smaller one is shown at once as a placeholder and reloaded at the new size (`getSharp`, 0.9 tolerance).
+- **Pinch baseline bug:** `calculateCentroidSize` is 0 on the frame the second finger lands (it only counts
+  fingers already down), so the starting distance is the first non-zero span.
+- **Timeline background** is painted with `colorScheme.background` (the window behind is a different shade, which
+  showed in the empty end of short rows). Video badges in cells under 64 dp show only the play icon.

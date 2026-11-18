@@ -52,7 +52,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -204,6 +208,7 @@ private fun TimelineGrid(
     ScrollToReturnedItem(listState, content, scrollMap, headerPx, rowPx, visiblePx)
 
     val zoom = remember { TimelineZoomState() }
+    val gridLayer = rememberGraphicsLayer()
     KeepZoomAnchor(zoom, content, listState, scrollMap, rowPx, cellSizePx, gapPx)
 
     val currentContent by rememberUpdatedState(content)
@@ -226,8 +231,7 @@ private fun TimelineGrid(
     }
 
     /** The item to keep in place when a pinch at [position] changes density: the cell there, or the nearest row's. */
-    fun anchorAt(position: Offset): Long? {
-        itemAt(position)?.let { return it.item.id }
+    fun anchorAt(position: Offset): ZoomAnchorCell? {
         val info = listState.layoutInfo
         val y = position.y + info.viewportStartOffset
         val row = info.visibleItemsInfo
@@ -236,7 +240,11 @@ private fun TimelineGrid(
         val items = currentContent.rowsByFirstId[(row.key as String).removePrefix(ROW_KEY_PREFIX).toLongOrNull()]
             ?: return null
         val column = (position.x / (cellSizePx + gapPx)).toInt().coerceIn(0, items.lastIndex)
-        return items[column].id
+        val centre = Offset(
+            x = column * (cellSizePx + gapPx) + cellSizePx / 2f,
+            y = (row.offset - info.viewportStartOffset + cellSizePx / 2).toFloat(),
+        )
+        return ZoomAnchorCell(items[column].id, centre)
     }
 
     // While drag-selecting, scroll when the finger is near the top or bottom edge. The pointer
@@ -263,7 +271,9 @@ private fun TimelineGrid(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    // Same colour as the day headers, so gaps and the empty end of a short row match them (the window
+    // behind is a slightly different shade).
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     Box(
         Modifier
             .fillMaxSize()
@@ -273,13 +283,21 @@ private fun TimelineGrid(
             .clipToBounds()
             // Outside the scaled list, so finger positions are not affected by the scale they drive.
             .pinchToZoom(
-                onPinch = zoom::onPinch,
-                onPinchEnd = { _, centroid ->
-                    zoom.onPinchEnd(scope, currentContent.level, centroid, ::anchorAt)?.let { level ->
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onLevelChange(level)
-                    }
+                onPinch = { scale, centroid ->
+                    zoom.onPinch(
+                        scale = scale,
+                        centroid = centroid,
+                        level = currentContent.level,
+                        scope = scope,
+                        snapshot = { gridLayer.toImageBitmap() },
+                        anchorAt = ::anchorAt,
+                        onSwitch = { level ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onLevelChange(level)
+                        },
+                    )
                 },
+                onPinchEnd = { zoom.onPinchEnd(scope) },
             ),
     ) {
     LazyColumn(
@@ -287,6 +305,11 @@ private fun TimelineGrid(
         modifier = Modifier
             .fillMaxSize()
             .zoomLayer(zoom)
+            // Records the grid into a layer as it draws, so a density switch can snapshot the old grid.
+            .drawWithContent {
+                gridLayer.record { this@drawWithContent.drawContent() }
+                drawLayer(gridLayer)
+            }
             .gridGestures(
                 onTap = { pos ->
                     itemAt(pos)?.let { hit ->
@@ -327,6 +350,7 @@ private fun TimelineGrid(
             }
         }
     }
+    ZoomOverlay(zoom)
     }
     TimelineFastScroller(
         listState = listState,

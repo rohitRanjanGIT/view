@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.feature.timeline.formatDuration
@@ -65,31 +66,41 @@ fun MediaThumbnail(
             )
         }
         if (showBadge && item.isVideo) {
+            // Small cells (dense grids) have no room for the duration: just the play icon.
+            val compact = with(LocalDensity.current) { cellSizePx.toDp() } < CompactCell
             DurationBadge(
                 durationMs = item.durationMs,
+                showDuration = !compact,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(4.dp),
+                    .padding(if (compact) 2.dp else 4.dp),
             )
         }
     }
 }
 
+/** Cells narrower than this show only the play icon. */
+private val CompactCell = 64.dp
+
 @Composable
-private fun DurationBadge(durationMs: Long, modifier: Modifier = Modifier) {
+private fun DurationBadge(durationMs: Long, showDuration: Boolean, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(Color.Black.copy(alpha = 0.55f))
-            .padding(horizontal = 4.dp, vertical = 1.dp),
+            .padding(horizontal = if (showDuration) 4.dp else 1.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
-        Text(
-            formatDuration(durationMs),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-        )
+        if (showDuration) {
+            Text(
+                formatDuration(durationMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
     }
 }

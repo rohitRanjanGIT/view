@@ -15,13 +15,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 /**
  * Two-finger pinch on a scrolling grid. While two fingers are down, their events are consumed in the
  * initial pass so the list underneath neither scrolls nor sees a tap or long press. [onPinch] gets the
- * scale relative to the fingers' starting distance and their centre; [onPinchEnd] fires once, as soon
- * as fewer than two fingers remain.
+ * scale relative to the fingers' distance at the start (or at the last time it returned true, which
+ * restarts the measurement) and their centre. [onPinchEnd] fires once, as soon as fewer than two
+ * fingers remain.
  */
 @Composable
 fun Modifier.pinchToZoom(
-    onPinch: (scale: Float, centroid: Offset) -> Unit,
-    onPinchEnd: (scale: Float, centroid: Offset) -> Unit,
+    onPinch: (scale: Float, centroid: Offset) -> Boolean,
+    onPinchEnd: () -> Unit,
 ): Modifier {
     val pinch by rememberUpdatedState(onPinch)
     val pinchEnd by rememberUpdatedState(onPinchEnd)
@@ -31,30 +32,28 @@ fun Modifier.pinchToZoom(
             var pinching = false
             var ended = false
             var startSpan = 0f
-            var scale = 1f
-            var centroid = Offset.Zero
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val pressed = event.changes.count { it.pressed }
                 if (pressed == 0) break
                 if (pressed >= 2 && !ended) {
+                    pinching = true
                     val span = event.calculateCentroidSize(useCurrent = true)
-                    centroid = event.calculateCentroid(useCurrent = true)
-                    if (!pinching) {
-                        pinching = true
+                    // The span is 0 on the frame the second finger lands (the helper only counts fingers that
+                    // were already down), so the baseline is the first non-zero span.
+                    if (startSpan <= 0f) {
                         startSpan = span
-                    } else if (startSpan > 0f) {
-                        scale = span / startSpan
-                        pinch(scale, centroid)
+                    } else if (span > 0f && pinch(span / startSpan, event.calculateCentroid(useCurrent = true))) {
+                        startSpan = span
                     }
                 } else if (pinching && !ended) {
                     ended = true
-                    pinchEnd(scale, centroid)
+                    pinchEnd()
                 }
                 // Once a pinch has started, the rest of the gesture belongs to it.
                 if (pinching) event.changes.forEach { it.consume() }
             }
-            if (pinching && !ended) pinchEnd(scale, centroid)
+            if (pinching && !ended) pinchEnd()
         }
     }
 }

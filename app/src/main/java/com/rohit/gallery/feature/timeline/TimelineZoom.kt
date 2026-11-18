@@ -1,6 +1,10 @@
 package com.rohit.gallery.feature.timeline
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -11,116 +15,246 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.util.lerp
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-/** Pinch past these scales (on release) to change the grid density. */
-private const val ZOOM_IN_AT = 1.15f
-private const val ZOOM_OUT_AT = 0.87f
+/** Pinch scale (since the last switch) at which the grid switches density, while the fingers are still down. */
+private const val ZOOM_IN_AT = 1.1f
+private const val ZOOM_OUT_AT = 0.9f
 
-/** How far the grid follows the fingers before the release decides. */
-private const val MIN_LIVE_SCALE = 0.5f
-private const val MAX_LIVE_SCALE = 2f
+/** How far the grid follows the fingers. Past the last level it only gives a little (rubber band). */
+private const val MIN_LIVE_SCALE = 0.6f
+private const val MAX_LIVE_SCALE = 1.6f
+private const val RUBBER_BAND = 0.25f
+
+private const val SWITCH_MS = 220
+
+/** The cell a pinch was on: its media id and its centre in the list's (unscaled) layout coordinates. */
+class ZoomAnchorCell(val itemId: Long, val centre: Offset)
 
 /**
- * The item the fingers were on when a pinch changed the density, where it was on screen ([y], list
- * coordinates) and how big its cells looked ([fromScale] x the old [fromColumns] grid).
- */
-class ZoomAnchor(val itemId: Long, val y: Float, val fromScale: Float, val fromColumns: Int)
-
-/**
- * Visual state of a timeline pinch: the grid is drawn scaled by [scale] around [origin] while the fingers
- * move, then the new density is laid out and eases from the size the cells had to its real size.
- * Read only in the graphics layer, so pinching never recomposes the grid.
+ * Visual state of a timeline pinch. Every transform is `screen = offset + scale * layoutPoint`.
+ *
+ * While the fingers move, the grid follows them (pivot = the fingers' centre). Past a threshold it switches
+ * density at once: a snapshot of the old grid is laid over the new one, the new layout is scrolled so the
+ * anchor cell is near the fingers, and both layers then scale together (so the anchor cell stays one cell)
+ * while the snapshot fades out. Pinching on after a switch keeps going to the next density.
+ *
+ * Only graphics-layer code reads these values, so pinching never recomposes the grid.
  */
 @Stable
 class TimelineZoomState {
-    var scale by mutableFloatStateOf(1f)
+    var gridScale by mutableFloatStateOf(1f)
         private set
-    var origin by mutableStateOf(Offset.Zero)
-        private set
-
-    /** Set when a pinch committed to a new density, until that density is laid out. */
-    var pending: ZoomAnchor? = null
+    var gridOffset by mutableStateOf(Offset.Zero)
         private set
 
-    private var animation: Job? = null
-
-    fun onPinch(pinchScale: Float, centroid: Offset) {
-        if (pending != null) return
-        animation?.cancel()
-        scale = pinchScale.coerceIn(MIN_LIVE_SCALE, MAX_LIVE_SCALE)
-        origin = centroid
-    }
+    /** The old grid during a switch, drawn over the new one. */
+    var overlay by mutableStateOf<ImageBitmap?>(null)
+        private set
+    var overlayScale by mutableFloatStateOf(1f)
+        private set
+    var overlayOffset by mutableStateOf(Offset.Zero)
+        private set
+    var overlayAlpha by mutableFloatStateOf(1f)
+        private set
 
     /**
-     * Decides what the pinch meant. Returns the density to switch to (after recording [anchorAt]'s item as
-     * the anchor), or null after easing back to the current one.
+     * A switch is in progress: from commit until its animation ends. The grid doesn't follow the fingers
+     * meanwhile, but their movement still counts towards the next switch, so a fast pinch chains switches.
      */
-    fun onPinchEnd(
-        scope: CoroutineScope,
-        current: GridLevel,
+    private var busy = false
+
+    /** Pinch scale shown as 1 (the grid's real size); reset after a switch so the grid never jumps. */
+    private var displayBase = 1f
+    private var resetDisplayBase = false
+    private var pending: Pending? = null
+    private var transition: Transition? = null
+    private var lastPivot = Offset.Zero
+    private var job: Job? = null
+
+    private class Pending(val cell: ZoomAnchorCell, val screenCentre: Offset, val fromScale: Float, val fromColumns: Int)
+
+    private class Transition(
+        val startScale: Float,
+        val startCentre: Offset,
+        val endCentre: Offset,
+        val newAnchor: Offset,
+        val oldAnchor: Offset,
+        val oldToNew: Float,
+    )
+
+    /**
+     * Follows the fingers and switches density past a threshold. Returns true when the pinch should measure
+     * from here on (at each switch), so the next switch needs a further [ZOOM_IN_AT] / [ZOOM_OUT_AT].
+     */
+    fun onPinch(
+        scale: Float,
         centroid: Offset,
-        anchorAt: (Offset) -> Long?,
-    ): GridLevel? {
-        if (pending != null) return null
+        level: GridLevel,
+        scope: CoroutineScope,
+        snapshot: suspend () -> ImageBitmap?,
+        anchorAt: (Offset) -> ZoomAnchorCell?,
+        onSwitch: (GridLevel) -> Unit,
+    ): Boolean {
+        if (busy) return false
+        if (resetDisplayBase) {
+            resetDisplayBase = false
+            displayBase = scale
+        }
+        job?.cancel()
+        val zoomIn = level.zoomIn()
+        val zoomOut = level.zoomOut()
+        val live = scale / displayBase
+        val shown = when {
+            live > 1f && zoomIn == null -> 1f + (live - 1f) * RUBBER_BAND
+            live < 1f && zoomOut == null -> 1f + (live - 1f) * RUBBER_BAND
+            else -> live.coerceIn(MIN_LIVE_SCALE, MAX_LIVE_SCALE)
+        }
+        setPinch(shown, centroid)
+
         val target = when {
-            scale >= ZOOM_IN_AT -> current.zoomIn()
-            scale <= ZOOM_OUT_AT -> current.zoomOut()
+            scale >= ZOOM_IN_AT -> zoomIn
+            scale <= ZOOM_OUT_AT -> zoomOut
             else -> null
+        } ?: return false
+        // The pivot stays put under scaling, so the screen point under the fingers is also its layout point.
+        val cell = anchorAt(centroid) ?: return false
+
+        busy = true
+        displayBase = 1f
+        val fromOffset = gridOffset
+        scope.launch {
+            val image = runCatching { snapshot() }.getOrNull()
+            pending = Pending(cell, fromOffset + cell.centre * shown, shown, level.columns)
+            overlayScale = shown
+            overlayOffset = fromOffset
+            overlayAlpha = 1f
+            overlay = image
+            onSwitch(target)
         }
-        val anchorId = target?.let { anchorAt(centroid) }
-        if (target == null || anchorId == null) {
-            animateTo(scope, from = scale, to = 1f)
-            return null
+        return true
+    }
+
+    /** Fingers lifted: if no switch is running, ease the grid back to its real size. */
+    fun onPinchEnd(scope: CoroutineScope) {
+        if (busy || gridScale == 1f) return
+        val pivot = lastPivot
+        job?.cancel()
+        job = scope.launch {
+            animate(gridScale, 1f, animationSpec = GalleryMotion.snappy()) { value, _ -> setPinch(value, pivot) }
         }
-        pending = ZoomAnchor(anchorId, centroid.y, scale, current.columns)
-        return target
     }
 
     /**
-     * Called during the first composition of a new density with the anchor's new cell centre. Snaps the
-     * grid to the size its cells had at the end of the pinch, so there is no jump, and returns the anchor.
+     * During the first composition of the new density: [newCentreOf] scrolls the new layout and returns where
+     * the anchor cell's centre is in it (layout coordinates), or null if the item is gone. Sets the first
+     * frame to match how the old grid looked when the switch happened.
      */
-    fun takeAnchor(newColumns: Int, anchorCentre: (ZoomAnchor) -> Offset?): ZoomAnchor? {
-        val anchor = pending ?: return null
+    fun startSwitch(newColumns: Int, newCentreOf: (itemId: Long, preferredY: Float) -> Offset?) {
+        val p = pending ?: return
         pending = null
-        anchorCentre(anchor)?.let { origin = it }
-        scale = anchor.fromScale * newColumns / anchor.fromColumns
-        return anchor
-    }
-
-    /** Eases whatever scale the grid is at back to its real size. */
-    fun settle(scope: CoroutineScope) {
-        if (scale != 1f) animateTo(scope, from = scale, to = 1f)
-    }
-
-    private fun animateTo(scope: CoroutineScope, from: Float, to: Float) {
-        animation?.cancel()
-        animation = scope.launch {
-            animate(from, to, animationSpec = GalleryMotion.snappy()) { value, _ -> scale = value }
+        val newAnchor = newCentreOf(p.cell.itemId, p.screenCentre.y)
+        if (newAnchor == null) {
+            transition = null
+            return
         }
+        // Equal cell size on screen: fromScale / fromColumns == startScale / newColumns.
+        val startScale = p.fromScale * newColumns / p.fromColumns
+        transition = Transition(
+            startScale = startScale,
+            startCentre = p.screenCentre,
+            endCentre = newAnchor,
+            newAnchor = newAnchor,
+            oldAnchor = p.cell.centre,
+            oldToNew = p.fromColumns.toFloat() / newColumns,
+        ).also { applyProgress(it, 0f) }
+    }
+
+    /** After the first frame of a new density: runs the switch animation (or just resets). */
+    fun finishSwitch(scope: CoroutineScope) {
+        val t = transition
+        transition = null
+        job?.cancel()
+        if (t == null) {
+            overlay = null
+            setPinch(1f, Offset.Zero)
+            busy = false
+            resetDisplayBase = true
+            return
+        }
+        job = scope.launch {
+            try {
+                animate(0f, 1f, animationSpec = tween(SWITCH_MS, easing = FastOutSlowInEasing)) { p, _ ->
+                    applyProgress(t, p)
+                }
+            } finally {
+                overlay = null
+                setPinch(1f, Offset.Zero)
+                busy = false
+                resetDisplayBase = true
+            }
+        }
+    }
+
+    private fun applyProgress(t: Transition, p: Float) {
+        val scale = lerp(t.startScale, 1f, p)
+        val centre = lerp(t.startCentre, t.endCentre, p)
+        gridScale = scale
+        gridOffset = centre - t.newAnchor * scale
+        val oldScale = scale * t.oldToNew
+        overlayScale = oldScale
+        overlayOffset = centre - t.oldAnchor * oldScale
+        overlayAlpha = 1f - p
+    }
+
+    private fun setPinch(scale: Float, pivot: Offset) {
+        lastPivot = pivot
+        gridScale = scale
+        gridOffset = pivot * (1f - scale)
     }
 }
 
-/** Draws the grid at the zoom state's live scale. */
+/** Draws the grid with the zoom state's live transform. */
 fun Modifier.zoomLayer(zoom: TimelineZoomState): Modifier = graphicsLayer {
-    val s = zoom.scale
-    scaleX = s
-    scaleY = s
-    if (size.width > 0f && size.height > 0f) {
-        transformOrigin = TransformOrigin(zoom.origin.x / size.width, zoom.origin.y / size.height)
-    }
+    transformOrigin = TransformOrigin(0f, 0f)
+    scaleX = zoom.gridScale
+    scaleY = zoom.gridScale
+    translationX = zoom.gridOffset.x
+    translationY = zoom.gridOffset.y
+}
+
+/** The old grid's snapshot during a density switch, over the new grid. Draws nothing otherwise. */
+@Composable
+fun ZoomOverlay(zoom: TimelineZoomState) {
+    val image = zoom.overlay ?: return
+    Spacer(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                transformOrigin = TransformOrigin(0f, 0f)
+                scaleX = zoom.overlayScale
+                scaleY = zoom.overlayScale
+                translationX = zoom.overlayOffset.x
+                translationY = zoom.overlayOffset.y
+                alpha = zoom.overlayAlpha
+            }
+            .drawBehind { drawImage(image) },
+    )
 }
 
 /**
- * After a pinch changed the density: during the first composition of the new layout, scrolls so the
- * anchor item's row sits where the fingers were, then eases the grid to its real size.
+ * After a pinch switched density: during the first composition of the new layout, scrolls so the anchor
+ * item's row sits where the fingers were and starts the switch animation from there.
  */
 @Composable
 fun KeepZoomAnchor(
@@ -135,19 +269,19 @@ fun KeepZoomAnchor(
     val shownLevel = remember { object { var level = content.level } }
     if (shownLevel.level != content.level) {
         shownLevel.level = content.level
-        zoom.takeAnchor(content.columns) { anchor ->
-            val position = content.indexById[anchor.itemId]?.let { gridPositionOf(content.days, it) }
-                ?: return@takeAnchor null
+        zoom.startSwitch(content.columns) { itemId, preferredY ->
+            val position = content.indexById[itemId]?.let { gridPositionOf(content.days, it) }
+                ?: return@startSwitch null
             val rowTop = map.offsetOf(position.lazyIndex, 0)
-            val top = (rowTop + rowPx / 2 - anchor.y.toLong()).coerceAtLeast(0L)
+            val top = (rowTop + rowPx / 2 - preferredY.toLong()).coerceAtLeast(0L)
             val (index, offset) = map.positionAt(top)
             listState.requestScrollToItem(index, offset)
             Offset(
                 x = position.column * (cellSizePx + gapPx) + cellSizePx / 2f,
-                y = anchor.y,
+                y = (rowTop - top + rowPx / 2).toFloat(),
             )
         }
     }
-    // Runs after the first frame of the new layout, which is drawn at the snapped scale.
-    LaunchedEffect(content.level) { zoom.settle(this) }
+    // Runs after the first frame of the new layout, which is drawn at the switch's starting transform.
+    LaunchedEffect(content.level) { zoom.finishSwitch(this) }
 }
