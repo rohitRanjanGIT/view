@@ -206,3 +206,7 @@ Non-obvious technical choices, newest last.
   fingers already down), so the starting distance is the first non-zero span.
 - **Timeline background** is painted with `colorScheme.background` (the window behind is a different shade, which
   showed in the empty end of short rows). Video badges in cells under 64 dp show only the play icon.
+- **Album grids too:** the pinch engine moved to `core/ui/components` (`GridZoomState`, `pinchToZoom`, `zoomLayer`,
+  `ZoomOverlay`) and only knows column counts. `SelectableMediaGrid` (album, Favorites, Videos, Trash) pinches
+  through 2 / 4 / 6 columns (no month view: no date sections there); `KeepFlatGridAnchor` scrolls with exact
+  row geometry. Column count is per screen (`rememberSaveable`) until DataStore lands.

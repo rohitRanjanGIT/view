@@ -29,6 +29,11 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.snapshotFlow
 import com.rohit.gallery.core.ui.components.FastScroller
+import com.rohit.gallery.core.ui.components.GridZoomState
+import com.rohit.gallery.core.ui.components.ZoomAnchorCell
+import com.rohit.gallery.core.ui.components.ZoomOverlay
+import com.rohit.gallery.core.ui.components.pinchToZoom
+import com.rohit.gallery.core.ui.components.zoomLayer
 import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.util.Locale
@@ -207,7 +212,7 @@ private fun TimelineGrid(
         WindowInsets.statusBars.getTop(density) - with(density) { contentBottomPadding.roundToPx() }
     ScrollToReturnedItem(listState, content, scrollMap, headerPx, rowPx, visiblePx)
 
-    val zoom = remember { TimelineZoomState() }
+    val zoom = remember { GridZoomState() }
     val gridLayer = rememberGraphicsLayer()
     KeepZoomAnchor(zoom, content, listState, scrollMap, rowPx, cellSizePx, gapPx)
 
@@ -284,16 +289,19 @@ private fun TimelineGrid(
             // Outside the scaled list, so finger positions are not affected by the scale they drive.
             .pinchToZoom(
                 onPinch = { scale, centroid ->
+                    val level = currentContent.level
                     zoom.onPinch(
                         scale = scale,
                         centroid = centroid,
-                        level = currentContent.level,
+                        columns = level.columns,
+                        canZoomIn = level.zoomIn() != null,
+                        canZoomOut = level.zoomOut() != null,
                         scope = scope,
                         snapshot = { gridLayer.toImageBitmap() },
                         anchorAt = ::anchorAt,
-                        onSwitch = { level ->
+                        onSwitch = { zoomIn ->
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onLevelChange(level)
+                            (if (zoomIn) level.zoomIn() else level.zoomOut())?.let(onLevelChange)
                         },
                     )
                 },

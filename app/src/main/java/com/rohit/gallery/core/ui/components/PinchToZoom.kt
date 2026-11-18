@@ -1,4 +1,4 @@
-package com.rohit.gallery.feature.timeline
+package com.rohit.gallery.core.ui.components
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown

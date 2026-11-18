@@ -1,14 +1,18 @@
 package com.rohit.gallery.feature.selection
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -19,49 +23,74 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
-import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.GridZoomState
 import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.ui.platform.LocalWindowInfo
+import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.ZoomAnchorCell
+import com.rohit.gallery.core.ui.components.ZoomOverlay
 import com.rohit.gallery.core.ui.components.mediaSharedElement
+import com.rohit.gallery.core.ui.components.pinchToZoom
+import com.rohit.gallery.core.ui.components.zoomLayer
 
+/** Column counts a pinch steps through on flat grids (no month view: these grids have no date sections). */
+val FLAT_GRID_COLUMNS = listOf(2, 4, 6)
 const val GRID_COLUMNS = 4
+
+private val CellGap = 2.dp
 
 /** Rough height of a secondary screen's title bar, for deciding whether a returned item is on screen. */
 private val ReturnChromeHeight = 64.dp
+private const val HEADER_KEY = "grid-header"
 
 private class GridHit(val item: MediaItem, val index: Int)
 
-/** A flat grid of [list]: tap, long-press and drag to select, with auto-scroll at the edges. */
+/**
+ * A flat grid of [list]: tap, long-press and drag to select, with auto-scroll at the edges, and pinch to
+ * change [columns] (one of [FLAT_GRID_COLUMNS]) through [onColumnsChange].
+ */
 @Composable
 fun SelectableMediaGrid(
     list: List<MediaItem>,
     selection: SelectionState,
-    cellPx: Int,
+    columns: Int,
+    onColumnsChange: (Int) -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
     header: String? = null,
 ) {
     val gridState = rememberLazyGridState()
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     val currentList by rememberUpdatedState(list)
     val indexById = remember(list) { HashMap<Long, Int>(list.size * 2).also { m -> list.forEachIndexed { i, it -> m[it.id] = i } } }
     val currentIndex by rememberUpdatedState(indexById)
+    val currentColumns by rememberUpdatedState(columns)
+
+    val density = LocalDensity.current
+    val windowWidthPx = LocalWindowInfo.current.containerSize.width
+    val gapPx = with(density) { CellGap.toPx() }
+    val cellWidth = (windowWidthPx - gapPx * (columns - 1)) / columns
+    val cellPx = cellWidth.toInt()
 
     // Back from the viewer: bring the item it ended on into view before the first frame (see ViewerReturnTarget).
     val returnTarget = LocalViewerReturnTarget.current
-    val density = LocalDensity.current
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
     val statusBarPx = WindowInsets.statusBars.getTop(density)
     remember {
@@ -71,8 +100,8 @@ fun SelectableMediaGrid(
         val chromePx = with(density) { (ReturnChromeHeight + 96.dp).roundToPx() } + statusBarPx
         val fullRows = ((windowHeightPx - chromePx) / cellPx.coerceAtLeast(1) - 1).coerceAtLeast(1)
         val first = gridState.firstVisibleItemIndex
-        if (gridIndex < first || gridIndex >= first + fullRows * GRID_COLUMNS) {
-            gridState.requestScrollToItem((gridIndex - GRID_COLUMNS * (fullRows / 2)).coerceAtLeast(0))
+        if (gridIndex < first || gridIndex >= first + fullRows * columns) {
+            gridState.requestScrollToItem((gridIndex - columns * (fullRows / 2)).coerceAtLeast(0))
         }
     }
 
@@ -86,9 +115,25 @@ fun SelectableMediaGrid(
         return GridHit(currentList[index], index)
     }
 
+    /** The cell nearest to [position], for keeping it in place when a pinch changes the column count. */
+    fun anchorAt(position: Offset): ZoomAnchorCell? {
+        val cell = gridState.layoutInfo.visibleItemsInfo
+            .filter { it.key is Long }
+            .minByOrNull {
+                val centre = Offset(it.offset.x + it.size.width / 2f, it.offset.y + it.size.height / 2f)
+                (centre - position).getDistanceSquared()
+            } ?: return null
+        val centre = Offset(cell.offset.x + cell.size.width / 2f, cell.offset.y + cell.size.height / 2f)
+        return ZoomAnchorCell(cell.key as Long, centre)
+    }
+
+    val zoom = remember { GridZoomState() }
+    val gridLayer = rememberGraphicsLayer()
+    KeepFlatGridAnchor(zoom, gridState, columns, indexById, header != null, cellWidth, gapPx)
+
     val pointer = remember { object { var position: Offset? = null } }
     var dragActive by remember { mutableStateOf(false) }
-    val edgePx = with(LocalDensity.current) { 96.dp.toPx() }
+    val edgePx = with(density) { 96.dp.toPx() }
     LaunchedEffect(dragActive) {
         while (dragActive) {
             val p = pointer.position ?: break
@@ -106,54 +151,140 @@ fun SelectableMediaGrid(
         }
     }
 
-    LazyVerticalGrid(
-        state = gridState,
-        columns = GridCells.Fixed(GRID_COLUMNS),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        contentPadding = PaddingValues(bottom = 96.dp),
-        modifier = Modifier
+    Box(
+        Modifier
             .fillMaxSize()
-            .gridGestures(
-                onTap = { pos ->
-                    itemAt(pos)?.let { hit ->
-                        if (selection.isSelecting) selection.toggle(hit.item.id) else onOpenMedia(hit.item)
-                    }
+            // Same colour as the rest of the screen, so the empty end of the last row matches.
+            .background(MaterialTheme.colorScheme.background)
+            .clipToBounds()
+            .pinchToZoom(
+                onPinch = { scale, centroid ->
+                    val position = FLAT_GRID_COLUMNS.indexOf(currentColumns)
+                    zoom.onPinch(
+                        scale = scale,
+                        centroid = centroid,
+                        columns = currentColumns,
+                        canZoomIn = position > 0,
+                        canZoomOut = position in 0 until FLAT_GRID_COLUMNS.lastIndex,
+                        scope = scope,
+                        snapshot = { gridLayer.toImageBitmap() },
+                        anchorAt = ::anchorAt,
+                        onSwitch = { zoomIn ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onColumnsChange(FLAT_GRID_COLUMNS[if (zoomIn) position - 1 else position + 1])
+                        },
+                    )
                 },
-                onLongPress = { pos ->
-                    itemAt(pos)?.let { hit ->
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        pointer.position = pos
-                        dragActive = true
-                        selection.startDrag(hit.index, hit.item.id)
-                    }
-                },
-                onDrag = { pos ->
-                    pointer.position = pos
-                    itemAt(pos)?.let { selection.dragTo(it.index, currentList) }
-                },
-                onDragEnd = {
-                    dragActive = false
-                    pointer.position = null
-                    selection.endDrag()
-                },
+                onPinchEnd = { zoom.onPinchEnd(scope) },
             ),
     ) {
-        if (header != null) item(span = { GridItemSpan(GRID_COLUMNS) }) {
-            Text(
-                header,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
-            )
-        }
-        items(list, key = { it.id }) { item ->
-            Box(Modifier.aspectRatio(1f).mediaSharedElement(item.id)) {
-                MediaThumbnail(item, cellPx, Modifier.fillMaxSize())
-                if (selection.isSelecting) {
-                    SelectionCheck(item.id in selection.ids, Modifier.align(Alignment.TopStart).padding(6.dp))
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(columns),
+            horizontalArrangement = Arrangement.spacedBy(CellGap),
+            verticalArrangement = Arrangement.spacedBy(CellGap),
+            contentPadding = PaddingValues(bottom = 96.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .zoomLayer(zoom)
+                // Records the grid as it draws, so a column switch can snapshot the old grid.
+                .drawWithContent {
+                    gridLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(gridLayer)
+                }
+                .gridGestures(
+                    onTap = { pos ->
+                        itemAt(pos)?.let { hit ->
+                            if (selection.isSelecting) selection.toggle(hit.item.id) else onOpenMedia(hit.item)
+                        }
+                    },
+                    onLongPress = { pos ->
+                        itemAt(pos)?.let { hit ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            pointer.position = pos
+                            dragActive = true
+                            selection.startDrag(hit.index, hit.item.id)
+                        }
+                    },
+                    onDrag = { pos ->
+                        pointer.position = pos
+                        itemAt(pos)?.let { selection.dragTo(it.index, currentList) }
+                    },
+                    onDragEnd = {
+                        dragActive = false
+                        pointer.position = null
+                        selection.endDrag()
+                    },
+                ),
+        ) {
+            if (header != null) item(key = HEADER_KEY, span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    header,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+            items(list, key = { it.id }) { item ->
+                Box(Modifier.aspectRatio(1f).mediaSharedElement(item.id)) {
+                    MediaThumbnail(item, cellPx, Modifier.fillMaxSize())
+                    if (selection.isSelecting) {
+                        SelectionCheck(item.id in selection.ids, Modifier.align(Alignment.TopStart).padding(6.dp))
+                    }
                 }
             }
         }
+        ZoomOverlay(zoom)
     }
+}
+
+/**
+ * After a pinch changed the column count: during the first composition of the new layout, scrolls so the
+ * anchor item sits where the fingers were (rows are a fixed height, so this is exact apart from the end of
+ * the list) and starts the switch animation.
+ */
+@Composable
+private fun KeepFlatGridAnchor(
+    zoom: GridZoomState,
+    gridState: LazyGridState,
+    columns: Int,
+    indexById: Map<Long, Int>,
+    hasHeader: Boolean,
+    cellWidth: Float,
+    gapPx: Float,
+) {
+    // The header's height, measured while it is visible. Collected outside composition, so scrolling never
+    // recomposes this screen.
+    val headerPx = remember { object { var value = 0f } }
+    if (hasHeader) {
+        LaunchedEffect(gridState) {
+            snapshotFlow { gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == HEADER_KEY }?.size?.height }
+                .collect { height -> if (height != null) headerPx.value = height + gapPx }
+        }
+    }
+    val shown = remember { object { var columns = columns } }
+    if (shown.columns != columns) {
+        shown.columns = columns
+        zoom.startSwitch(columns) { itemId, preferredY ->
+            val index = indexById[itemId] ?: return@startSwitch null
+            val headerHeight = if (hasHeader) headerPx.value else 0f
+            val rowHeight = cellWidth + gapPx
+            val row = index / columns
+            val rowTop = headerHeight + row * rowHeight
+            val top = (rowTop + cellWidth / 2 - preferredY).coerceAtLeast(0f)
+            val headerItems = if (hasHeader) 1 else 0
+            if (top < headerHeight) {
+                gridState.requestScrollToItem(0, top.toInt())
+            } else {
+                val firstRow = ((top - headerHeight) / rowHeight).toInt()
+                gridState.requestScrollToItem(headerItems + firstRow * columns, (top - headerHeight - firstRow * rowHeight).toInt())
+            }
+            Offset(
+                x = (index % columns) * (cellWidth + gapPx) + cellWidth / 2,
+                y = rowTop - top + cellWidth / 2,
+            )
+        }
+    }
+    // Runs after the first frame of the new layout, which is drawn at the switch's starting transform.
+    LaunchedEffect(columns) { zoom.finishSwitch(this) }
 }

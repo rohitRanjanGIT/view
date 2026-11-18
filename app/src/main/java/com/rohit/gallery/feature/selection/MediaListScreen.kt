@@ -22,7 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
@@ -70,7 +72,8 @@ fun MediaListScreen(
 ) {
     BackHandler(enabled = selection.isSelecting) { selection.clear() }
 
-    val cellPx = LocalWindowInfo.current.containerSize.width / GRID_COLUMNS
+    // Kept per screen for now; remembered across launches once Settings / DataStore land.
+    var columns by rememberSaveable { mutableIntStateOf(GRID_COLUMNS) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -89,7 +92,7 @@ fun MediaListScreen(
                 items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text(emptyText, style = MaterialTheme.typography.titleMedium)
                 }
-                else -> SelectableMediaGrid(items, selection, cellPx, onOpenMedia, header = gridHeader)
+                else -> SelectableMediaGrid(items, selection, columns, { columns = it }, onOpenMedia, header = gridHeader)
             }
         }
 
