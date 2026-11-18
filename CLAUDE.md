@@ -152,7 +152,7 @@ com.rohit.gallery
 - **Done when:** my real library appears, scrolls smoothly, and new photos
   from the camera show up without restarting.
 
-### Phase 2: Core daily-driver UX
+### Phase 2: Core daily-driver UX (DONE, verified on device; full-day test in progress)
 - Viewer (zoom, pager, shared-element transition, drag-to-dismiss, info sheet).
 - Video playback with Media3 (scrubber, mute, keep-screen-on, resume position).
 - Albums tab + album detail; Favorites; Trash with restore/permanent delete.
@@ -196,80 +196,96 @@ the Phase 0 task list and wait for my confirmation before changing anything.
 
 ## 11. Status and handoff (update this at the end of every work session)
 
-Last updated: 2026-11-17. Read this section first in a new session, then `docs/DECISIONS.md`.
+Last updated: 2026-11-18. Read this section first in a new session, then `docs/DECISIONS.md`.
+Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/main`; push only when I ask). `README.md`
+describes the project for GitHub; keep its Features / Status sections in step when a phase finishes.
 
-### Done
-- **Phase 0 (project setup):** app "Gallery", `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin),
-  Kotlin 2.2.10, Gradle 9.6.0, Compose BOM 2026.02.01, Hilt + KSP, Navigation Compose
-  (type-safe routes), release (R8 + shrink) and `benchmark` build types, package structure,
-  Material 3 dynamic-color theme, 3-tab shell (Pictures / Albums / Menu).
-- **Phase 1 (foundation), verified on my phone:** permission flow, `MediaStoreDataSource` + in-memory
-  `MediaRepository` index with debounced `ContentObserver`, day-grouped timeline (sticky headers, video
-  badges), own `ThumbnailCache` + prefetch.
-- **Phase 2 so far (all committed on `main`; 19 unit tests pass):**
-  - **Viewer** (verified by me): pager, Telephoto zoom, shared-element open/close (photo-shaped flight element),
-    2D drag-to-dismiss (diagonal too), swipe-up opens details instantly, details panel stacked under the photo
-    (photo shrinks upward), swipe-down with details open returns to the photo, filmstrip, info with EXIF /
-    lazy `ACCESS_MEDIA_LOCATION`. Files in `feature/viewer/`.
-  - **Video** (verified by me, except item 8 of the checklist): Media3 ExoPlayer, scrubber, mute, keep-screen-on,
-    in-memory resume position.
-  - **Multi-select** (verified by me): long-press + drag-select with auto-scroll, selection bars replacing the nav
-    bar, Share, Favorite (toggles), Trash (`createTrashRequest`), Move/Copy to album under More. Shared by all
-    grids via `SelectableMediaGrid` and `SelectionActions` / `SelectionActionsBar` in `feature/selection/`.
-  - **Trash screen** (verified): Menu > Trash, open in viewer with Restore / Delete forever, select + drag-select.
-  - **Favorites** (verified): Menu > Favorites. **Albums tab + album detail** (verified): `feature/albums/`.
-  - **External intents** (commit `5875a71`): ACTION_VIEW + camera REVIEW open straight into the viewer; indexed
-    MediaStore URIs get the full pager, others a single item. Verified by adb: REVIEW opens the right photo with the
-    filmstrip, Back returns to the caller, file:// single item shows, unreadable URI closes with a toast.
-  - **Fast-scroller** (commit `7840cd0`): handle on the timeline's right edge while scrolling, drag with a
-    "Month Year" bubble. Checked by adb screenshots; feel not yet confirmed by me. Commit `cec7e0c` fixed the
-    grid freezing / jumping back after a handle drag (stale target re-applied on every library change);
-    I confirmed that was the glitch, installed on the phone 2026-11-18.
-  - 33 unit tests pass.
-- Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
+### Where we are
+- **Phases 0, 1 and 2 are done and verified on my phone.** Last code commit `2bb579a`; README `f57ce72`.
+  33 unit tests pass. Release and benchmark builds compile; merged manifests contain no `INTERNET`
+  (re-check each build).
+- **Phase 2 is closed by my full-day test** (I'm doing it now). If I report problems, fix those first.
+- **Next: Phase 3.** Per section 9, start by posting the Phase 3 task list and wait for my OK. Suggested order:
+  pinch grid density (3 / 4 / 7 columns + month view, animated), then settings + DataStore (also fixes resume
+  positions being lost), sort options / hidden albums / custom album order (Room), search, editor, then GIF /
+  motion photo / Ultra HDR display.
 
-### Verified by me on the phone (2026-11-18)
-- Scroll glitch fixed (`cec7e0c`), Menu text colour (`2b78276`), Videos page, header below the clock, return to
-  the photo you ended on, zoomed-in close, Favorites / Trash, "Open with". Close flight: every close (back, back
-  swipe, swipe-down, zoomed) flies into the cell, timed to match Google Photos (`831171e`, `da9286d`, 180 ms).
-- Phone setup during testing: Developer options animation scales set to 0.7 (my choice), Stay awake on, DND on.
+### What exists (Phase 0-2)
+- **Setup:** `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin), Kotlin 2.2.10, Gradle 9.6.0, Compose BOM
+  2026.02.01, Hilt + KSP, Navigation Compose (type-safe routes in `navigation/Routes.kt`), release (R8 + shrink)
+  and `benchmark` build types, Material 3 dynamic colour, tabs Pictures / Albums / Menu.
+- **Foundation:** permission flow (full / partial / denied), `MediaStoreDataSource` + in-memory `MediaRepository`
+  index (`StateFlow<MediaIndexState>`) with debounced `ContentObserver`, own `ThumbnailCache` + prefetch.
+- **Timeline** (`feature/timeline/`): day-grouped `LazyColumn` of rows, sticky day headers pinned below the status
+  bar, video badges, fast-scroller with month bubble (`TimelineScrollMap` maps scroll px <-> rows), return-to-photo
+  after the viewer closes (`ViewerReturnTarget`).
+- **Viewer** (`feature/viewer/`): pager, Telephoto zoom, shared-element open/close via the photo-shaped
+  `SharedFlightFrame` (180 ms `FastOutSlowInEasing`, matched to Google Photos), drag-to-dismiss in any direction
+  that flies into the grid cell, zoomed close zooms out first, details panel (EXIF, lazy location), filmstrip,
+  video (Media3: scrubber, mute, keep-screen-on, in-memory resume). Tap pre-decodes the photo
+  (`ViewerPrefetch.kt`) so it is usually sharp on arrival.
+- **Selection** (`feature/selection/`): long-press + drag-select with edge auto-scroll; Share, Favorite, Trash,
+  Move/Copy to album. All secondary grids (album, Favorites, Videos, Trash) use `MediaListScreen` /
+  `SelectableMediaGrid`.
+- **Albums, Favorites, Videos, Trash** (restore / delete forever with confirmation).
+- **External intents:** `ACTION_VIEW` + camera `REVIEW` for image/video content and file URIs open straight into
+  the viewer (indexed MediaStore URI: full pager; otherwise a single item), works without media permission.
 
-### Next steps (Phase 2 order I approved)
-All Phase 2 code is done and checked. Remaining:
-1. Full-day test closes Phase 2. Then Phase 3 starts with pinch grid density.
-2. Camera thumbnail opening Google Photos: still parked (likely the system default for opening photos).
-Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4 as in section 8.
+### Known gaps / deferred
+- Camera thumbnail opens Google Photos, not Gallery (parked by me; likely the system default app setting).
+- Resume positions are lost on process death (DataStore, Phase 3).
+- `ACCESS_MEDIA_LOCATION` runtime flow untested on device.
+- **Phase 4:** request 120 Hz (`preferredDisplayModeId`; app renders at 90 Hz, Motorola maps "high" to 90),
+  run `assembleRelease` / benchmark builds on the phone (R8 risk), Baseline Profile (viewer setup is
+  ~140-190 ms in debug), accessibility `contentDescription`s, collapsing title header, real nav icons
+  (current ones are `material-icons-core`).
+- Not added yet (add in the phase that needs them): Room, DataStore, WorkManager, Turbine.
+
+### How I like to work (learned in Phase 2)
+- When I report something vague ("it glitches", "it vanishes"), first say back what you understood and ask what
+  you need; change code only after I confirm.
+- Measure before and after on the phone for anything about speed or feel, and show me the numbers.
+- Say what each change means for me in plain words; keep reports short.
 
 ### Testing on my phone (rules)
 - Only test with copies, never touch originals (no restore / delete / move of real media without my approval).
 - Keep Do Not Disturb on, take a screenshot before every tap, never send blind tap chains (a stray tap once
-  started a real call).
+  started a real call). If the phone is locked or dozing, stop and ask me; never unlock it yourself.
+- I may be using the phone at the same time: if logs show actions you did not send, stop tapping.
+- Phone settings I chose: Developer options animation scales 0.7, Stay awake on (while charging), DND on.
+  If you change animation scale for a test, put it back to 0.7 afterwards.
 
-### Known gaps / deferred
-- Camera thumbnail opens Google Photos, not Gallery (reported 2026-11-17; parked by me, revisit later).
-- Resume positions are lost on process death (needs DataStore, Phase 3).
-- `ACCESS_MEDIA_LOCATION` runtime flow untested on device.
-- **Phase 4:** request 120 Hz (`preferredDisplayModeId`; app currently renders at 90 Hz, Motorola maps "high" to 90),
-  run `assembleRelease` / benchmark builds on the phone (R8 risk), Baseline Profile, accessibility
-  `contentDescription`s, collapsing title header, real nav icons (current ones are `material-icons-core`).
-- Not added yet (add in the phase that needs them): Room, DataStore, WorkManager, Turbine.
+### Running on my phone (Motorola Edge 60 Pro, Android 17, 1220x2712, wireless debugging)
+- adb: `"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"`. Check with `adb devices -l`; the serial looks like
+  `adb-ZA223D32VK-xxxxxx._adb-tls-connect._tcp`.
+- If it is not listed: `adb mdns services` shows the connect address (`adb connect <ip:port>`). If pairing is lost,
+  ask me for a fresh pairing code and run `adb pair <ip:port> <code>`.
+- Install and launch: `ANDROID_SERIAL=<serial> ./gradlew.bat installDebug`, then
+  `adb -s <serial> shell am start -n com.rohit.gallery/.MainActivity`.
+- In Git Bash, prefix adb commands that take device paths with `MSYS_NO_PATHCONV=1`.
+- **Animation analysis:** set `animator_duration_scale` to 10, loop `screencap <file>.raw` (raw, ~0.23 s/frame;
+  `-p` PNG takes ~1.3 s) into `/data/local/tmp` (not `/sdcard`, which would add files to the gallery), pull, and
+  stitch a contact sheet with a small PowerShell + inline C# script (`System.Drawing`). Restore the scale after.
+- **Timing:** temporary `Log.d` lines read with `adb logcat -d -s <TAG>:D`; remove them before committing.
 
 ### Gotchas learned (do not re-learn these)
 - **Kotlin 2.2.10 compiler cannot read Kotlin 2.4 metadata.** Latest coroutines (1.11), kotlinx-serialization
   (1.13) and Coil (3.5+) fail. Pinned: coroutines 1.10.2, serialization 1.9.0, Coil 3.4.0, Telephoto 0.19.0
   (`me.saket.telephoto.zoomable`), Media3 1.11.1. Check a library's POM `kotlin-stdlib` before bumping.
-- `hiltViewModel` lives in `androidx.hilt.lifecycle.viewmodel.compose`.
-- Use `@param:ApplicationContext` on constructor params.
+- Library internals: no sources jars in the Gradle cache; unzip the aar's `classes.jar` and read it with `javap -c -p`.
+- `hiltViewModel` lives in `androidx.hilt.lifecycle.viewmodel.compose`. Use `@param:ApplicationContext`.
+- There is no root `Surface`: `MainActivity` provides `LocalContentColor = onBackground`, otherwise text and icons
+  default to black in dark mode.
+- Sticky headers ignore `contentPadding`: inset the list with `windowInsetsPadding` instead.
+- One-shot UI commands (like a fast-scroll drag target) go through a conflated `Channel`, not state: state is
+  re-applied whenever its effect restarts (that caused the "grid jumps back" glitch).
+- Shared elements: only the tapped cell and the viewer's current page carry the shared modifier. Drag-dismiss moves
+  the flight frame by *layout* (`FlightPlacement`), because the flight starts from layout bounds and ignores
+  graphics-layer transforms.
+- Coil memory-cache hits for the viewer need the same request Telephoto builds: page size, `Precision.INEXACT`,
+  `maxBitmapSize(Size.ORIGINAL)`.
 - Don't run `python`/`python3` in the shell (hangs). `.gitignore` must use `build/` (not `/build`).
-  Heredocs with backslashes lose them: use raw strings or the Write tool.
+  Heredocs with backslashes lose them: use raw strings or the Write tool. In PowerShell, commit with `-m`
+  arguments, not heredocs (a heredoc commit silently did nothing).
 - Git commits use `-c user.name=rohit -c user.email=rohit@localhost`.
-- Shared elements: only the tapped cell and the viewer's current page carry the shared modifier. The flight
-  element is the photo-shaped `SharedFlightFrame`; drag-dismiss moves it by *layout* (`FlightPlacement`), because
-  the flight starts from layout bounds and ignores graphics-layer transforms.
 
-### Running on my phone (Motorola Edge 60 Pro, wireless debugging)
-- adb: `"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"`. Check with `adb devices -l`.
-- The phone's IP/port changes. If it is not listed: `adb mdns services` shows the connect address
-  (`adb connect <ip:port>`). If pairing is lost, ask me for a fresh pairing code and run `adb pair <ip:port> <code>`.
-- Install and launch: `ANDROID_SERIAL=<serial> ./gradlew.bat installDebug`, then
-  `adb -s <serial> shell am start -n com.rohit.gallery/.MainActivity`.

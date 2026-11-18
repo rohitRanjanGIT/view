@@ -174,3 +174,11 @@ Non-obvious technical choices, newest last.
   pager as the `stateIn` initial value, so its pages exist on the first frame instead of after a background hop.
   Tap to sharp photo went from ~420-600 ms to ~220-350 ms. Remaining: viewer setup (~140-190 ms, debug build) and
   Telephoto's sub-sampling checks (~60-80 ms).
+- **Fast-scroll targets go through a conflated `Channel`** (`cec7e0c`). The drag target used to be state read by a
+  `LaunchedEffect(map)`; every library change rebuilt `TimelineScrollMap`, restarted the effect and re-applied the
+  last target, so the grid jumped back to the old handle position and seemed frozen. A `Channel(CONFLATED)` collected
+  in `LaunchedEffect(listState)` (map via `rememberUpdatedState`) delivers each target once. `gridGestures` also ends
+  a drag in `finally`, so a cancelled long-press drag cannot leave edge auto-scroll running.
+- **Default content colour** (`2b78276`): there is no root `Surface`, so `LocalContentColor` defaulted to black and
+  plain `Text` / `Icon` (Menu screen) were black on the dark background. `MainActivity` now provides
+  `LocalContentColor = colorScheme.onBackground` around the nav host.
