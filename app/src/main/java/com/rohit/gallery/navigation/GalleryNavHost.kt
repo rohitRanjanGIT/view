@@ -50,6 +50,10 @@ import com.rohit.gallery.feature.settings.MenuScreen
 import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.timeline.TimelineScreen
 import com.rohit.gallery.feature.viewer.ViewerScreen
+import com.rohit.gallery.feature.viewer.prefetchViewerImage
+import com.rohit.gallery.core.model.MediaItem
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import com.rohit.gallery.feature.videos.VideosScreen
 import kotlinx.coroutines.launch
 
@@ -77,6 +81,19 @@ fun GalleryNavHost(
     var sharedMediaId by remember { mutableStateOf<Long?>(null) }
     val returnTarget = remember { ViewerReturnTarget() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val windowSize = LocalWindowInfo.current.containerSize
+
+    /** Opens the viewer at [item]: starts its decode right away, then tags the cell and navigates. */
+    fun openViewer(item: MediaItem, route: ViewerRoute) {
+        prefetchViewerImage(context, item, windowSize.width, windowSize.height)
+        // Tag the grid cell first so the shared element exists on both sides.
+        sharedMediaId = item.id
+        scope.launch {
+            androidx.compose.runtime.withFrameNanos { }
+            navController.navigate(route)
+        }
+    }
 
     SharedTransitionLayout {
         CompositionLocalProvider(
@@ -93,14 +110,7 @@ fun GalleryNavHost(
                 ) {
                     topLevel<PicturesRoute> {
                         TimelineScreen(
-                            onOpenMedia = { item ->
-                                // Tag the grid cell first so the shared element exists on both sides.
-                                sharedMediaId = item.id
-                                scope.launch {
-                                    androidx.compose.runtime.withFrameNanos { }
-                                    navController.navigate(ViewerRoute(item.id))
-                                }
-                            },
+                            onOpenMedia = { item -> openViewer(item, ViewerRoute(item.id)) },
                             onSelectionModeChange = { selectionActive = it },
                             contentBottomPadding = contentBottomPadding,
                         )
@@ -114,13 +124,7 @@ fun GalleryNavHost(
                     topLevel<AlbumDetailRoute> {
                         AlbumDetailScreen(
                             onBack = { navController.popBackStack() },
-                            onOpenMedia = { item, bucketId ->
-                                sharedMediaId = item.id
-                                scope.launch {
-                                    androidx.compose.runtime.withFrameNanos { }
-                                    navController.navigate(ViewerRoute(item.id, bucketId = bucketId))
-                                }
-                            },
+                            onOpenMedia = { item, bucketId -> openViewer(item, ViewerRoute(item.id, bucketId = bucketId)) },
                         )
                     }
                     topLevel<MenuRoute> {
@@ -134,37 +138,19 @@ fun GalleryNavHost(
                     topLevel<FavoritesRoute> {
                         FavoritesScreen(
                             onBack = { navController.popBackStack() },
-                            onOpenMedia = { item ->
-                                sharedMediaId = item.id
-                                scope.launch {
-                                    androidx.compose.runtime.withFrameNanos { }
-                                    navController.navigate(ViewerRoute(item.id, favoritesOnly = true))
-                                }
-                            },
+                            onOpenMedia = { item -> openViewer(item, ViewerRoute(item.id, favoritesOnly = true)) },
                         )
                     }
                     topLevel<VideosRoute> {
                         VideosScreen(
                             onBack = { navController.popBackStack() },
-                            onOpenMedia = { item ->
-                                sharedMediaId = item.id
-                                scope.launch {
-                                    androidx.compose.runtime.withFrameNanos { }
-                                    navController.navigate(ViewerRoute(item.id, videosOnly = true))
-                                }
-                            },
+                            onOpenMedia = { item -> openViewer(item, ViewerRoute(item.id, videosOnly = true)) },
                         )
                     }
                     topLevel<TrashRoute> {
                         TrashScreen(
                             onBack = { navController.popBackStack() },
-                            onOpenMedia = { item ->
-                                sharedMediaId = item.id
-                                scope.launch {
-                                    androidx.compose.runtime.withFrameNanos { }
-                                    navController.navigate(ViewerRoute(item.id, trashed = true))
-                                }
-                            },
+                            onOpenMedia = { item -> openViewer(item, ViewerRoute(item.id, trashed = true)) },
                         )
                     }
                     composable<ViewerRoute>(

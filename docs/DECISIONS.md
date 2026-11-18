@@ -166,3 +166,11 @@ Non-obvious technical choices, newest last.
   spring (1200) read as vanishing; a soft one (450) crept slowly into the cell at the end.
 - **All secondary grids share `MediaListScreen`.** Favorites now has Move/Copy too; Trash passes its own Restore /
   Delete bar through a slot.
+- **Viewer opens sharp sooner** (measured with temporary logs on the phone, debug build). Telephoto's Coil resolver
+  copies our request and asks Coil for the image at the page size with `Precision.INEXACT` and
+  `maxBitmapSize(Size.ORIGINAL)`, honouring the memory cache (checked by `javap` on the 0.19.0 aar). So
+  `prefetchViewerImage` enqueues that same request (window size) at tap time in `openViewer`, while the viewer is
+  built and the flight runs; the page then gets a `MEMORY_CACHE` hit. The unfiltered timeline is also handed to the
+  pager as the `stateIn` initial value, so its pages exist on the first frame instead of after a background hop.
+  Tap to sharp photo went from ~420-600 ms to ~220-350 ms. Remaining: viewer setup (~140-190 ms, debug build) and
+  Telephoto's sub-sampling checks (~60-80 ms).

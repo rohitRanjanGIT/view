@@ -83,7 +83,16 @@ class ViewerViewModel @Inject constructor(
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-        else -> indexedItems().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        else -> indexedItems().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialIndexedItems())
+    }
+
+    /**
+     * The unfiltered timeline is already in memory: hand it over on the first frame, so the pager (and
+     * the photo's decode) does not wait a background hop. Filtered views still filter off the main thread.
+     */
+    private fun initialIndexedItems(): List<MediaItem>? {
+        val unfiltered = !route.favoritesOnly && !route.videosOnly && route.bucketId == null
+        return if (unfiltered) (repository.state.value as? MediaIndexState.Ready)?.items else null
     }
 
     init {
