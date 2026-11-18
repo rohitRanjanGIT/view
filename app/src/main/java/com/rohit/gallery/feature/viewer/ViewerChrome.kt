@@ -59,9 +59,16 @@ fun ViewerTopBar(
     Row(
         modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)))
+            // Dark enough, and tall enough, that the back arrow, date and menu stay readable on bright photos.
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.75f),
+                    0.55f to Color.Black.copy(alpha = 0.45f),
+                    1f to Color.Transparent,
+                ),
+            )
             .statusBarsPadding()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 40.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {

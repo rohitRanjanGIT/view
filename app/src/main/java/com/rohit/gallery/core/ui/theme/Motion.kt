@@ -2,6 +2,7 @@ package com.rohit.gallery.core.ui.theme
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 
@@ -17,7 +18,14 @@ object GalleryMotion {
      */
     fun sharedBounds() = tween<androidx.compose.ui.geometry.Rect>(SHARED_FLIGHT_MS, easing = FastOutSlowInEasing)
 
+    /**
+     * Viewer -> grid (closing): a little longer and decelerating, so the photo visibly glides from where the finger
+     * let go into its cell instead of seeming to vanish. A tween, not a spring, so it has no slow creeping tail.
+     */
+    fun sharedBoundsClosing() = tween<androidx.compose.ui.geometry.Rect>(SHARED_CLOSE_MS, easing = LinearOutSlowInEasing)
+
     const val SHARED_FLIGHT_MS = 180
+    const val SHARED_CLOSE_MS = 250
 
     const val FADE_MS = 140
 }

@@ -51,7 +51,10 @@ fun Modifier.mediaSharedElement(mediaId: Long, force: Boolean = false): Modifier
         this@mediaSharedElement.sharedElement(
             sharedContentState = rememberSharedContentState(key = "media-$mediaId"),
             animatedVisibilityScope = visibilityScope,
-            boundsTransform = { _, _ -> GalleryMotion.sharedBounds() },
+            // Shrinking (viewer -> grid) is the close; it glides a little longer than the open.
+            boundsTransform = { initial, target ->
+                if (initial.width > target.width) GalleryMotion.sharedBoundsClosing() else GalleryMotion.sharedBounds()
+            },
         )
     }
 }
