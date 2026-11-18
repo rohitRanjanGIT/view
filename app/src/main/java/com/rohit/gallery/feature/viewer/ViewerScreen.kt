@@ -93,11 +93,12 @@ private const val DISMISS_VELOCITY = 1800f
 private val DismissDistance = 120.dp
 private val UpSwipeOpenDistance = 48.dp
 
-/** How far the photo shrinks at the end of a back gesture (the same scale as that much drag-down progress). */
-private const val BACK_MAX_PROGRESS = 0.5f
+/** How far the photo shrinks at the end of a back gesture, as drag-down progress (0.9: about 60 % size, the
+ * background mostly faded, corners rounded like a card). */
+private const val BACK_MAX_PROGRESS = 0.9f
 
 /** How far the photo leans towards the swiped edge at the end of a back gesture. */
-private val BackLean = 32.dp
+private val BackLean = 96.dp
 
 /** Share of the screen height the details panel takes; the photo gets the rest. */
 private const val InfoPanelFraction = 0.46f
@@ -241,8 +242,10 @@ private fun ViewerContent(
         try {
             events.collect { event ->
                 val toward = if (event.swipeEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
-                backShrink = event.progress
-                dragX = toward * event.progress * backLeanPx
+                // Ease-out, so even a short swipe already shows a clear change.
+                val eased = 1f - (1f - event.progress) * (1f - event.progress)
+                backShrink = eased
+                dragX = toward * eased * backLeanPx
             }
             dismissed = true
             onBack()

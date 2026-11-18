@@ -277,7 +277,8 @@ Non-obvious technical choices, newest last.
   predictive pop slides the leaving screen out towards the side the swipe started from while the screen beneath
   stays still (`predictivePopEnterTransition = None`).
 - The viewer handles the gesture itself with `PredictiveBackHandler` (inner handlers win over the NavHost's): the
-  photo shrinks (up to half of the drag-down shrink) and leans 32 dp towards the swiped edge, chrome fades, and
+  photo shrinks to about 60 % (drag-down progress 0.9, so the background mostly fades and corners round) and
+  leans 96 dp towards the swiped edge, eased out so a short swipe already shows; chrome fades, and
   releasing closes through the normal path, so the shared-element flight starts from where the photo is.
   Cancelling springs it back. Zoomed in or with details open, back keeps its old behaviour (zoom out / close
   details).
