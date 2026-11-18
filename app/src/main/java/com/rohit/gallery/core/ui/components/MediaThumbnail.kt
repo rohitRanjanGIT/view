@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.feature.timeline.formatDuration
@@ -79,6 +81,29 @@ fun MediaThumbnail(
         if (showBadge && item.mimeType.equals("image/gif", ignoreCase = true)) {
             TextBadge("GIF", Modifier.align(Alignment.BottomEnd).padding(4.dp))
         }
+        if (showBadge && item.isFavorite) {
+            val compact = with(LocalDensity.current) { cellSizePx.toDp() } < CompactCell
+            FavoriteBadge(
+                size = if (compact) 12.dp else 18.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(if (compact) 2.dp else 5.dp),
+            )
+        }
+    }
+}
+
+/** White heart with a soft dark outline, readable on light and dark photos alike. */
+@Composable
+private fun FavoriteBadge(size: Dp, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Icon(
+            Icons.Filled.Favorite,
+            contentDescription = "Favourite",
+            tint = Color.Black.copy(alpha = 0.45f),
+            modifier = Modifier.size(size + 3.dp),
+        )
+        Icon(Icons.Filled.Favorite, contentDescription = null, tint = Color.White, modifier = Modifier.size(size))
     }
 }
 
