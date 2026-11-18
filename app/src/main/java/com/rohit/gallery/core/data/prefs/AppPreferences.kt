@@ -3,6 +3,7 @@ package com.rohit.gallery.core.data.prefs
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rohit.gallery.core.model.AlbumSort
@@ -28,6 +29,15 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         .map { prefs -> prefs[ALBUM_OLDEST_FIRST] ?: false }
         .distinctUntilChanged()
 
+    /** Albums per row in the Albums tab (2, 3 or 4). */
+    val albumColumns: Flow<Int> = context.dataStore.data
+        .map { prefs -> prefs[ALBUM_COLUMNS] ?: 2 }
+        .distinctUntilChanged()
+
+    suspend fun setAlbumColumns(columns: Int) {
+        context.dataStore.edit { it[ALBUM_COLUMNS] = columns }
+    }
+
     suspend fun setAlbumSort(sort: AlbumSort) {
         context.dataStore.edit { it[ALBUM_SORT] = sort.name }
     }
@@ -39,5 +49,6 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
     private companion object {
         val ALBUM_SORT = stringPreferencesKey("album_sort")
         val ALBUM_OLDEST_FIRST = booleanPreferencesKey("album_oldest_first")
+        val ALBUM_COLUMNS = intPreferencesKey("album_columns")
     }
 }

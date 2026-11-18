@@ -236,3 +236,8 @@ Non-obvious technical choices, newest last.
   the earlier long-press menu). The bar's buttons reverse when they already apply to every selected album
   (Pin -> Unpin, Hide -> Show), so hidden albums can be shown in bulk from Edit albums. Albums pinned together
   get `now + index` in display order, so they keep that order after earlier pins. Writes are one `upsertAll`.
+- **Pinch on the Albums tab:** 2 / 3 / 4 albums per row (my choice), saved in DataStore (`album_columns`).
+  The anchor maths is now shared (`KeepGridZoomAnchor` + `GridGeometry`: padding, leading items, row pitch),
+  because album rows are taller than photo rows (the name and count under each card are measured). Card
+  placement animation is off for the one frame where the column count changes, so cards don't slide under
+  the cross-fade.

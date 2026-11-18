@@ -2,7 +2,12 @@ package com.rohit.gallery.feature.albums
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +24,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,10 +45,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -59,13 +74,24 @@ import com.rohit.gallery.core.model.Album
 import com.rohit.gallery.core.model.AlbumEntry
 import com.rohit.gallery.core.model.AlbumSort
 import com.rohit.gallery.core.permissions.MediaAccessGate
+import com.rohit.gallery.core.ui.components.GridGeometry
+import com.rohit.gallery.core.ui.components.GridZoomState
+import com.rohit.gallery.core.ui.components.KeepGridZoomAnchor
 import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.ZoomAnchorCell
+import com.rohit.gallery.core.ui.components.ZoomOverlay
+import com.rohit.gallery.core.ui.components.pinchToZoom
+import com.rohit.gallery.core.ui.components.zoomLayer
 import com.rohit.gallery.core.ui.components.OrganizeIcons
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import com.rohit.gallery.feature.selection.SelectionCheck
 import com.rohit.gallery.feature.selection.SelectionTopBar
 
-private const val ALBUM_COLUMNS = 2
+/** Albums per row a pinch steps through. */
+private val ALBUM_COLUMN_STEPS = listOf(2, 3, 4)
+private val ALBUM_EDGE = 16.dp
+private val ALBUM_TOP = 8.dp
+private val CardPlacement = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold)
 private val ALBUM_GAP = 12.dp
 
 /**
@@ -84,6 +110,7 @@ fun AlbumsScreen(
     MediaAccessGate(modifier.fillMaxSize()) {
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
         val organized by viewModel.organized.collectAsStateWithLifecycle()
+        val columns by viewModel.columns.collectAsStateWithLifecycle()
         val current = organized
         val context = LocalContext.current
         val selection = rememberAlbumSelection()
@@ -115,28 +142,15 @@ fun AlbumsScreen(
                     list.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                         Text("No albums yet", style = MaterialTheme.typography.titleMedium)
                     }
-                    else -> {
-                        val cellPx = (LocalWindowInfo.current.containerSize.width / ALBUM_COLUMNS)
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(ALBUM_COLUMNS),
-                            horizontalArrangement = Arrangement.spacedBy(ALBUM_GAP),
-                            verticalArrangement = Arrangement.spacedBy(ALBUM_GAP),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = contentBottomPadding + 8.dp),
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            items(list, key = { it.album.bucketId }) { entry ->
-                                val id = entry.album.bucketId
-                                AlbumCard(
-                                    entry = entry,
-                                    cellPx = cellPx,
-                                    selecting = selection.isSelecting,
-                                    selected = id in selection.ids,
-                                    onClick = { if (selection.isSelecting) selection.toggle(id) else onOpenAlbum(entry.album) },
-                                    onLongClick = { selection.toggle(id) },
-                                    modifier = Modifier.animateItem(),
-                                )
-                            }
-                        }
+                    else -> columns?.let { cols ->
+                        AlbumGrid(
+                            list = list,
+                            columns = cols,
+                            selection = selection,
+                            contentBottomPadding = contentBottomPadding,
+                            onOpenAlbum = onOpenAlbum,
+                            onColumnsChange = viewModel::setColumns,
+                        )
                     }
                 }
             }
@@ -159,6 +173,135 @@ fun AlbumsScreen(
                 )
             }
         }
+    }
+}
+
+/**
+ * The album cards, [columns] per row. Pinch in / out steps through [ALBUM_COLUMN_STEPS]; the album under the
+ * fingers stays in place while the old layout cross-fades into the new one (see GridZoomState).
+ */
+@Composable
+private fun AlbumGrid(
+    list: List<AlbumEntry>,
+    columns: Int,
+    selection: AlbumSelection,
+    contentBottomPadding: Dp,
+    onOpenAlbum: (Album) -> Unit,
+    onColumnsChange: (Int) -> Unit,
+) {
+    val gridState = rememberLazyGridState()
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val widthPx = LocalWindowInfo.current.containerSize.width
+    val edgePx = with(density) { ALBUM_EDGE.toPx() }
+    val gapPx = with(density) { ALBUM_GAP.toPx() }
+    val topPx = with(density) { ALBUM_TOP.toPx() }
+    val cardWidth = (widthPx - 2 * edgePx - gapPx * (columns - 1)) / columns
+    val currentColumns by rememberUpdatedState(columns)
+    val currentList by rememberUpdatedState(list)
+    val indexById = remember(list) { list.withIndex().associate { (i, e) -> e.album.bucketId to i } }
+
+    // Height of the name and count under each picture, measured from a laid-out card (it follows font scale).
+    val labelPx = remember { object { var value = with(density) { 48.dp.toPx() } } }
+    LaunchedEffect(gridState) {
+        snapshotFlow { gridState.layoutInfo.visibleItemsInfo.firstOrNull()?.size }
+            .collect { size -> if (size != null && size.height > size.width) labelPx.value = (size.height - size.width).toFloat() }
+    }
+
+    val shownColumns = remember { object { var value = columns } }
+    val columnsChanged = shownColumns.value != columns
+    SideEffect { shownColumns.value = columns }
+
+    val zoom = remember { GridZoomState() }
+    val gridLayer = rememberGraphicsLayer()
+    KeepGridZoomAnchor(
+        zoom = zoom,
+        gridState = gridState,
+        geometry = GridGeometry(
+            columns = columns,
+            cellWidth = cardWidth,
+            columnPitch = cardWidth + gapPx,
+            rowPitch = cardWidth + labelPx.value + gapPx,
+            anchorY = cardWidth / 2,
+            startPadding = edgePx,
+            topPadding = topPx,
+        ),
+        indexOf = { indexById[it] },
+    )
+
+    /** The album nearest to [position]; its picture's centre, in the grid's own coordinates. */
+    fun anchorAt(position: Offset): ZoomAnchorCell? {
+        val info = gridState.layoutInfo
+        val cell = info.visibleItemsInfo.minByOrNull {
+            val centreY = it.offset.y - info.viewportStartOffset + it.size.width / 2f
+            kotlin.math.abs(centreY - position.y) * 4 + kotlin.math.abs(it.offset.x + it.size.width / 2f - position.x)
+        } ?: return null
+        val index = cell.index
+        val pitch = cardWidth + gapPx
+        val centre = Offset(
+            x = edgePx + (index % currentColumns) * pitch + cardWidth / 2,
+            y = cell.offset.y - info.viewportStartOffset + cardWidth / 2,
+        )
+        return ZoomAnchorCell(currentList[index].album.bucketId, centre)
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .pinchToZoom(
+                onPinch = { scale, centroid ->
+                    val step = ALBUM_COLUMN_STEPS.indexOf(currentColumns)
+                    zoom.onPinch(
+                        scale = scale,
+                        centroid = centroid,
+                        columns = currentColumns,
+                        canZoomIn = step > 0,
+                        canZoomOut = step in 0 until ALBUM_COLUMN_STEPS.lastIndex,
+                        scope = scope,
+                        snapshot = { gridLayer.toImageBitmap() },
+                        anchorAt = ::anchorAt,
+                        onSwitch = { zoomIn ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onColumnsChange(ALBUM_COLUMN_STEPS[if (zoomIn) step - 1 else step + 1])
+                        },
+                    )
+                },
+                onPinchEnd = { zoom.onPinchEnd(scope) },
+            ),
+    ) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(columns),
+            horizontalArrangement = Arrangement.spacedBy(ALBUM_GAP),
+            verticalArrangement = Arrangement.spacedBy(ALBUM_GAP),
+            contentPadding = PaddingValues(start = ALBUM_EDGE, end = ALBUM_EDGE, top = ALBUM_TOP, bottom = contentBottomPadding + 8.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .zoomLayer(zoom)
+                // Records the grid as it draws, so a switch can snapshot the old layout.
+                .drawWithContent {
+                    gridLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(gridLayer)
+                },
+        ) {
+            items(list, key = { it.album.bucketId }) { entry ->
+                val id = entry.album.bucketId
+                AlbumCard(
+                    entry = entry,
+                    cellPx = cardWidth.toInt(),
+                    selecting = selection.isSelecting,
+                    selected = id in selection.ids,
+                    onClick = { if (selection.isSelecting) selection.toggle(id) else onOpenAlbum(entry.album) },
+                    onLongClick = { selection.toggle(id) },
+                    // Cards glide when pins or sorting move them, but not when a pinch re-lays them out (the
+                    // cross-fade handles that; sliding cards would fight it).
+                    modifier = Modifier.animateItem(placementSpec = if (columnsChanged) null else CardPlacement),
+                )
+            }
+        }
+        ZoomOverlay(zoom)
     }
 }
 

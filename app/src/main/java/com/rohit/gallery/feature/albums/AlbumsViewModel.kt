@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rohit.gallery.core.data.repository.AlbumRepository
 import com.rohit.gallery.core.data.repository.MediaRepository
+import com.rohit.gallery.core.data.prefs.AppPreferences
 import com.rohit.gallery.core.model.AlbumSort
 import com.rohit.gallery.core.model.OrganizedAlbums
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,11 +19,18 @@ import kotlinx.coroutines.launch
 class AlbumsViewModel @Inject constructor(
     private val repository: MediaRepository,
     private val albums: AlbumRepository,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
     /** Albums in display order (hidden ones flagged); null while the index is loading. */
     val organized: StateFlow<OrganizedAlbums?> = albums.organized
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Albums per row; null until read from storage (so the grid never jumps from a default). */
+    val columns: StateFlow<Int?> = prefs.albumColumns
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setColumns(columns: Int) = launch { prefs.setAlbumColumns(columns) }
 
     fun refresh() = repository.refresh()
 

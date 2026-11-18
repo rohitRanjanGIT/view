@@ -41,7 +41,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.ui.components.GridGeometry
 import com.rohit.gallery.core.ui.components.GridZoomState
+import com.rohit.gallery.core.ui.components.KeepGridZoomAnchor
 import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
 import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.ZoomAnchorCell
@@ -129,7 +131,21 @@ fun SelectableMediaGrid(
 
     val zoom = remember { GridZoomState() }
     val gridLayer = rememberGraphicsLayer()
-    KeepFlatGridAnchor(zoom, gridState, columns, indexById, header != null, cellWidth, gapPx)
+    val headerHeight = rememberHeaderHeight(gridState, header != null, gapPx)
+    KeepGridZoomAnchor(
+        zoom = zoom,
+        gridState = gridState,
+        geometry = GridGeometry(
+            columns = columns,
+            cellWidth = cellWidth,
+            columnPitch = cellWidth + gapPx,
+            rowPitch = cellWidth + gapPx,
+            anchorY = cellWidth / 2,
+            leadingItems = if (header != null) 1 else 0,
+            leadingHeight = headerHeight(),
+        ),
+        indexOf = { indexById[it] },
+    )
 
     val pointer = remember { object { var position: Offset? = null } }
     var dragActive by remember { mutableStateOf(false) }
@@ -238,53 +254,16 @@ fun SelectableMediaGrid(
     }
 }
 
-/**
- * After a pinch changed the column count: during the first composition of the new layout, scrolls so the
- * anchor item sits where the fingers were (rows are a fixed height, so this is exact apart from the end of
- * the list) and starts the switch animation.
- */
+/** Height of the grid's header item (gap included) while it has been seen; 0 when there is none. */
 @Composable
-private fun KeepFlatGridAnchor(
-    zoom: GridZoomState,
-    gridState: LazyGridState,
-    columns: Int,
-    indexById: Map<Long, Int>,
-    hasHeader: Boolean,
-    cellWidth: Float,
-    gapPx: Float,
-) {
-    // The header's height, measured while it is visible. Collected outside composition, so scrolling never
-    // recomposes this screen.
+private fun rememberHeaderHeight(gridState: LazyGridState, hasHeader: Boolean, gapPx: Float): () -> Float {
     val headerPx = remember { object { var value = 0f } }
     if (hasHeader) {
+        // Collected outside composition, so scrolling never recomposes this screen.
         LaunchedEffect(gridState) {
             snapshotFlow { gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == HEADER_KEY }?.size?.height }
                 .collect { height -> if (height != null) headerPx.value = height + gapPx }
         }
     }
-    val shown = remember { object { var columns = columns } }
-    if (shown.columns != columns) {
-        shown.columns = columns
-        zoom.startSwitch(columns) { itemId, preferredY ->
-            val index = indexById[itemId] ?: return@startSwitch null
-            val headerHeight = if (hasHeader) headerPx.value else 0f
-            val rowHeight = cellWidth + gapPx
-            val row = index / columns
-            val rowTop = headerHeight + row * rowHeight
-            val top = (rowTop + cellWidth / 2 - preferredY).coerceAtLeast(0f)
-            val headerItems = if (hasHeader) 1 else 0
-            if (top < headerHeight) {
-                gridState.requestScrollToItem(0, top.toInt())
-            } else {
-                val firstRow = ((top - headerHeight) / rowHeight).toInt()
-                gridState.requestScrollToItem(headerItems + firstRow * columns, (top - headerHeight - firstRow * rowHeight).toInt())
-            }
-            Offset(
-                x = (index % columns) * (cellWidth + gapPx) + cellWidth / 2,
-                y = rowTop - top + cellWidth / 2,
-            )
-        }
-    }
-    // Runs after the first frame of the new layout, which is drawn at the switch's starting transform.
-    LaunchedEffect(columns) { zoom.finishSwitch(this) }
+    return { if (hasHeader) headerPx.value else 0f }
 }
