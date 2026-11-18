@@ -161,7 +161,7 @@ com.rohit.gallery
 - Fast-scroller with date bubble.
 - **Done when:** I can replace my current gallery for a full day without missing anything.
 
-### Phase 3: Polish and power features (IN PROGRESS)
+### Phase 3: Polish and power features (NEARLY DONE: only the own editor is left)
 - [x] Pinch grid density + month view (Pictures, album grids, Albums tab).
 - [ ] Editor: crop, rotate, flip, basic adjustments, filters; save as copy. (LATER, my call: for now the viewer's
   Edit button hands the photo to Google Photos' editor with read-only access, so it can only save a copy.)
@@ -198,75 +198,81 @@ the Phase 0 task list and wait for my confirmation before changing anything.
 
 ## 11. Status and handoff (update this at the end of every work session)
 
-Last updated: 2026-11-18. Read this section first in a new session, then `docs/DECISIONS.md`.
-Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/main`; push only when I ask). `README.md`
-describes the project for GitHub; keep its Features / Status sections in step when a phase finishes.
+Last updated: 2026-11-19. Read this section first in a new session, then `docs/DECISIONS.md` (newest entries at the
+bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/main`; push only when I ask).
+`README.md` describes the project for GitHub; keep its Features / Status sections in step when a phase finishes.
 
 ### Where we are
-- **Phases 0-2 done and verified on my phone. Phase 3 in progress.** 50 unit tests pass.
-  Merged manifests contain no `INTERNET` (re-check each build; Room/DataStore add only non-network permissions).
-- **Phase 3 done so far (all verified on my phone):** pinch density, album timelines, album organisation (pin /
-  hide / sort / custom order / bulk select), Albums tab pinch, oldest-first albums, search, own back-gesture
-  animations (screens slide; viewer photo shrinks with the grid and a gap behind it).
-  Edit via Google Photos is built (`MediaActions.openInEditor`) but not yet tried on the phone.
-- **Phase 3 decisions:** no ML search for now. Settings is parked by me until later. Trash stays a flat grid.
-- **Next:** my idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes after
-  sharing). Proposed design in the chat of 2026-11-18; my answers on notification vs card, delay, default on/off are
-  still pending. Then Phase 4. Own editor is planned for later.
+- **Phases 0-2 done and verified on my phone. Phase 3 nearly done** (only the own editor is left, deferred by me).
+  54 unit tests pass. Merged manifests contain no `INTERNET` (re-check each build).
+- **Phase 3 done and verified on my phone:** pinch density, album timelines, album organisation, Albums tab pinch,
+  oldest-first albums, search, own back-gesture animations, Edit hand-off to Google Photos, GIF / motion photo /
+  Ultra HDR, Settings, the viewer redesign, favourite hearts, tabs that slide with the finger.
+- **Decisions:** no ML search for now. Trash stays a flat grid. Own editor later (Edit hands off to Google Photos).
+- **Next (pick with me):**
+  1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes
+     after sharing). Proposed 2026-11-18; my answers on notification vs in-app card, delay (5 min suggested), and
+     default on/off are still pending.
+  2. More UI polish / features I bring (I am doing a polish pass now, one request at a time).
+  3. Then Phase 4 (see Known gaps).
 
 ### What exists
 - **Setup:** `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin), Kotlin 2.2.10, Gradle 9.6.0, Compose BOM
   2026.02.01, Hilt + KSP, Navigation Compose (type-safe routes in `navigation/Routes.kt`), release (R8 + shrink)
-  and `benchmark` build types, Material 3 dynamic colour, tabs Pictures / Albums / Menu.
+  and `benchmark` build types, Material 3 dynamic colour.
+- **Navigation:** `HomeRoute` is one destination holding Pictures / Albums / Menu in `HomePager`
+  (`navigation/HomePager.kt`: pages follow the finger, no-bounce spring stiffness 900, 30% threshold; still while
+  selecting or with two fingers; Back on Albums / Menu slides to Pictures; dragging the bottom bar drives it too).
+  The pager state lives in `GalleryNavHost`, so the tab survives opening the viewer. Other screens are normal routes.
 - **Foundation:** permission flow (full / partial / denied), `MediaStoreDataSource` + in-memory `MediaRepository`
   index (`StateFlow<MediaIndexState>`) with debounced `ContentObserver`, own `ThumbnailCache` + prefetch.
 - **Timeline** (`feature/timeline/`): day-grouped `LazyColumn` of rows, sticky day headers pinned below the status
-  bar, video badges, fast-scroller with month bubble (`TimelineScrollMap` maps scroll px <-> rows), return-to-photo
-  after the viewer closes (`ViewerReturnTarget`).
-- **Viewer** (`feature/viewer/`): pager, Telephoto zoom, shared-element open/close via the photo-shaped
-  `SharedFlightFrame` (180 ms `FastOutSlowInEasing`, matched to Google Photos), drag-to-dismiss in any direction
-  that flies into the grid cell, zoomed close zooms out first, details panel (EXIF, lazy location), filmstrip,
-  video (Media3: scrubber, mute, keep-screen-on, in-memory resume). Tap pre-decodes the photo
-  (`ViewerPrefetch.kt`) so it is usually sharp on arrival.
-- **Selection** (`feature/selection/`): long-press + drag-select with edge auto-scroll; Share, Favorite, Trash,
-  Move/Copy to album. All secondary grids (album, Favorites, Videos, Trash) use `MediaListScreen` /
+  bar, video / GIF badges, red heart on favourites (`MediaThumbnail`, `FavoriteHeartRed`), fast-scroller with month
+  bubble, search button on the pinned header, return-to-photo after the viewer closes (`ViewerReturnTarget`).
+- **Viewer** (`feature/viewer/`):
+  - Pager, Telephoto zoom (double-tap-and-drag zoom works: `DismissGestures` ignores the second press of a
+    double-tap), shared-element open 180 ms / close 250 ms decelerating (`GalleryMotion`, chosen by direction in
+    `mediaSharedElement`), drag-to-dismiss into the grid cell, own back gesture over a picture of the grid.
+  - Chrome (`ViewerChrome.kt`): two-line date top bar (Today / Yesterday / date over time) with a dark tall fade and a
+    ⋮ menu (Use as, Open with: read-only hand-offs); bottom bar: Share circle, Favourite / Edit / Trash pill, Details
+    circle (Trash viewer: Restore / Delete forever). Play pill above the filmstrip for motion photos (clip plays once)
+    and GIFs (still first frame until Play: `BitmapFactoryDecoder` + separate memory-cache keys).
+  - Filmstrip (`ViewerFilmstrip.kt`): square thumbnails; swiping it changes the photo live, snaps to centre.
+  - Details panel (`InfoPanel.kt`): big date, file name, location; camera, "MP | size | bytes | type", ISO / shutter /
+    aperture / focal box (`ExposureValues`); album row (opens the album) and Favourites row (opens Favourites).
+  - Video (Media3: scrubber, mute, keep-screen-on, resume saved across launches), Ultra HDR window mode.
+- **Selection** (`feature/selection/`): long-press + drag-select with edge auto-scroll; Share, Favourite, Trash,
+  Move/Copy to album. Secondary grids (album, Favourites, Videos, Trash) use `MediaListScreen` /
   `SelectableMediaGrid`.
-- **Albums, Favorites, Videos, Trash** (restore / delete forever with confirmation).
-- **External intents:** `ACTION_VIEW` + camera `REVIEW` for image/video content and file URIs open straight into
-  the viewer (indexed MediaStore URI: full pager; otherwise a single item), works without media permission.
-- **Pinch density (Phase 3):** `core/ui/components/GridZoom.kt` (`GridZoomState`: live switch every 10% while
-  pinching, snapshot of the old grid cross-faded over 220 ms), `PinchToZoom.kt`, `GridZoomAnchor.kt` (keeps the cell
-  under the fingers in place for flat grids). Pictures: 2/4/6 + month (8, by month), default 4, in memory only.
-  Album / Favorites / Videos use the same `TimelineGrid` (`underStatusBar = false`); Trash is a flat 2/4/6 grid.
-- **Album organisation (Phase 3):** Room `gallery.db` (`AlbumPrefEntity`: hidden, pinnedAt, position; schema in
-  `app/schemas/`), DataStore `AppPreferences` (album sort, albums per row 2/3/4, oldest-first). Hidden albums are
-  filtered out of `MediaRepository.state` everywhere (`allState` is unfiltered, used by Move/Copy). Pins keep pin
-  order. Edit albums screen: drag to reorder, pin and eye toggles. Long-press bulk select on Albums and Edit albums.
-- **Search (Phase 3):** `feature/search/` (`parseSearch` / `SearchIndex` / suggestions, recent searches in DataStore),
-  opened from the button at the right of the pinned day header on Pictures; `ViewerRoute.searchQuery` pages matches.
-- **Back gestures (Phase 3):** NavHost `predictivePop*` slide; viewer uses `PredictiveBackHandler` and a picture of
-  the grid taken on open (`ViewerBackdrop`, cells from `RegisterViewerCells`) drawn behind the photo with a gap.
-- **Viewer polish (2026-11-18/19):** layout from my reference screenshots (`ViewerChrome.kt`: two-line date bar + ⋮
-  menu, bottom Share / Favourite-Edit-Trash / Details bar), Play pill for motion photos and GIFs (GIFs still until
-  Play), filmstrip scrubbing (centred thumbnail is the photo, live), redesigned details panel with album and
-  Favourites links, double-tap-and-drag zoom no longer closes. Red heart badge on favourite thumbnails.
-- **Tabs (2026-11-19):** `HomeRoute` holds Pictures / Albums / Menu in one `HomePager` (pages follow the finger).
+- **Albums, Favourites, Videos, Trash** (restore / delete forever with confirmation). UI text spells "Favourite"
+  (British); code identifiers keep `favorite`.
+- **External intents:** `ACTION_VIEW` + camera `REVIEW` open straight into the viewer, works without media permission.
+- **Pinch density:** `GridZoom.kt` / `PinchToZoom.kt` / `GridZoomAnchor.kt`. Pictures 2/4/6 + month; album lists
+  share one size; Trash a flat 2/4/6 grid. All remembered across launches (`GridSizeKey` in `AppPreferences`).
+- **Album organisation:** Room `gallery.db` (`AlbumPrefEntity`: hidden, pinnedAt, position; schema in `app/schemas/`),
+  DataStore `AppPreferences` (album sort, albums per row, oldest-first). Hidden albums filtered out of
+  `MediaRepository.state` (`allState` is unfiltered, used by Move/Copy). Edit albums screen.
+- **Search:** `feature/search/` (`parseSearch` / `SearchIndex` / suggestions, recent searches in DataStore).
+- **Settings** (`feature/settings/`): theme, wallpaper colours, start muted, motion autoplay, Ultra HDR, skip
+  confirmation pop-ups (`MANAGE_MEDIA` special access), About. `AppSettings` read before the first frame.
 
 ### Known gaps / deferred
 - Camera thumbnail opens Google Photos, not Gallery (parked by me; likely the system default app setting).
-- Resume positions, the Pictures grid level and secondary grid sizes are lost on restart (Settings, parked).
-- `ACCESS_MEDIA_LOCATION` runtime flow untested on device.
-- **Phase 4:** request 120 Hz (`preferredDisplayModeId`; app renders at 90 Hz, Motorola maps "high" to 90),
-  run `assembleRelease` / benchmark builds on the phone (R8 risk), Baseline Profile (viewer setup is
-  ~140-190 ms in debug), accessibility `contentDescription`s, collapsing title header, real nav icons
-  (current ones are `material-icons-core`).
+- `ACCESS_MEDIA_LOCATION` first-run prompt untested on device (location shows on my phone).
+- The very first "open album" tap from an externally opened photo once landed on Pictures; not reproducible.
+- **Phase 4:** request 120 Hz (`preferredDisplayModeId`; app renders at 90 Hz), run `assembleRelease` / benchmark
+  builds on the phone (R8 risk; release should be 2-3x smoother than debug), Baseline Profile, accessibility
+  `contentDescription`s, collapsing title header, real nav icons (current ones are `material-icons-core`).
 - Not added yet (add in the phase that needs them): WorkManager, Turbine.
 
-### How I like to work (learned in Phase 2)
+### How I like to work
 - When I report something vague ("it glitches", "it vanishes"), first say back what you understood and ask what
-  you need; change code only after I confirm.
-- Measure before and after on the phone for anything about speed or feel, and show me the numbers.
-- Say what each change means for me in plain words; keep reports short.
+  you need; change code only after I confirm. Clear requests can go straight to work.
+- For anything about speed or feel, measure on the phone (for motion: 10x animator scale + frame contact sheet) and
+  show me what you found before changing it.
+- Say what each change means for me in plain words; keep reports short. Commit after each working change; push only
+  when I say so.
+- I give UI references as screenshots from other phones: follow the layout, implement it our own way.
 
 ### Testing on my phone (rules)
 - Only test with copies, never touch originals (no restore / delete / move of real media without my approval).
@@ -275,6 +281,9 @@ describes the project for GitHub; keep its Features / Status sections in step wh
 - I may be using the phone at the same time: if logs show actions you did not send, stop tapping.
 - Phone settings I chose: Developer options animation scales 0.7, Stay awake on (while charging), DND on.
   If you change animation scale for a test, put it back to 0.7 afterwards.
+- One tap per adb command, with a screenshot before the next (chained taps get blocked). A single drag / gesture
+  can be sent as one `input motionevent DOWN / MOVE... / UP` sequence. If a call or notification shows up, stop.
+- adb taps are too slow for double-tap gestures: ask me to test those (and anything with two fingers).
 
 ### Running on my phone (Motorola Edge 60 Pro, Android 17, 1220x2712, wireless debugging)
 - adb: `"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"`. Check with `adb devices -l`; the serial looks like
@@ -314,4 +323,8 @@ describes the project for GitHub; keep its Features / Status sections in step wh
   Heredocs with backslashes lose them: use raw strings or the Write tool. In PowerShell, commit with `-m`
   arguments, not heredocs (a heredoc commit silently did nothing).
 - Git commits use `-c user.name=rohit -c user.email=rohit@localhost`.
+- Some sources and CLAUDE.md have CRLF line endings: strip `\r` before multi-line perl edits
+  (`perl -pi -e 's/\r$//' file`).
+  In perl `s{}{}` replacements with Kotlin braces break: use the Edit tool or `s///` instead.
+- Coil memory-cache keys ignore the decoder: give a request with a custom `decoderFactory` its own `memoryCacheKey`.
 
