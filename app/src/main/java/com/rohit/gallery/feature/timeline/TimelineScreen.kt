@@ -461,7 +461,8 @@ private fun TimelineFastScroller(
         labelAt = { fraction ->
             map.epochDayAt((fraction * maxScrollPx()).toLong())?.let { monthLabel(it, locale) }.orEmpty()
         },
-        topPadding = if (underStatusBar) WindowInsets.statusBars.asPaddingValues().calculateTopPadding() else 0.dp,
+        // On Pictures the track starts below the pinned day header, leaving its right end to the search button.
+        topPadding = if (underStatusBar) WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + DayHeaderHeight else 0.dp,
         bottomPadding = bottomPadding,
         modifier = modifier,
     )
