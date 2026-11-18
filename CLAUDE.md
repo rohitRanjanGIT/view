@@ -265,8 +265,9 @@ Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4
 - Don't run `python`/`python3` in the shell (hangs). `.gitignore` must use `build/` (not `/build`).
   Heredocs with backslashes lose them: use raw strings or the Write tool.
 - Git commits use `-c user.name=rohit -c user.email=rohit@localhost`.
-- Shared elements: only the tapped cell and the viewer's current page carry the shared modifier; drag-dismiss
-  disables the flight and fades instead (otherwise the grid thumbnail is stretched full screen).
+- Shared elements: only the tapped cell and the viewer's current page carry the shared modifier. The flight
+  element is the photo-shaped `SharedFlightFrame`; drag-dismiss moves it by *layout* (`FlightPlacement`), because
+  the flight starts from layout bounds and ignores graphics-layer transforms.
 
 ### Running on my phone (Motorola Edge 60 Pro, wireless debugging)
 - adb: `"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"`. Check with `adb devices -l`.

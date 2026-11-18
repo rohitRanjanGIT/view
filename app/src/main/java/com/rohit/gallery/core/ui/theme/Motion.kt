@@ -8,8 +8,11 @@ object GalleryMotion {
     fun <T> standard() = spring<T>(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
     fun <T> snappy() = spring<T>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
 
-    /** Grid <-> viewer flight: quick, no overshoot. */
-    fun sharedBounds() = spring<androidx.compose.ui.geometry.Rect>(dampingRatio = 0.9f, stiffness = 1200f)
+    /**
+     * Grid <-> viewer flight: no overshoot, ~300 ms so the photo is seen travelling into its cell
+     * (at 1200 stiffness it settled in ~130 ms and read as the photo vanishing).
+     */
+    fun sharedBounds() = spring<androidx.compose.ui.geometry.Rect>(dampingRatio = 0.95f, stiffness = 450f)
 
     const val FADE_MS = 140
 }

@@ -16,6 +16,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.roundToInt
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.LocalThumbnailCache
 import com.rohit.gallery.core.ui.components.mediaSharedElement
@@ -48,6 +51,7 @@ fun SharedFlightFrame(
     thumbnail: ImageBitmap?,
     transitionActive: () -> Boolean,
     modifier: Modifier = Modifier,
+    placement: (() -> FlightPlacement)? = null,
 ) {
     val bitmap = thumbnail ?: return
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -57,8 +61,25 @@ fun SharedFlightFrame(
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
                 .aspectRatio(bitmap.width.toFloat() / bitmap.height)
+                .then(if (placement != null) Modifier.flightPlacement(placement) else Modifier)
                 .mediaSharedElement(item.id, force = true)
                 .graphicsLayer { alpha = if (transitionActive()) 1f else 0f },
         )
     }
+}
+
+/** Where the drag-to-dismiss gesture has moved the photo: offset from its resting place, and scale. */
+class FlightPlacement(val x: Float, val y: Float, val scale: Float)
+
+/**
+ * Applies [placement] as layout (size and position), not as a graphics layer: the shared-element
+ * flight starts from layout bounds, so this makes a swipe-down close start exactly where the finger
+ * left the photo. Scaling keeps the centre, like the drag's graphics layer does.
+ */
+private fun Modifier.flightPlacement(placement: () -> FlightPlacement): Modifier = layout { measurable, constraints ->
+    val p = placement()
+    val w = (constraints.maxWidth * p.scale).roundToInt().coerceAtLeast(1)
+    val h = (constraints.maxHeight * p.scale).roundToInt().coerceAtLeast(1)
+    val placeable = measurable.measure(Constraints.fixed(w, h))
+    layout(w, h) { placeable.place(p.x.roundToInt(), p.y.roundToInt()) }
 }

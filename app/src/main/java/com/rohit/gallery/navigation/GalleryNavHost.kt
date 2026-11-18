@@ -180,7 +180,6 @@ fun GalleryNavHost(
                                 onBack = { if (external) onExitExternal() else navController.popBackStack() },
                                 onCurrentItemChanged = {
                                     sharedMediaId = it
-                                    // Null means a drag-dismiss turned off the flight; the grid should still land on it.
                                     if (it != null) returnTarget.mediaId = it
                                 },
                             )

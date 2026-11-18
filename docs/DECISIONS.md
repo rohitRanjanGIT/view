@@ -157,5 +157,9 @@ Non-obvious technical choices, newest last.
   Timeline uses exact geometry (`TimelineScrollMap`, `lazyRowIndexOf`); flat grids use a row estimate.
 - **Zoomed close:** Back / back gesture / top-bar arrow call `resetZoom` (220 ms) then pop. Drag-dismiss cannot start
   while zoomed (Telephoto consumes the pan), so it needs no change.
+- **Every close flies into the cell.** Drag-dismiss used to switch the flight off and fade (the photo just vanished).
+  Now it keeps the flight: `SharedFlightFrame` takes the drag as layout size/offset (`FlightPlacement`), since the
+  flight starts from layout bounds, so it leaves from where the finger let go. The flight spring went from
+  stiffness 1200 (~130 ms, read as vanishing) to 450 / damping 0.95 (~300 ms, no overshoot), open and close alike.
 - **All secondary grids share `MediaListScreen`.** Favorites now has Move/Copy too; Trash passes its own Restore /
   Delete bar through a slot.

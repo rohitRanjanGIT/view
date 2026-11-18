@@ -194,6 +194,11 @@ private fun ViewerContent(
         shape = RoundedCornerShape((28.dp * progress).toPx())
         clip = progress > 0f
     }
+    // The same drag, for the flight copy: a swipe-down close flies from where the finger left the photo.
+    val flightPlacement: () -> FlightPlacement = {
+        val p = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
+        FlightPlacement(dragX, dragY, 1f - 0.45f * p)
+    }
 
     // Details: the photo shrinks upward into the area above an inline panel (stacked, not overlapping).
     val infoProgress by animateFloatAsState(if (showInfo) 1f else 0f, GalleryMotion.snappy(), label = "info")
@@ -263,8 +268,8 @@ private fun ViewerContent(
                             SwipeMode.CloseInfo -> if (velocityY > DISMISS_VELOCITY) showInfo = false
                             SwipeMode.Dismiss ->
                                 if (dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY) {
+                                    // The flight stays on: the photo glides from here into its grid cell.
                                     dismissed = true
-                                    onCurrentItemChanged(null)
                                     onBack()
                                 } else {
                                     settle(GalleryMotion.standard())
@@ -297,8 +302,8 @@ private fun ViewerContent(
                     item = item,
                     isCurrent = isCurrent,
                     playback = if (isCurrent) playback else null,
-                    sharedElement = !dismissed,
                     dragLayer = if (isCurrent) dragLayer else null,
+                    flightPlacement = if (isCurrent) flightPlacement else null,
                     onZoomedChange = { zoomed = it },
                     onZoomState = { state -> currentZoom.state = state },
                     onTap = { if (showInfo) showInfo = false else chromeVisible = !chromeVisible },
@@ -384,8 +389,8 @@ private fun ViewerContent(
 private fun ImagePage(
     item: MediaItem,
     isCurrent: Boolean,
-    sharedElement: Boolean,
     dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    flightPlacement: (() -> FlightPlacement)?,
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
@@ -411,9 +416,9 @@ private fun ImagePage(
         }
     }
     val transitionActive = rememberSharedTransitionActive()
-    val flightEnabled = isCurrent && sharedElement
+    val flightEnabled = isCurrent
     Box(Modifier.fillMaxSize()) {
-        if (flightEnabled) SharedFlightFrame(item, rememberThumbnail(item), transitionActive)
+        if (flightEnabled) SharedFlightFrame(item, rememberThumbnail(item), transitionActive, placement = flightPlacement)
         ZoomableAsyncImage(
             model = request,
             contentDescription = null,
@@ -490,16 +495,16 @@ private fun ViewerPage(
     item: MediaItem,
     isCurrent: Boolean,
     playback: PlaybackState?,
-    sharedElement: Boolean,
     dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    flightPlacement: (() -> FlightPlacement)?,
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
 ) {
     if (item.isVideo) {
-        VideoPage(item, isCurrent, playback, sharedElement, dragLayer, onTap)
+        VideoPage(item, isCurrent, playback, dragLayer, flightPlacement, onTap)
     } else {
-        ImagePage(item, isCurrent, sharedElement, dragLayer, onZoomedChange, onZoomState, onTap)
+        ImagePage(item, isCurrent, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap)
     }
 }
 
@@ -509,13 +514,13 @@ private fun VideoPage(
     item: MediaItem,
     isCurrent: Boolean,
     playback: PlaybackState?,
-    sharedElement: Boolean,
     dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    flightPlacement: (() -> FlightPlacement)?,
     onTap: () -> Unit,
 ) {
     val thumbnail = rememberThumbnail(item)
     val transitionActive = rememberSharedTransitionActive()
-    val flightEnabled = isCurrent && sharedElement
+    val flightEnabled = isCurrent
     val shutter: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             thumbnail?.let {
@@ -524,7 +529,7 @@ private fun VideoPage(
         }
     }
     Box(Modifier.fillMaxSize()) {
-    if (flightEnabled) SharedFlightFrame(item, thumbnail, transitionActive)
+    if (flightEnabled) SharedFlightFrame(item, thumbnail, transitionActive, placement = flightPlacement)
     Box(
         Modifier
             .fillMaxSize()
