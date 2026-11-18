@@ -228,18 +228,16 @@ Last updated: 2026-11-17. Read this section first in a new session, then `docs/D
   - 33 unit tests pass.
 - Release and benchmark builds compile; merged manifests contain no `INTERNET` (re-check each build).
 
-### Waiting on my device report
-- Back-close fix (commit `d55ceac`): back button, back swipe and swipe-down should fly the photo into its
-  grid cell with no full-screen flash. Check portrait / landscape / square / video / zoomed-in.
-- External intents: tapping the Motorola camera's thumbnail (does it offer/open Gallery?), "Open with" from Files /
-  WhatsApp, a video, and opening a file with media permission revoked.
+### Verified by me on the phone (2026-11-18)
+- Scroll glitch fixed (`cec7e0c`), Menu text colour (`2b78276`), Videos page, header below the clock, return to
+  the photo you ended on, zoomed-in close, Favorites / Trash, "Open with". Close flight: every close (back, back
+  swipe, swipe-down, zoomed) flies into the cell, timed to match Google Photos (`831171e`, `da9286d`, 180 ms).
+- Phone setup during testing: Developer options animation scales set to 0.7 (my choice), Stay awake on, DND on.
 
 ### Next steps (Phase 2 order I approved)
-All Phase 2 code is done (last: `80e78b6`, `dcee7f5`, `7e90075`). Remaining, all on my phone:
-1. Check: Videos page; header no longer under the clock; closing the viewer lands on the photo you ended on
-   (swipe a few photos away first); zoomed-in close zooms out then flies; Favorites/Trash look and work as before.
-2. Decide on the camera thumbnail opening Google Photos (parked).
-3. Full-day test closes Phase 2. Then Phase 3 starts with pinch grid density.
+All Phase 2 code is done and checked. Remaining:
+1. Full-day test closes Phase 2. Then Phase 3 starts with pinch grid density.
+2. Camera thumbnail opening Google Photos: still parked (likely the system default for opening photos).
 Commit after each task and ask me to test on the phone. Then Phase 3 and Phase 4 as in section 8.
 
 ### Testing on my phone (rules)
