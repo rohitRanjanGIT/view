@@ -319,3 +319,6 @@ Non-obvious technical choices, newest last.
   system screen). With it, MediaStore trash / favourite requests complete without the system dialog; permanent
   delete still has the app's own confirmation in Trash.
 - The Settings screen UI was written by a helper agent in parallel (new files only), then reviewed and built here.
+
+## Filmstrip scrubbing (2026-11-18)
+Swiping the viewer filmstrip changes the photo live: whichever thumbnail is nearest the middle becomes the current page (`pagerState.scrollToPage`). Only user scrolls drive this (a drag, or the snap fling after it, tracked with a wrapping `FlingBehavior`), so our own animated scroll that follows the pager never selects the items it passes. `SnapPosition.Center` snapping leaves one thumbnail exactly centred.
