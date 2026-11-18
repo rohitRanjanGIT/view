@@ -109,6 +109,7 @@ class ViewerViewModel @Inject constructor(
                         route.favoritesOnly -> state.items.filter { it.isFavorite }
                         route.videosOnly -> state.items.filter { it.isVideo }
                         route.bucketId != null -> state.items.filter { it.bucketId == route.bucketId }
+                            .let { if (route.oldestFirst) it.reversed() else it }
                         else -> state.items
                     }
             }

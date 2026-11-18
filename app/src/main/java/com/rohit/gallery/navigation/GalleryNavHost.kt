@@ -130,7 +130,9 @@ fun GalleryNavHost(
                     topLevel<AlbumDetailRoute> {
                         AlbumDetailScreen(
                             onBack = { navController.popBackStack() },
-                            onOpenMedia = { item, bucketId -> openViewer(item, ViewerRoute(item.id, bucketId = bucketId)) },
+                            onOpenMedia = { item, bucketId, oldestFirst ->
+                                openViewer(item, ViewerRoute(item.id, bucketId = bucketId, oldestFirst = oldestFirst))
+                            },
                         )
                     }
                     topLevel<MenuRoute> {

@@ -241,3 +241,11 @@ Non-obvious technical choices, newest last.
   because album rows are taller than photo rows (the name and count under each card are measured). Card
   placement animation is off for the one frame where the column count changes, so cards don't slide under
   the cross-fade.
+
+### Album order: newest or oldest first (Phase 3)
+- One setting for every album (`AppPreferences.albumOldestFirst`), changed from the ⋮ menu on an album's title
+  bar. Favorites, Videos and Pictures stay newest first.
+- The album's list waits for both the index and the setting before showing anything, so it never shows newest
+  first and then flips.
+- The viewer gets `oldestFirst` in `ViewerRoute` and reverses the same filtered list, so swiping goes in the
+  order the album shows. Day and month grouping keep whatever order they are given.

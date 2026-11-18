@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -54,6 +55,7 @@ fun MediaListScreen(
     selectionActions: SelectionActions,
     onBack: () -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
+    titleActions: @Composable RowScope.() -> Unit = {},
 ) {
     val allFavorite by remember(items) {
         derivedStateOf {
@@ -61,14 +63,14 @@ fun MediaListScreen(
             ids.isNotEmpty() && items.orEmpty().filter { it.id in ids }.let { sel -> sel.isNotEmpty() && sel.all { it.isFavorite } }
         }
     }
-    MediaListScreen(title, emptyText, items, selection, onBack, onOpenMedia, asTimeline = true) { modifier ->
+    MediaListScreen(title, emptyText, items, selection, onBack, onOpenMedia, asTimeline = true, titleActions = titleActions) { modifier ->
         SelectionActionsBar(selectionActions, selection, modifier, allFavorite = allFavorite)
     }
 }
 
 /**
- * The same screen with its own bottom bar for a selection (Trash: Restore / Delete). [gridHeader] is a
- * note shown above the flat grid. [asTimeline] shows the items like Pictures (day headers, fast-scroller,
+ * The same screen with its own bottom bar for a selection (Trash: Restore / Delete). [titleActions] go at the
+ * end of the title bar. [gridHeader] is a note shown above the flat grid. [asTimeline] shows the items like Pictures (day headers, fast-scroller,
  * month view) instead of a flat grid.
  */
 @Composable
@@ -81,6 +83,7 @@ fun MediaListScreen(
     onOpenMedia: (MediaItem) -> Unit,
     gridHeader: String? = null,
     asTimeline: Boolean = false,
+    titleActions: @Composable RowScope.() -> Unit = {},
     selectionBar: @Composable (Modifier) -> Unit,
 ) {
     BackHandler(enabled = selection.isSelecting) { selection.clear() }
@@ -92,7 +95,7 @@ fun MediaListScreen(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             if (!selection.isSelecting) {
-                TitleBar(title, onBack)
+                TitleBar(title, onBack, titleActions)
             } else {
                 SelectionTopBar(
                     count = selection.ids.size,
@@ -150,7 +153,7 @@ private fun MediaTimeline(
 private val ListBottomPadding = 96.dp
 
 @Composable
-private fun TitleBar(title: String, onBack: () -> Unit) {
+private fun TitleBar(title: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Row(
             Modifier.statusBarsPadding().padding(horizontal = 4.dp, vertical = 4.dp),
@@ -159,7 +162,8 @@ private fun TitleBar(title: String, onBack: () -> Unit) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            actions()
         }
     }
 }

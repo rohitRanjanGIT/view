@@ -45,7 +45,7 @@ fun List<DayGroup>.toTimelineDays(columns: Int): List<TimelineDay> =
 
 /**
  * Merges consecutive day groups of the same calendar month into one group per month, keyed by the
- * month's first day. Input must be newest first, as [groupByDay] returns it.
+ * month's first day. Works for either order ([groupByDay] keeps the order it is given).
  */
 fun groupByMonth(days: List<DayGroup>): List<DayGroup> {
     val months = ArrayList<DayGroup>()

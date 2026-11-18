@@ -35,6 +35,8 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
     val trashed: Boolean = false,
     val favoritesOnly: Boolean = false,
     val videosOnly: Boolean = false,
+    /** With [bucketId]: page oldest first, matching the album screen. */
+    val oldestFirst: Boolean = false,
     val externalUri: String? = null,
     val externalMime: String? = null,
 )
