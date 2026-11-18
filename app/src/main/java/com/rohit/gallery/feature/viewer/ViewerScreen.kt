@@ -14,7 +14,17 @@ import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.snapshotFlow
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.ZoomableImageState
@@ -82,6 +92,7 @@ import coil3.request.ImageRequest
 import coil3.request.placeholder
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.LocalThumbnailCache
+import com.rohit.gallery.core.ui.components.LocalViewerBackdrop
 import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
 import com.rohit.gallery.core.ui.components.thumbKey
 import kotlin.math.abs
@@ -196,14 +207,16 @@ private fun ViewerContent(
         scope.launch { animate(dragY, 0f, animationSpec = spec) { v, _ -> dragY = v } }
     }
 
-    val dragLayer: GraphicsLayerScope.() -> Unit = {
+    // [contentAspect]: the photo's width / height (0 if unknown), so the rounding follows its real edges.
+    val dragLayer: GraphicsLayerScope.(contentAspect: Float) -> Unit = { contentAspect ->
         translationX = dragX
         translationY = dragY
         val s = (1f - 0.45f * progress) * (1f - 0.2f * exitProgress)
         alpha = 1f - exitProgress
         scaleX = s
         scaleY = s
-        shape = RoundedCornerShape((28.dp * progress).toPx())
+        val radius = (28.dp * progress).toPx()
+        shape = if (contentAspect > 0f) FittedRoundedShape(contentAspect, radius) else RoundedCornerShape(radius)
         clip = progress > 0f
     }
     // The same drag, for the flight copy: a swipe-down close flies from where the finger left the photo.
@@ -233,6 +246,9 @@ private fun ViewerContent(
         }
     }
     BackHandler(enabled = zoomed && !showInfo) { close() }
+    val backdropHolder = LocalViewerBackdrop.current
+    val backdrop = backdropHolder?.image
+    val gapColor = MaterialTheme.colorScheme.background
 
     // System back gesture (not zoomed, details closed): the photo shrinks and leans towards the edge the swipe
     // started from, following the finger. Letting go flies it into its grid cell like a drag-down close;
@@ -259,6 +275,13 @@ private fun ViewerContent(
     Box(
         modifier
             .fillMaxSize()
+            // While a gesture fades the black, the grid as it was when the viewer opened shows behind the photo.
+            // The photo's own cell is drawn empty there: it is the gap the photo flies back into.
+            .drawBehind {
+                if (backdrop == null || progress <= 0f) return@drawBehind
+                drawImage(backdrop, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()))
+                backdropHolder.cells[currentItem.id]?.let { cell -> drawRect(gapColor, topLeft = cell.topLeft, size = cell.size) }
+            }
             .background(Color.Black.copy(alpha = dismissAlpha * (1f - 0.85f * progress))),
     ) {
         Box(
@@ -423,7 +446,7 @@ private fun ViewerContent(
 private fun ImagePage(
     item: MediaItem,
     isCurrent: Boolean,
-    dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    dragLayer: (GraphicsLayerScope.(Float) -> Unit)?,
     flightPlacement: (() -> FlightPlacement)?,
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
@@ -449,10 +472,12 @@ private fun ImagePage(
             onDispose { onZoomState(null) }
         }
     }
+    val thumbnail = rememberThumbnail(item)
+    val aspect = contentAspect(item, thumbnail)
     val transitionActive = rememberSharedTransitionActive()
     val flightEnabled = isCurrent
     Box(Modifier.fillMaxSize()) {
-        if (flightEnabled) SharedFlightFrame(item, rememberThumbnail(item), transitionActive, placement = flightPlacement)
+        if (flightEnabled) SharedFlightFrame(item, thumbnail, transitionActive, placement = flightPlacement)
         ZoomableAsyncImage(
             model = request,
             contentDescription = null,
@@ -460,7 +485,7 @@ private fun ImagePage(
             onClick = { onTap() },
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier)
+                .then(if (dragLayer != null) Modifier.graphicsLayer { dragLayer(aspect) } else Modifier)
                 // The photo-shaped copy flies during transitions; this interactive one waits.
                 .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f },
         )
@@ -529,7 +554,7 @@ private fun ViewerPage(
     item: MediaItem,
     isCurrent: Boolean,
     playback: PlaybackState?,
-    dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    dragLayer: (GraphicsLayerScope.(Float) -> Unit)?,
     flightPlacement: (() -> FlightPlacement)?,
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
@@ -548,7 +573,7 @@ private fun VideoPage(
     item: MediaItem,
     isCurrent: Boolean,
     playback: PlaybackState?,
-    dragLayer: (GraphicsLayerScope.() -> Unit)?,
+    dragLayer: (GraphicsLayerScope.(Float) -> Unit)?,
     flightPlacement: (() -> FlightPlacement)?,
     onTap: () -> Unit,
 ) {
@@ -568,7 +593,7 @@ private fun VideoPage(
         Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f }
-            .then(if (dragLayer != null) Modifier.graphicsLayer(dragLayer) else Modifier)
+            .then(if (dragLayer != null) Modifier.graphicsLayer { dragLayer(contentAspect(item, thumbnail)) } else Modifier)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTap() },
     ) {
         if (playback != null) {
@@ -601,3 +626,25 @@ private fun VideoPage(
 
 /** What the current vertical swipe on the photo does; fixed at the start of the swipe. */
 private enum class SwipeMode { None, OpenInfo, CloseInfo, Dismiss, Ignore }
+
+/** Width / height of the photo as shown (the decoded thumbnail knows the real orientation); 0 if unknown. */
+private fun contentAspect(item: MediaItem, thumbnail: ImageBitmap?): Float = when {
+    thumbnail != null && thumbnail.height > 0 -> thumbnail.width.toFloat() / thumbnail.height
+    item.width > 0 && item.height > 0 -> item.width.toFloat() / item.height
+    else -> 0f
+}
+
+/**
+ * Rounds the corners of the photo itself rather than its full-screen page: the outline is the photo fitted
+ * (centred, whole) inside the page, so letterboxed photos get visibly rounded corners while they shrink.
+ */
+private class FittedRoundedShape(private val aspect: Float, private val radius: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val wide = aspect > size.width / size.height
+        val w = if (wide) size.width else size.height * aspect
+        val h = if (wide) size.width / aspect else size.height
+        val left = (size.width - w) / 2f
+        val top = (size.height - h) / 2f
+        return Outline.Rounded(RoundRect(left, top, left + w, top + h, CornerRadius(radius)))
+    }
+}

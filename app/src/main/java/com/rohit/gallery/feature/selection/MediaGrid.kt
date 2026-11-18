@@ -33,6 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -46,6 +49,7 @@ import com.rohit.gallery.core.ui.components.GridZoomState
 import com.rohit.gallery.core.ui.components.KeepGridZoomAnchor
 import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
 import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.RegisterViewerCells
 import com.rohit.gallery.core.ui.components.ZoomAnchorCell
 import com.rohit.gallery.core.ui.components.ZoomOverlay
 import com.rohit.gallery.core.ui.components.mediaSharedElement
@@ -147,6 +151,23 @@ fun SelectableMediaGrid(
         indexOf = { indexById[it] },
     )
 
+    // Where the visible photos are on screen, for the viewer's backdrop (it leaves a gap at the open photo).
+    val gridOrigin = remember { object { var value = Offset.Zero } }
+    RegisterViewerCells {
+        val info = gridState.layoutInfo
+        val origin = gridOrigin.value
+        val visibleBottom = origin.y + info.viewportSize.height - info.afterContentPadding
+        val cells = HashMap<Long, Rect>()
+        info.visibleItemsInfo.forEach { cell ->
+            val id = cell.key as? Long ?: return@forEach
+            val left = origin.x + cell.offset.x
+            val top = origin.y + cell.offset.y
+            val rect = Rect(left, maxOf(top, origin.y), left + cell.size.width, minOf(top + cell.size.height, visibleBottom))
+            if (rect.height > 0f) cells[id] = rect
+        }
+        cells
+    }
+
     val pointer = remember { object { var position: Offset? = null } }
     var dragActive by remember { mutableStateOf(false) }
     val edgePx = with(density) { 96.dp.toPx() }
@@ -202,6 +223,7 @@ fun SelectableMediaGrid(
             contentPadding = PaddingValues(bottom = 96.dp),
             modifier = Modifier
                 .fillMaxSize()
+                .onPlaced { gridOrigin.value = it.positionInWindow() }
                 .zoomLayer(zoom)
                 // Records the grid as it draws, so a column switch can snapshot the old grid.
                 .drawWithContent {

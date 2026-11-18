@@ -13,6 +13,9 @@ import androidx.compose.animation.core.tween
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import androidx.activity.BackEventCompat
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +28,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +51,8 @@ import com.rohit.gallery.core.ui.components.LocalSharedMediaId
 import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
 import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
 import com.rohit.gallery.core.ui.components.ViewerReturnTarget
+import com.rohit.gallery.core.ui.components.ViewerBackdrop
+import com.rohit.gallery.core.ui.components.LocalViewerBackdrop
 import com.rohit.gallery.feature.albums.AlbumDetailScreen
 import com.rohit.gallery.feature.albums.AlbumsScreen
 import com.rohit.gallery.feature.albums.EditAlbumsScreen
@@ -86,6 +92,14 @@ fun GalleryNavHost(
 
     var sharedMediaId by remember { mutableStateOf<Long?>(null) }
     val returnTarget = remember { ViewerReturnTarget() }
+    val backdrop = remember { ViewerBackdrop() }
+    // Everything below the shared-element overlay, recorded as it draws, so opening the viewer can keep a
+    // picture of the grid to show behind the photo during back and drag-down gestures.
+    val screenLayer = rememberGraphicsLayer()
+    LaunchedEffect(currentDestination) {
+        // A full-screen bitmap: drop it as soon as the viewer is not showing.
+        if (currentDestination?.hasRoute<ViewerRoute>() != true) backdrop.image = null
+    }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val windowSize = LocalWindowInfo.current.containerSize
@@ -95,6 +109,8 @@ fun GalleryNavHost(
         prefetchViewerImage(context, item, windowSize.width, windowSize.height)
         // Tag the grid cell first so the shared element exists on both sides.
         sharedMediaId = item.id
+        backdrop.takeCells()
+        scope.launch { backdrop.image = runCatching { screenLayer.toImageBitmap() }.getOrNull() }
         scope.launch {
             androidx.compose.runtime.withFrameNanos { }
             navController.navigate(route)
@@ -106,8 +122,14 @@ fun GalleryNavHost(
             LocalSharedTransitionScope provides this,
             LocalSharedMediaId provides sharedMediaId,
             LocalViewerReturnTarget provides returnTarget,
+            LocalViewerBackdrop provides backdrop,
         ) {
-            Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize().drawWithContent {
+                    screenLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(screenLayer)
+                },
+            ) {
                 NavHost(
                     navController = navController,
                     // Opened by another app: only the viewer, no permission gate or timeline underneath.

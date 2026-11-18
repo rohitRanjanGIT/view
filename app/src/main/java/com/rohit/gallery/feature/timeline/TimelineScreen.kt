@@ -68,6 +68,9 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -83,6 +86,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.RegisterViewerCells
 import com.rohit.gallery.core.ui.components.mediaSharedElement
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import com.rohit.gallery.feature.selection.SelectionActionsBar
@@ -265,6 +269,29 @@ fun TimelineGrid(
         return ZoomAnchorCell(items[column].id, centre)
     }
 
+    // Where the visible photos are on screen, for the viewer's backdrop (it leaves a gap at the open photo).
+    // Cells under the pinned day header or the bottom padding are cut to what is actually visible.
+    val listOrigin = remember { object { var value = Offset.Zero } }
+    RegisterViewerCells {
+        val info = listState.layoutInfo
+        val origin = listOrigin.value
+        val visibleTop = origin.y + headerPx
+        val visibleBottom = origin.y + info.viewportSize.height - info.afterContentPadding
+        val cells = HashMap<Long, Rect>()
+        info.visibleItemsInfo.forEach { row ->
+            val key = row.key as? String ?: return@forEach
+            if (!key.startsWith(ROW_KEY_PREFIX)) return@forEach
+            val items = currentContent.rowsByFirstId[key.removePrefix(ROW_KEY_PREFIX).toLongOrNull()] ?: return@forEach
+            val top = origin.y + row.offset - info.viewportStartOffset
+            items.forEachIndexed { column, item ->
+                val left = origin.x + column * (cellSizePx + gapPx)
+                val rect = Rect(left, maxOf(top, visibleTop), left + cellSizePx, minOf(top + cellSizePx, visibleBottom))
+                if (rect.height > 0f) cells[item.id] = rect
+            }
+        }
+        cells
+    }
+
     // While drag-selecting, scroll when the finger is near the top or bottom edge. The pointer
     // lives in a plain holder (not state) so moving the finger never recomposes the grid.
     val pointer = remember { object { var position: Offset? = null } }
@@ -325,6 +352,7 @@ fun TimelineGrid(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
+            .onPlaced { listOrigin.value = it.positionInWindow() }
             .zoomLayer(zoom)
             // Records the grid into a layer as it draws, so a density switch can snapshot the old grid.
             .drawWithContent {

@@ -282,3 +282,12 @@ Non-obvious technical choices, newest last.
   releasing closes through the normal path, so the shared-element flight starts from where the photo is.
   Cancelling springs it back. Zoomed in or with details open, back keeps its old behaviour (zoom out / close
   details).
+- **Grid behind the photo:** the grid is not composed while the viewer is open, so `GalleryNavHost` records its
+  content into a `GraphicsLayer` and, when a photo is opened, keeps `toImageBitmap()` of it (`ViewerBackdrop`,
+  cleared when the viewer is gone). The viewer draws it under its black background only while a back or
+  drag-down gesture is fading the black. Grids register a locator (`RegisterViewerCells`) so the capture also
+  records where each visible photo sits; the viewer draws the current photo's cell as an empty gap, which the
+  close flight then fills. It is a picture from when the viewer opened, so after paging far it may not show the
+  current photo's cell (then there is no gap).
+- **Rounded corners while shrinking** follow the photo itself (`FittedRoundedShape`: the fitted, centred photo
+  rect inside the page), not the full-screen page, so letterboxed photos visibly round.

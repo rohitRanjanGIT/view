@@ -5,6 +5,11 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import com.rohit.gallery.core.ui.theme.GalleryMotion
@@ -61,3 +66,40 @@ fun rememberSharedTransitionActive(): () -> Boolean {
     val scope = LocalSharedTransitionScope.current
     return androidx.compose.runtime.remember(scope) { { scope?.isTransitionActive == true } }
 }
+
+/**
+ * A picture of the screen taken as the viewer opens. The grid itself is not drawn while the viewer is open, so
+ * this is what shows behind the photo when a back or drag-down gesture fades the viewer's black background.
+ * Cleared once the viewer is gone.
+ */
+class ViewerBackdrop {
+    var image by mutableStateOf<ImageBitmap?>(null)
+
+    /** Where each photo visible in [image] sits on screen (window coordinates), taken together with it. */
+    var cells: Map<Long, Rect> = emptyMap()
+
+    /** Set by the grid on screen: reports where its visible photos are, for [cells]. */
+    var locator: (() -> Map<Long, Rect>)? = null
+
+    /** Takes the cell positions now; call right before capturing [image]. */
+    fun takeCells() {
+        cells = locator?.invoke().orEmpty()
+    }
+}
+
+/**
+ * Registers [visibleCells] as the screen's cell locator while this grid is composed, so the viewer can leave a gap
+ * where the photo it shows sits in the grid behind it.
+ */
+@Composable
+fun RegisterViewerCells(visibleCells: () -> Map<Long, Rect>) {
+    val backdrop = LocalViewerBackdrop.current ?: return
+    val latest = androidx.compose.runtime.rememberUpdatedState(visibleCells)
+    androidx.compose.runtime.DisposableEffect(backdrop) {
+        val locator: () -> Map<Long, Rect> = { latest.value() }
+        backdrop.locator = locator
+        onDispose { if (backdrop.locator === locator) backdrop.locator = null }
+    }
+}
+
+val LocalViewerBackdrop = staticCompositionLocalOf<ViewerBackdrop?> { null }
