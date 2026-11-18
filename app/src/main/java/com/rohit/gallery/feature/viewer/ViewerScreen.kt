@@ -5,6 +5,8 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.activity.BackEventCompat
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.layout.layout
@@ -83,12 +85,19 @@ import com.rohit.gallery.core.ui.components.LocalThumbnailCache
 import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
 import com.rohit.gallery.core.ui.components.thumbKey
 import kotlin.math.abs
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 
 private const val DISMISS_VELOCITY = 1800f
 private val DismissDistance = 120.dp
 private val UpSwipeOpenDistance = 48.dp
+
+/** How far the photo shrinks at the end of a back gesture (the same scale as that much drag-down progress). */
+private const val BACK_MAX_PROGRESS = 0.5f
+
+/** How far the photo leans towards the swiped edge at the end of a back gesture. */
+private val BackLean = 32.dp
 
 /** Share of the screen height the details panel takes; the photo gets the rest. */
 private const val InfoPanelFraction = 0.46f
@@ -166,6 +175,8 @@ private fun ViewerContent(
     var dragX by remember { mutableFloatStateOf(0f) }
     var dragY by remember { mutableFloatStateOf(0f) }
     var dismissed by remember { mutableStateOf(false) }
+    // 0..1 while the system back gesture is in progress (see PredictiveBackHandler below).
+    var backShrink by remember { mutableFloatStateOf(0f) }
     var zoomed by remember { mutableStateOf(false) }
     // Videos do not zoom; make sure a previous photo's zoom state cannot block the dismiss gesture.
     LaunchedEffect(currentItem.isVideo) { if (currentItem.isVideo) zoomed = false }
@@ -174,10 +185,10 @@ private fun ViewerContent(
     // Plain holder (not state): per-gesture bookkeeping that must not trigger recomposition.
     val swipe = remember { object { var mode = SwipeMode.None; var travel = 0f } }
     val infoScroll = rememberScrollState()
-    val progress = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
+    val progress = maxOf((dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f), backShrink * BACK_MAX_PROGRESS)
     val dismissAlpha by animateFloatAsState(if (dismissed) 0f else 1f, tween(160), label = "dismissAlpha")
     val exitProgress by animateFloatAsState(if (dismissed) 1f else 0f, tween(180), label = "exit")
-    val chromeAlpha = dismissAlpha * (1f - (abs(dragY) / dismissDistancePx).coerceIn(0f, 1f))
+    val chromeAlpha = dismissAlpha * (1f - maxOf((abs(dragY) / dismissDistancePx).coerceIn(0f, 1f), backShrink))
 
     fun settle(spec: androidx.compose.animation.core.AnimationSpec<Float>) {
         scope.launch { animate(dragX, 0f, animationSpec = spec) { v, _ -> dragX = v } }
@@ -196,7 +207,7 @@ private fun ViewerContent(
     }
     // The same drag, for the flight copy: a swipe-down close flies from where the finger left the photo.
     val flightPlacement: () -> FlightPlacement = {
-        val p = (dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f)
+        val p = maxOf((dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f), backShrink * BACK_MAX_PROGRESS)
         FlightPlacement(dragX, dragY, 1f - 0.45f * p)
     }
 
@@ -221,6 +232,26 @@ private fun ViewerContent(
         }
     }
     BackHandler(enabled = zoomed && !showInfo) { close() }
+
+    // System back gesture (not zoomed, details closed): the photo shrinks and leans towards the edge the swipe
+    // started from, following the finger. Letting go flies it into its grid cell like a drag-down close;
+    // cancelling springs it back. Replaces the navigation library's shrinking-card preview for this screen.
+    val backLeanPx = with(LocalDensity.current) { BackLean.toPx() }
+    PredictiveBackHandler(enabled = !zoomed && !showInfo && !dismissed) { events ->
+        try {
+            events.collect { event ->
+                val toward = if (event.swipeEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
+                backShrink = event.progress
+                dragX = toward * event.progress * backLeanPx
+            }
+            dismissed = true
+            onBack()
+        } catch (e: CancellationException) {
+            settle(GalleryMotion.standard())
+            scope.launch { animate(backShrink, 0f, animationSpec = GalleryMotion.standard()) { v, _ -> backShrink = v } }
+            throw e
+        }
+    }
 
     Box(
         modifier

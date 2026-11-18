@@ -8,14 +8,18 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import com.rohit.gallery.core.ui.theme.GalleryMotion
+import androidx.activity.BackEventCompat
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
@@ -109,6 +113,12 @@ fun GalleryNavHost(
                     // Opened by another app: only the viewer, no permission gate or timeline underneath.
                     startDestination = externalStart ?: PicturesRoute,
                     modifier = Modifier.fillMaxSize(),
+                    // Back gesture: the screen slides away with the finger (towards the side it was swiped from)
+                    // while the one underneath stays still. The viewer handles its own back gesture (see ViewerScreen).
+                    predictivePopEnterTransition = { EnterTransition.None },
+                    predictivePopExitTransition = { swipeEdge ->
+                        slideOutHorizontally { width -> if (swipeEdge == BackEventCompat.EDGE_LEFT) width else -width }
+                    },
                 ) {
                     topLevel<PicturesRoute> {
                         TimelineScreen(
@@ -228,7 +238,10 @@ private inline fun <reified T : Any> androidx.navigation.NavGraphBuilder.topLeve
         exitTransition = { if (targetsViewer()) ExitTransition.None else fadeOut(tween(GalleryMotion.FADE_MS)) },
         popEnterTransition = { if (initialIsViewer()) EnterTransition.None else fadeIn(tween(GalleryMotion.FADE_MS)) },
     ) {
-        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) { content() }
+        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+            // Opaque, so a screen sliding away during the back gesture never shows the one beneath through it.
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }
+        }
     }
 }
 

@@ -268,3 +268,16 @@ Non-obvious technical choices, newest last.
 - **Recent searches** (8, newest first) live in DataStore, saved when the user presses Search on the keyboard or
   opens a match (not on every keystroke).
 - The Pictures search button sits at the right end of the pinned day header, which is otherwise empty there.
+
+### Back gesture animations (Phase 3)
+- Navigation Compose 2.10 previews the system back gesture with its own `predictivePopExitTransition`
+  (a `scaleOut` "card"). It did not suit this app: screens without a background showed the screen beneath
+  through them, and the viewer's photo (drawn in the shared-element overlay) did not follow the card.
+- Now: every bottom-bar / secondary destination draws an opaque background (in `topLevel`), and the NavHost's
+  predictive pop slides the leaving screen out towards the side the swipe started from while the screen beneath
+  stays still (`predictivePopEnterTransition = None`).
+- The viewer handles the gesture itself with `PredictiveBackHandler` (inner handlers win over the NavHost's): the
+  photo shrinks (up to half of the drag-down shrink) and leans 32 dp towards the swiped edge, chrome fades, and
+  releasing closes through the normal path, so the shared-element flight starts from where the photo is.
+  Cancelling springs it back. Zoomed in or with details open, back keeps its old behaviour (zoom out / close
+  details).
