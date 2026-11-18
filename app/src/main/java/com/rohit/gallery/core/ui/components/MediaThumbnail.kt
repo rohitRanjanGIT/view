@@ -93,7 +93,7 @@ fun MediaThumbnail(
     }
 }
 
-/** White heart with a soft dark outline, readable on light and dark photos alike. */
+/** Red heart (as in the viewer) with a soft dark outline, readable on light and dark photos alike. */
 @Composable
 private fun FavoriteBadge(size: Dp, modifier: Modifier = Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
@@ -103,7 +103,7 @@ private fun FavoriteBadge(size: Dp, modifier: Modifier = Modifier) {
             tint = Color.Black.copy(alpha = 0.45f),
             modifier = Modifier.size(size + 3.dp),
         )
-        Icon(Icons.Filled.Favorite, contentDescription = null, tint = Color.White, modifier = Modifier.size(size))
+        Icon(Icons.Filled.Favorite, contentDescription = null, tint = Color(0xFFFF4D6D), modifier = Modifier.size(size))
     }
 }
 
