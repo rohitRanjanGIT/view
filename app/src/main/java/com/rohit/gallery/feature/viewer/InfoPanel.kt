@@ -8,6 +8,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -91,6 +95,7 @@ fun InfoPanel(
     scrollState: ScrollState,
     modifier: Modifier = Modifier,
     bottomSpace: androidx.compose.ui.unit.Dp = 0.dp,
+    onOpenAlbum: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var locationGranted by remember {
@@ -154,12 +159,33 @@ fun InfoPanel(
                 ExposureBox(it)
             }
 
-            d?.folder?.let { folder ->
+            // The album (folder) it is in; tapping opens that album.
+            val albumName = item.bucketName.takeIf { it.isNotBlank() && onOpenAlbum != null }
+            if (albumName != null || d?.folder != null) {
                 PanelDivider()
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .then(if (onOpenAlbum != null) Modifier.clickable(onClick = onOpenAlbum) else Modifier)
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Icon(GalleryIcons.Folder, contentDescription = null, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(16.dp))
-                    Text(folder, style = MaterialTheme.typography.bodyLarge)
+                    Column(Modifier.weight(1f)) {
+                        Text(albumName ?: d?.folder.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+                        if (albumName != null) {
+                            d?.folder?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = muted) }
+                        }
+                    }
+                    if (onOpenAlbum != null) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Open album",
+                            tint = muted,
+                        )
+                    }
                 }
             }
         }

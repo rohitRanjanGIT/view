@@ -221,6 +221,7 @@ fun GalleryNavHost(
                                     sharedMediaId = it
                                     if (it != null) returnTarget.mediaId = it
                                 },
+                                onOpenAlbum = { bucketId -> navController.navigate(AlbumDetailRoute(bucketId)) },
                             )
                         }
                     }

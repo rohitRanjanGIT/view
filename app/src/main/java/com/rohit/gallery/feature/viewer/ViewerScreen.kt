@@ -138,6 +138,7 @@ private const val ZOOM_OUT_MS = 220
 fun ViewerScreen(
     onBack: () -> Unit,
     onCurrentItemChanged: (Long?) -> Unit,
+    onOpenAlbum: (bucketId: Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ViewerViewModel = hiltViewModel(),
 ) {
@@ -158,6 +159,7 @@ fun ViewerScreen(
             startId = viewModel.startId,
             onBack = onBack,
             onCurrentItemChanged = onCurrentItemChanged,
+            onOpenAlbum = onOpenAlbum,
             viewModel = viewModel,
             modifier = modifier,
         )
@@ -170,6 +172,7 @@ private fun ViewerContent(
     startId: Long,
     onBack: () -> Unit,
     onCurrentItemChanged: (Long?) -> Unit,
+    onOpenAlbum: (bucketId: Long) -> Unit,
     viewModel: ViewerViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -504,6 +507,10 @@ private fun ViewerContent(
                 askedForLocation = askedForLocation,
                 onAskedForLocation = { askedForLocation = true },
                 loadDetails = viewModel::loadDetails,
+                // The album the item is in (not for Trash, or a file another app handed us).
+                onOpenAlbum = if (viewModel.isTrash || !canWrite || currentItem.bucketId == 0L) null else {
+                    { onOpenAlbum(currentItem.bucketId) }
+                },
                 scrollState = infoScroll,
                 bottomSpace = ActionBarHeight + 16.dp,
                 modifier = Modifier
