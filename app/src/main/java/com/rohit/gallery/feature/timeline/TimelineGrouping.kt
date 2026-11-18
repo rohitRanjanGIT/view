@@ -12,7 +12,10 @@ import java.util.Locale
 @Immutable
 data class DayGroup(val epochDay: Long, val items: List<MediaItem>)
 
-/** A day laid out for the grid: [rows] each hold up to the current column count of items. */
+/**
+ * A section laid out for the grid: one day, or one month (keyed by its first day) in the month view.
+ * [rows] each hold up to the current column count of items.
+ */
 @Immutable
 data class TimelineDay(val epochDay: Long, val rows: List<List<MediaItem>>)
 
@@ -39,6 +42,45 @@ fun groupByDay(items: List<MediaItem>, zone: ZoneId): List<DayGroup> {
 
 fun List<DayGroup>.toTimelineDays(columns: Int): List<TimelineDay> =
     map { TimelineDay(it.epochDay, it.items.chunked(columns)) }
+
+/**
+ * Merges consecutive day groups of the same calendar month into one group per month, keyed by the
+ * month's first day. Input must be newest first, as [groupByDay] returns it.
+ */
+fun groupByMonth(days: List<DayGroup>): List<DayGroup> {
+    val months = ArrayList<DayGroup>()
+    var currentMonth = Long.MIN_VALUE
+    var current = ArrayList<MediaItem>()
+    for (day in days) {
+        val month = LocalDate.ofEpochDay(day.epochDay).withDayOfMonth(1).toEpochDay()
+        if (month != currentMonth) {
+            if (current.isNotEmpty()) months += DayGroup(currentMonth, current)
+            currentMonth = month
+            current = ArrayList()
+        }
+        current.addAll(day.items)
+    }
+    if (current.isNotEmpty()) months += DayGroup(currentMonth, current)
+    return months
+}
+
+/** Timeline densities, from biggest cells to smallest. Pinching in moves up the list, out moves down. */
+enum class GridLevel(val columns: Int, val byMonth: Boolean) {
+    Large(2, false),
+    Medium(4, false),
+    Small(6, false),
+    Month(8, true);
+
+    /** One step towards bigger cells, or null at the end. */
+    fun zoomIn(): GridLevel? = entries.getOrNull(ordinal - 1)
+
+    /** One step towards smaller cells, or null at the end. */
+    fun zoomOut(): GridLevel? = entries.getOrNull(ordinal + 1)
+
+    companion object {
+        val Default = Medium
+    }
+}
 
 /** "Today", "Yesterday", "Mon, 12 Nov", or "12 Nov 2024" for other years. */
 fun dayLabel(epochDay: Long, today: LocalDate, locale: Locale = Locale.getDefault()): String {

@@ -52,6 +52,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -121,7 +122,7 @@ private fun TimelineContent(
                 Text("No photos or videos yet", style = MaterialTheme.typography.titleMedium)
             }
             is TimelineUiState.Content -> {
-                TimelineGrid(s, selection, contentBottomPadding, onOpenMedia)
+                TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
                 if (selecting) SelectionBars(viewModel, s, selection, Modifier.matchParentSize())
             }
         }
@@ -168,6 +169,7 @@ private fun TimelineGrid(
     selection: SelectionState,
     contentBottomPadding: Dp,
     onOpenMedia: (MediaItem) -> Unit,
+    onLevelChange: (GridLevel) -> Unit,
 ) {
     val columns = content.columns
     val density = LocalDensity.current
@@ -175,6 +177,7 @@ private fun TimelineGrid(
     val gapPx = with(density) { CellGap.roundToPx() }
     val cellSizePx = (windowWidthPx - gapPx * (columns - 1)) / columns
     val today = remember { LocalDate.now() }
+    val locale = remember { Locale.getDefault() }
 
     val listState = rememberLazyListState()
     PrefetchThumbnails(listState, content.days, cellSizePx)
@@ -200,8 +203,12 @@ private fun TimelineGrid(
         WindowInsets.statusBars.getTop(density) - with(density) { contentBottomPadding.roundToPx() }
     ScrollToReturnedItem(listState, content, scrollMap, headerPx, rowPx, visiblePx)
 
+    val zoom = remember { TimelineZoomState() }
+    KeepZoomAnchor(zoom, content, listState, scrollMap, rowPx, cellSizePx, gapPx)
+
     val currentContent by rememberUpdatedState(content)
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
 
     /** The cell under [position] (this list's coordinates), or null on a header, gap or empty space. */
     fun itemAt(position: Offset): HitResult? {
@@ -216,6 +223,20 @@ private fun TimelineGrid(
         val column = (position.x / (cellSizePx + gapPx)).toInt().coerceIn(0, c.columns - 1)
         val item = items.getOrNull(column) ?: return null
         return HitResult(item, c.indexById[item.id] ?: return null)
+    }
+
+    /** The item to keep in place when a pinch at [position] changes density: the cell there, or the nearest row's. */
+    fun anchorAt(position: Offset): Long? {
+        itemAt(position)?.let { return it.item.id }
+        val info = listState.layoutInfo
+        val y = position.y + info.viewportStartOffset
+        val row = info.visibleItemsInfo
+            .filter { (it.key as? String)?.startsWith(ROW_KEY_PREFIX) == true }
+            .minByOrNull { kotlin.math.abs(it.offset + it.size / 2 - y) } ?: return null
+        val items = currentContent.rowsByFirstId[(row.key as String).removePrefix(ROW_KEY_PREFIX).toLongOrNull()]
+            ?: return null
+        val column = (position.x / (cellSizePx + gapPx)).toInt().coerceIn(0, items.lastIndex)
+        return items[column].id
     }
 
     // While drag-selecting, scroll when the finger is near the top or bottom edge. The pointer
@@ -243,13 +264,29 @@ private fun TimelineGrid(
     }
 
     Box(Modifier.fillMaxSize()) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
+    Box(
+        Modifier
             .fillMaxSize()
             // The list starts below the status bar (not top content padding): a pinned day header
             // sits at the viewport top, and with padding it slid under the clock.
             .windowInsetsPadding(WindowInsets.statusBars)
+            .clipToBounds()
+            // Outside the scaled list, so finger positions are not affected by the scale they drive.
+            .pinchToZoom(
+                onPinch = zoom::onPinch,
+                onPinchEnd = { _, centroid ->
+                    zoom.onPinchEnd(scope, currentContent.level, centroid, ::anchorAt)?.let { level ->
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onLevelChange(level)
+                    }
+                },
+            ),
+    ) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .zoomLayer(zoom)
             .gridGestures(
                 onTap = { pos ->
                     itemAt(pos)?.let { hit ->
@@ -276,9 +313,10 @@ private fun TimelineGrid(
             ),
         contentPadding = PaddingValues(bottom = contentBottomPadding),
     ) {
+        val byMonth = content.level.byMonth
         content.days.forEach { day ->
             stickyHeader(key = "day-${day.epochDay}", contentType = "header") {
-                DayHeader(dayLabel(day.epochDay, today))
+                DayHeader(if (byMonth) monthLabel(day.epochDay, locale) else dayLabel(day.epochDay, today))
             }
             items(
                 items = day.rows,
@@ -288,6 +326,7 @@ private fun TimelineGrid(
                 ThumbnailRow(row, columns, cellSizePx, selection)
             }
         }
+    }
     }
     TimelineFastScroller(
         listState = listState,

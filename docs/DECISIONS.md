@@ -182,3 +182,20 @@ Non-obvious technical choices, newest last.
 - **Default content colour** (`2b78276`): there is no root `Surface`, so `LocalContentColor` defaulted to black and
   plain `Text` / `Icon` (Menu screen) were black on the dark background. `MainActivity` now provides
   `LocalContentColor = colorScheme.onBackground` around the nav host.
+
+## Phase 3: pinch grid density
+- **Levels:** 2 / 4 / 6 columns and a month view (8 columns, one section per month), chosen by me over the
+  brief's 3 / 4 / 7. Default stays 4. `GridLevel` enum; held in memory in `TimelineViewModel` until DataStore lands.
+- **Group once, chunk per level:** the library is grouped into days and months once per index change
+  (`GroupedLibrary`); switching density only re-chunks rows, so the switch does not redo date math for 50k items.
+  A month section is a `TimelineDay` keyed by the month's first day, so `TimelineScrollMap`, prefetch and the
+  fast-scroller work unchanged.
+- **Gesture:** `pinchToZoom` sits on a Box around the list (outside the scaled layer, so finger positions don't
+  move with the scale) and consumes events in the initial pass once two fingers are down, so the list neither
+  scrolls nor sees a tap/long press. The grid follows the fingers through a `graphicsLayer` scale (no
+  recomposition). On release, past 1.15x / 0.87x it switches level; otherwise it springs back.
+- **Anchor:** the cell under the fingers (or the nearest row's) is kept where the fingers were. In the first
+  composition of the new level `KeepZoomAnchor` calls `requestScrollToItem` from exact geometry, snaps the scale
+  to how big the cells looked at release (`pinchScale x newColumns / oldColumns`) and springs it to 1.
+- **Sharper thumbnails on zoom-in:** `ThumbnailCache` remembers the cell size each bitmap was decoded for.
+  A smaller one is shown at once as a placeholder and reloaded at the new size (`getSharp`, 0.9 tolerance).

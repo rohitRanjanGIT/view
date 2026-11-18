@@ -46,9 +46,12 @@ fun MediaThumbnail(
     val key = item.thumbKey
     var image: ImageBitmap? by remember(key) { mutableStateOf(cache.get(key)?.asImageBitmap()) }
 
-    if (image == null) {
+    // A cached thumbnail decoded for smaller cells (before a pinch to fewer columns) is shown at once
+    // and replaced by a sharper one.
+    val sharp = remember(key, cellSizePx, image) { image != null && cache.getSharp(key, cellSizePx) != null }
+    if (!sharp) {
         LaunchedEffect(key, cellSizePx) {
-            image = runCatching { cache.load(item, cellSizePx) }.getOrNull()?.asImageBitmap()
+            runCatching { cache.load(item, cellSizePx) }.getOrNull()?.let { image = it.asImageBitmap() }
         }
     }
 

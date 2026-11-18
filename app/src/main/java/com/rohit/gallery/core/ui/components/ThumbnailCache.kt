@@ -35,15 +35,25 @@ val MediaItem.thumbKey: ThumbKey get() = ThumbKey(id, dateModifiedMs)
 class ThumbnailCache @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
-    private val cache = object : LruCache<ThumbKey, Bitmap>(MAX_BYTES) {
-        override fun sizeOf(key: ThumbKey, value: Bitmap): Int = value.byteCount
+    /** A cached bitmap and the cell size it was decoded for (the grid density can change). */
+    private class Entry(val bitmap: Bitmap, val cellSizePx: Int)
+
+    private val cache = object : LruCache<ThumbKey, Entry>(MAX_BYTES) {
+        override fun sizeOf(key: ThumbKey, value: Entry): Int = value.bitmap.byteCount
     }
 
     // Visible cells get their own lane so queued prefetch work can never delay them.
     private val visibleDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(4)
     private val prefetchDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(2)
 
-    fun get(key: ThumbKey): Bitmap? = cache.get(key)
+    /** The cached thumbnail at whatever size it was decoded; good as a placeholder. */
+    fun get(key: ThumbKey): Bitmap? = cache.get(key)?.bitmap
+
+    /** The cached thumbnail only if it is sharp enough for a [cellSizePx] cell. */
+    fun getSharp(key: ThumbKey, cellSizePx: Int): Bitmap? =
+        cache.get(key)?.takeIf { it.isSharpFor(cellSizePx) }?.bitmap
+
+    private fun Entry.isSharpFor(cellSizePx: Int) = this.cellSizePx >= cellSizePx * SHARP_ENOUGH
 
     /** Loads (or returns the cached) thumbnail for a cell currently on screen. */
     suspend fun load(item: MediaItem, cellSizePx: Int): Bitmap = load(item, cellSizePx, visibleDispatcher)
@@ -56,10 +66,11 @@ class ThumbnailCache @Inject constructor(
 
     private suspend fun load(item: MediaItem, cellSizePx: Int, dispatcher: CoroutineDispatcher): Bitmap {
         val key = item.thumbKey
-        cache.get(key)?.let { return it }
+        getSharp(key, cellSizePx)?.let { return it }
         return withContext(dispatcher) {
             // Another request (visible cell vs prefetch) may have finished while this one queued.
-            cache.get(key) ?: loadFromMediaStore(item, cellSizePx).also { cache.put(key, it) }
+            getSharp(key, cellSizePx)
+                ?: loadFromMediaStore(item, cellSizePx).also { cache.put(key, Entry(it, cellSizePx)) }
         }
     }
 
@@ -94,6 +105,9 @@ class ThumbnailCache @Inject constructor(
         // About 7 screens of 4-column thumbnails.
         const val MAX_BYTES = 96 * 1024 * 1024
         const val MAX_ASPECT_RATIO = 2.5f
+
+        // A thumbnail decoded for a slightly smaller cell still looks sharp; a much smaller one is reloaded.
+        const val SHARP_ENOUGH = 0.9f
     }
 }
 

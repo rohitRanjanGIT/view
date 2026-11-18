@@ -4,13 +4,22 @@ package com.rohit.gallery.feature.timeline
  * The lazy-list index of the row holding the item at [itemIndex] of the flattened timeline (each day is a
  * header followed by its rows), or null if out of range.
  */
-fun lazyRowIndexOf(days: List<TimelineDay>, itemIndex: Int): Int? {
+fun lazyRowIndexOf(days: List<TimelineDay>, itemIndex: Int): Int? = gridPositionOf(days, itemIndex)?.lazyIndex
+
+/** Where an item sits in the grid: its row's lazy-list index and its column in that row. */
+data class GridPosition(val lazyIndex: Int, val column: Int)
+
+/** The [GridPosition] of the item at [itemIndex] of the flattened timeline, or null if out of range. */
+fun gridPositionOf(days: List<TimelineDay>, itemIndex: Int): GridPosition? {
     if (itemIndex < 0) return null
     var lazyIndex = 0
     var remaining = itemIndex
     for (day in days) {
         val count = day.rows.sumOf { it.size }
-        if (remaining < count) return lazyIndex + 1 + remaining / day.rows.first().size
+        if (remaining < count) {
+            val perRow = day.rows.first().size
+            return GridPosition(lazyIndex + 1 + remaining / perRow, remaining % perRow)
+        }
         lazyIndex += 1 + day.rows.size
         remaining -= count
     }

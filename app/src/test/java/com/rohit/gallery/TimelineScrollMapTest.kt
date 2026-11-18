@@ -2,6 +2,8 @@ package com.rohit.gallery
 
 import com.rohit.gallery.feature.timeline.TimelineDay
 import com.rohit.gallery.feature.timeline.TimelineScrollMap
+import com.rohit.gallery.feature.timeline.GridPosition
+import com.rohit.gallery.feature.timeline.gridPositionOf
 import com.rohit.gallery.feature.timeline.lazyRowIndexOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,6 +69,19 @@ class TimelineScrollMapTest {
         assertEquals(4, lazyRowIndexOf(twoDays, 6))
         assertEquals(null, lazyRowIndexOf(twoDays, 7))
         assertEquals(null, lazyRowIndexOf(twoDays, -1))
+    }
+
+    @Test
+    fun gridPositionOfItem() {
+        // 4 columns. Day A: 5 items (rows of 4 + 1), day B: 2 items.
+        val a = TimelineDay(2, List(5) { testItem(it.toLong()) }.chunked(4))
+        val b = TimelineDay(1, List(2) { testItem(10L + it) }.chunked(4))
+        val twoDays = listOf(a, b)
+        assertEquals(GridPosition(1, 0), gridPositionOf(twoDays, 0))
+        assertEquals(GridPosition(1, 3), gridPositionOf(twoDays, 3))
+        assertEquals(GridPosition(2, 0), gridPositionOf(twoDays, 4))
+        assertEquals(GridPosition(4, 1), gridPositionOf(twoDays, 6))
+        assertEquals(null, gridPositionOf(twoDays, 7))
     }
 
     @Test

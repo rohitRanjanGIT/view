@@ -1,6 +1,8 @@
 package com.rohit.gallery
 
+import com.rohit.gallery.feature.timeline.GridLevel
 import com.rohit.gallery.feature.timeline.dayLabel
+import com.rohit.gallery.feature.timeline.groupByMonth
 import com.rohit.gallery.feature.timeline.formatDuration
 import com.rohit.gallery.feature.timeline.groupByDay
 import com.rohit.gallery.feature.timeline.toTimelineDays
@@ -49,6 +51,33 @@ class TimelineGroupingTest {
         val items = (1L..9L).map { testItem(it, dateTakenMs = ms("2026-03-02") - it) }
         val day = groupByDay(items, utc).toTimelineDays(columns = 4).single()
         assertEquals(listOf(4, 4, 1), day.rows.map { it.size })
+    }
+
+    @Test
+    fun `month view merges days of the same month`() {
+        val items = listOf(
+            testItem(1, dateTakenMs = ms("2026-03-20")),
+            testItem(2, dateTakenMs = ms("2026-03-02")),
+            testItem(3, dateTakenMs = ms("2026-02-28")),
+            testItem(4, dateTakenMs = ms("2025-03-15")),
+        )
+        val months = groupByMonth(groupByDay(items, utc))
+        assertEquals(listOf(listOf(1L, 2L), listOf(3L), listOf(4L)), months.map { m -> m.items.map { it.id } })
+        assertEquals(
+            listOf(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 2, 1), LocalDate.of(2025, 3, 1)).map { it.toEpochDay() },
+            months.map { it.epochDay },
+        )
+    }
+
+    @Test
+    fun `grid levels step between 2, 4, 6 columns and the month view`() {
+        assertEquals(listOf(2, 4, 6, 8), GridLevel.entries.map { it.columns })
+        assertEquals(GridLevel.Medium, GridLevel.Default)
+        assertEquals(null, GridLevel.Large.zoomIn())
+        assertEquals(GridLevel.Large, GridLevel.Medium.zoomIn())
+        assertEquals(GridLevel.Month, GridLevel.Small.zoomOut())
+        assertEquals(null, GridLevel.Month.zoomOut())
+        assertEquals(listOf(GridLevel.Month), GridLevel.entries.filter { it.byMonth })
     }
 
     @Test

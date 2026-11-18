@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 sealed interface TimelineUiState {
@@ -34,12 +35,22 @@ sealed interface TimelineUiState {
     @Immutable
     data class Content(
         val days: List<TimelineDay>,
-        val columns: Int,
+        val level: GridLevel,
         val items: List<MediaItem>,
         val indexById: Map<Long, Int>,
         val rowsByFirstId: Map<Long, List<MediaItem>>,
-    ) : TimelineUiState
+    ) : TimelineUiState {
+        val columns: Int get() = level.columns
+    }
 }
+
+/** The library grouped once per change; switching density only re-chunks rows. */
+private class GroupedLibrary(
+    val items: List<MediaItem>,
+    val days: List<DayGroup>,
+    val months: List<DayGroup>,
+    val indexById: Map<Long, Int>,
+)
 
 @HiltViewModel
 class TimelineViewModel @Inject constructor(
@@ -49,35 +60,55 @@ class TimelineViewModel @Inject constructor(
     albumRepository: AlbumRepository,
 ) : ViewModel() {
 
-    // Fixed for now; pinch-to-change density arrives in Phase 3.
-    private val columns = MutableStateFlow(DEFAULT_COLUMNS)
+    // In memory for now; saved across launches once Settings / DataStore land.
+    private val level = MutableStateFlow(GridLevel.Default)
 
     val selection = SelectionState()
 
-    val uiState: StateFlow<TimelineUiState> = combine(repository.state, columns) { index, cols ->
-        when (index) {
-            MediaIndexState.Loading -> TimelineUiState.Loading
-            is MediaIndexState.Ready ->
-                if (index.items.isEmpty()) {
-                    TimelineUiState.Empty
-                } else {
-                    val days = groupByDay(index.items, ZoneId.systemDefault()).toTimelineDays(cols)
-                    TimelineUiState.Content(
-                        days = days,
-                        columns = cols,
+    // null while loading.
+    private val library = repository.state
+        .map { index ->
+            when (index) {
+                MediaIndexState.Loading -> null
+                is MediaIndexState.Ready -> {
+                    val days = groupByDay(index.items, ZoneId.systemDefault())
+                    GroupedLibrary(
                         items = index.items,
+                        days = days,
+                        months = groupByMonth(days),
                         indexById = HashMap<Long, Int>(index.items.size * 2).also { map ->
                             index.items.forEachIndexed { i, item -> map[item.id] = i }
                         },
-                        rowsByFirstId = HashMap<Long, List<MediaItem>>().also { map ->
-                            days.forEach { day -> day.rows.forEach { row -> map[row.first().id] = row } }
-                        },
                     )
                 }
+            }
+        }
+        .flowOn(Dispatchers.Default)
+
+    val uiState: StateFlow<TimelineUiState> = combine(library, level) { lib, lvl ->
+        when {
+            lib == null -> TimelineUiState.Loading
+            lib.items.isEmpty() -> TimelineUiState.Empty
+            else -> {
+                val sections = (if (lvl.byMonth) lib.months else lib.days).toTimelineDays(lvl.columns)
+                TimelineUiState.Content(
+                    days = sections,
+                    level = lvl,
+                    items = lib.items,
+                    indexById = lib.indexById,
+                    rowsByFirstId = HashMap<Long, List<MediaItem>>().also { map ->
+                        sections.forEach { day -> day.rows.forEach { row -> map[row.first().id] = row } }
+                    },
+                )
+            }
         }
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TimelineUiState.Loading)
+
+    fun setLevel(newLevel: GridLevel) {
+        level.value = newLevel
+    }
 
     val selectionActions = SelectionActions(
         scope = viewModelScope,
@@ -90,9 +121,5 @@ class TimelineViewModel @Inject constructor(
     )
 
     fun refresh() = repository.refresh()
-
-    private companion object {
-        const val DEFAULT_COLUMNS = 4
-    }
 }
 
