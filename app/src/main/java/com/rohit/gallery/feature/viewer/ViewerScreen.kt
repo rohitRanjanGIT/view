@@ -57,6 +57,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -184,6 +185,7 @@ private fun ViewerContent(
     // finger in both axes; the transform is applied inside the shared element (see ViewerPage) so
     // the close flight starts exactly where the finger let go.
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var dragX by remember { mutableFloatStateOf(0f) }
     var dragY by remember { mutableFloatStateOf(0f) }
     var dismissed by remember { mutableStateOf(false) }
@@ -377,6 +379,13 @@ private fun ViewerContent(
                     item = currentItem,
                     onBack = ::close,
                     onInfo = { showInfo = !showInfo },
+                    onEdit = if (currentItem.isVideo || viewModel.isTrash) null else {
+                        {
+                            if (!viewModel.openInEditor(currentItem)) {
+                                Toast.makeText(context, "No photo editor found", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
                     modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
                 )
             }
@@ -496,6 +505,7 @@ private fun ViewerTopBar(
     item: MediaItem,
     onBack: () -> Unit,
     onInfo: () -> Unit,
+    onEdit: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -517,6 +527,12 @@ private fun ViewerTopBar(
             color = Color.White,
             modifier = Modifier.weight(1f),
         )
+        if (onEdit != null) {
+            // Editing is handed to Google Photos for now (it saves a copy); our own editor comes later.
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = Color.White)
+            }
+        }
         IconButton(onClick = onInfo) {
             Icon(Icons.Filled.Info, contentDescription = "Details", tint = Color.White)
         }

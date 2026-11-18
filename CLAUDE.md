@@ -163,9 +163,9 @@ com.rohit.gallery
 
 ### Phase 3: Polish and power features (IN PROGRESS)
 - [x] Pinch grid density + month view (Pictures, album grids, Albums tab).
-- [ ] Editor: crop, rotate, flip, basic adjustments, filters; save as copy.
-- [ ] Search: by date, album, file name, media type; optional on-device ML Kit
-  labels/text indexed via WorkManager (bundled models only, no network).
+- [ ] Editor: crop, rotate, flip, basic adjustments, filters; save as copy. (LATER, my call: for now the viewer's
+  Edit button hands the photo to Google Photos' editor with read-only access, so it can only save a copy.)
+- [x] Search: by date, album, file name, media type (in memory). ML Kit labels/text skipped for now (my call).
 - [x] Hidden albums, pinned albums, custom album order, sort options, oldest-first albums.
 - [ ] Settings screen (parked by me until later).
 - [ ] GIF, motion-photo and HDR/Ultra HDR display support.
@@ -202,15 +202,13 @@ Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/main`; push 
 describes the project for GitHub; keep its Features / Status sections in step when a phase finishes.
 
 ### Where we are
-- **Phases 0-2 done and verified on my phone. Phase 3 in progress.** Last code commit `e97e16b`. 41 unit tests pass.
+- **Phases 0-2 done and verified on my phone. Phase 3 in progress.** 50 unit tests pass.
   Merged manifests contain no `INTERNET` (re-check each build; Room/DataStore add only non-network permissions).
 - **Phase 3 done so far (all verified on my phone):** pinch density, album timelines, album organisation (pin /
-  hide / sort / custom order / bulk select), Albums tab pinch, oldest-first albums.
+  hide / sort / custom order / bulk select), Albums tab pinch, oldest-first albums, search, own back-gesture
+  animations (screens slide; viewer photo shrinks with the grid and a gap behind it), Edit via Google Photos.
 - **Phase 3 decisions:** no ML search for now. Settings is parked by me until later. Trash stays a flat grid.
-- **Next: search** (plan approved): add `DISPLAY_NAME` to the index (measure startup before/after), in-memory
-  query parser (dates, album, file name, type, combined words; hidden albums excluded), search screen from a button
-  on Pictures with suggestions and timeline results, recent searches. Then the editor, then GIF / motion / Ultra HDR,
-  then Settings.
+- **Next:** GIF / motion photo / Ultra HDR display, then Settings (parked by me). Own editor is planned for later.
 
 ### What exists
 - **Setup:** `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin), Kotlin 2.2.10, Gradle 9.6.0, Compose BOM
@@ -240,6 +238,10 @@ describes the project for GitHub; keep its Features / Status sections in step wh
   `app/schemas/`), DataStore `AppPreferences` (album sort, albums per row 2/3/4, oldest-first). Hidden albums are
   filtered out of `MediaRepository.state` everywhere (`allState` is unfiltered, used by Move/Copy). Pins keep pin
   order. Edit albums screen: drag to reorder, pin and eye toggles. Long-press bulk select on Albums and Edit albums.
+- **Search (Phase 3):** `feature/search/` (`parseSearch` / `SearchIndex` / suggestions, recent searches in DataStore),
+  opened from the button at the right of the pinned day header on Pictures; `ViewerRoute.searchQuery` pages matches.
+- **Back gestures (Phase 3):** NavHost `predictivePop*` slide; viewer uses `PredictiveBackHandler` and a picture of
+  the grid taken on open (`ViewerBackdrop`, cells from `RegisterViewerCells`) drawn behind the photo with a gap.
 
 ### Known gaps / deferred
 - Camera thumbnail opens Google Photos, not Gallery (parked by me; likely the system default app setting).

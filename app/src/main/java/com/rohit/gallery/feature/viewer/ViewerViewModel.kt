@@ -71,6 +71,9 @@ class ViewerViewModel @Inject constructor(
     /** True when paging through the recycle bin: the viewer then offers Restore and Delete. */
     val isTrash: Boolean = route.trashed
 
+    /** Hands [item] to Google Photos' editor (or another editor); false if none could be opened. */
+    fun openInEditor(item: MediaItem): Boolean = actions.openInEditor(item)
+
     private val trashItems = MutableStateFlow<List<MediaItem>?>(null)
     private val externalTarget = MutableStateFlow<ExternalTarget?>(null)
 

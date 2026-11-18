@@ -33,6 +33,20 @@ class MediaActions @Inject constructor(
         return Intent.createChooser(send, null)
     }
 
+    /**
+     * Opens [item] in Google Photos' editor, or (if it is not installed) any app that edits photos. Read access
+     * only: the editor can save its result as a new copy but can never overwrite the original.
+     */
+    fun openInEditor(item: MediaItem): Boolean {
+        fun edit() = Intent(Intent.ACTION_EDIT)
+            .setDataAndType(item.uri, item.mimeType.ifBlank { "image/*" })
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val launched = runCatching { context.startActivity(edit().setPackage(GOOGLE_PHOTOS)) }.isSuccess
+        if (launched) return true
+        val chooser = Intent.createChooser(edit(), null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(chooser) }.isSuccess
+    }
+
     /** System confirmation to move [items] to the trash (they can be restored from there). */
     suspend fun trashRequest(items: List<MediaItem>): IntentSender = withContext(Dispatchers.IO) {
         MediaStore.createTrashRequest(context.contentResolver, items.map { it.uri }, true).intentSender
@@ -63,3 +77,5 @@ fun commonMimeType(items: List<MediaItem>): String = when {
     items.all { it.isVideo } -> "video/*"
     else -> "*/*"
 }
+
+private const val GOOGLE_PHOTOS = "com.google.android.apps.photos"
