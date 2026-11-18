@@ -123,7 +123,7 @@ fun MediaListScreen(
  * once per list change; a density change only re-chunks rows.
  */
 @Composable
-private fun MediaTimeline(
+fun MediaTimeline(
     items: List<MediaItem>,
     selection: SelectionState,
     level: GridLevel,

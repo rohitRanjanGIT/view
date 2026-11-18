@@ -69,6 +69,7 @@ class MediaStoreDataSource @Inject constructor(
             val bucketNameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
             val favoriteCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_FAVORITE)
             val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+            val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
 
             val out = ArrayList<MediaItem>(it.count)
             while (it.moveToNext()) {
@@ -88,6 +89,7 @@ class MediaStoreDataSource @Inject constructor(
                     bucketName = it.getStringOrNull(bucketNameCol).orEmpty(),
                     isFavorite = it.getLongOrNull(favoriteCol) == 1L,
                     sizeBytes = it.getLongOrNull(sizeCol) ?: 0L,
+                    displayName = it.getStringOrNull(nameCol).orEmpty(),
                     isTrashed = trashed,
                 )
             }
@@ -123,6 +125,7 @@ class MediaStoreDataSource @Inject constructor(
             MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
             MediaStore.MediaColumns.IS_FAVORITE,
             MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DISPLAY_NAME,
         )
     }
 }

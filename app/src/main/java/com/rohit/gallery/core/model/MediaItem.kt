@@ -27,6 +27,8 @@ data class MediaItem(
     val bucketName: String,
     val isFavorite: Boolean,
     val sizeBytes: Long,
+    /** File name, e.g. "IMG_20250301_101500.jpg"; empty when unknown (files opened from other apps). */
+    val displayName: String = "",
     /** True for items listed from the trash; their URI must say so to be readable. */
     val isTrashed: Boolean = false,
     /**

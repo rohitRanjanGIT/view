@@ -37,6 +37,8 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
     val videosOnly: Boolean = false,
     /** With [bucketId]: page oldest first, matching the album screen. */
     val oldestFirst: Boolean = false,
+    /** Page through the matches for this search instead (see feature/search). */
+    val searchQuery: String? = null,
     val externalUri: String? = null,
     val externalMime: String? = null,
 )
@@ -52,6 +54,9 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
 
 /** One album (folder), opened from the Albums tab. */
 @Serializable data class AlbumDetailRoute(val bucketId: Long)
+
+/** Search the library, opened from the Pictures tab. */
+@Serializable data object SearchRoute
 
 /** Pin, hide and reorder albums, opened from the Albums tab menu. */
 @Serializable data object EditAlbumsRoute

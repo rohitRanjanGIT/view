@@ -15,8 +15,11 @@ import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
 import com.rohit.gallery.core.domain.MediaActions
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.feature.search.SearchIndex
+import com.rohit.gallery.feature.search.parseSearchNow
 import com.rohit.gallery.navigation.ViewerRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -91,7 +94,7 @@ class ViewerViewModel @Inject constructor(
      * the photo's decode) does not wait a background hop. Filtered views still filter off the main thread.
      */
     private fun initialIndexedItems(): List<MediaItem>? {
-        val unfiltered = !route.favoritesOnly && !route.videosOnly && route.bucketId == null
+        val unfiltered = !route.favoritesOnly && !route.videosOnly && route.bucketId == null && route.searchQuery == null
         return if (unfiltered) (repository.state.value as? MediaIndexState.Ready)?.items else null
     }
 
@@ -106,6 +109,8 @@ class ViewerViewModel @Inject constructor(
                 MediaIndexState.Loading -> null
                 is MediaIndexState.Ready ->
                     when {
+                        route.searchQuery != null ->
+                            SearchIndex(state.items, ZoneId.systemDefault()).search(parseSearchNow(route.searchQuery))
                         route.favoritesOnly -> state.items.filter { it.isFavorite }
                         route.videosOnly -> state.items.filter { it.isVideo }
                         route.bucketId != null -> state.items.filter { it.bucketId == route.bucketId }

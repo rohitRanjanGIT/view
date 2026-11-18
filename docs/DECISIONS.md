@@ -249,3 +249,22 @@ Non-obvious technical choices, newest last.
   first and then flips.
 - The viewer gets `oldestFirst` in `ViewerRoute` and reverses the same filtered list, so swiping goes in the
   order the album shows. Day and month grouping keep whatever order they are given.
+
+### Search (Phase 3)
+- **In memory, no database.** The index already holds every item, so a search is one loop over it on
+  `Dispatchers.Default` (`mapLatest`: a new keystroke cancels the old search). `SearchIndex` works out each item's
+  month and year once per library change, so a query never converts dates per item. No Room FTS table: it would
+  have to be kept in step with MediaStore for no speed gain at this size.
+- **File names:** `DISPLAY_NAME` was added to the one startup query (`MediaItem.displayName`).
+- **Query words are ANDed.** Each word is read as a year ("2024"), a month name or its start ("mar"; also matches
+  album names, so "may" finds "May trip"), a kind (videos, photos, screenshots, gifs, favourites), a relative date
+  (today, yesterday, this/last week/month/year; the week starts on the locale's first day), or else text looked
+  for in album and file names. Year-like words are never matched against file names: camera names carry the time
+  (`..._2024...` at 20:24), which would bring in other years. A "quoted phrase" is searched whole; album
+  suggestions use quotes so "WhatsApp Images" is not read as "WhatsApp" + photos.
+- **Screenshots** = album name contains "screenshot" or file name starts with it.
+- **Viewer:** `ViewerRoute.searchQuery` re-runs the same search on the viewer's side, so the pager swipes through the
+  matches only and survives process death without passing a long id list through navigation.
+- **Recent searches** (8, newest first) live in DataStore, saved when the user presses Search on the keyboard or
+  opens a match (not on every keystroke).
+- The Pictures search button sits at the right end of the pinned day header, which is otherwise empty there.

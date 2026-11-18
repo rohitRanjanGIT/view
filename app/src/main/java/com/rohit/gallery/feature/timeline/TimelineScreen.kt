@@ -21,6 +21,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -96,13 +101,14 @@ private const val AUTO_SCROLL_MAX_PX = 36f
 @Composable
 fun TimelineScreen(
     onOpenMedia: (MediaItem) -> Unit,
+    onOpenSearch: () -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
     contentBottomPadding: Dp,
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel = hiltViewModel(),
 ) {
     MediaAccessGate(modifier.fillMaxSize()) {
-        TimelineContent(viewModel, onOpenMedia, onSelectionModeChange, contentBottomPadding)
+        TimelineContent(viewModel, onOpenMedia, onOpenSearch, onSelectionModeChange, contentBottomPadding)
     }
 }
 
@@ -110,6 +116,7 @@ fun TimelineScreen(
 private fun TimelineContent(
     viewModel: TimelineViewModel,
     onOpenMedia: (MediaItem) -> Unit,
+    onOpenSearch: () -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
     contentBottomPadding: Dp,
 ) {
@@ -133,6 +140,7 @@ private fun TimelineContent(
             }
             is TimelineUiState.Content -> {
                 TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
+                if (!selecting) SearchButton(onOpenSearch, Modifier.align(Alignment.TopEnd))
                 if (selecting) SelectionBars(viewModel, s, selection, Modifier.matchParentSize())
             }
         }
@@ -458,6 +466,19 @@ private fun TimelineFastScroller(
         modifier = modifier,
     )
 }
+
+/** Search, at the right end of the pinned day header (the header leaves that space empty). */
+@Composable
+private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.windowInsetsPadding(WindowInsets.statusBars).height(DayHeaderHeight), Alignment.Center) {
+        IconButton(onClick = onClick) {
+            Icon(Icons.Filled.Search, contentDescription = "Search")
+        }
+    }
+}
+
+/** Rough height of a day header: title text plus its 10 dp padding above and below. */
+private val DayHeaderHeight = 40.dp
 
 @Composable
 private fun DayHeader(label: String) {

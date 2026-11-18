@@ -34,6 +34,26 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         .map { prefs -> prefs[ALBUM_COLUMNS] ?: 2 }
         .distinctUntilChanged()
 
+    /** Searches the user ran, newest first (at most [MAX_RECENT_SEARCHES]). */
+    val recentSearches: Flow<List<String>> = context.dataStore.data
+        .map { prefs -> prefs[RECENT_SEARCHES]?.split(SEARCH_SEPARATOR)?.filter { it.isNotEmpty() }.orEmpty() }
+        .distinctUntilChanged()
+
+    suspend fun addRecentSearch(query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        context.dataStore.edit { prefs ->
+            val old = prefs[RECENT_SEARCHES]?.split(SEARCH_SEPARATOR).orEmpty()
+            val updated = (listOf(q) + old.filter { it.isNotEmpty() && !it.equals(q, ignoreCase = true) })
+                .take(MAX_RECENT_SEARCHES)
+            prefs[RECENT_SEARCHES] = updated.joinToString(SEARCH_SEPARATOR)
+        }
+    }
+
+    suspend fun clearRecentSearches() {
+        context.dataStore.edit { it.remove(RECENT_SEARCHES) }
+    }
+
     suspend fun setAlbumColumns(columns: Int) {
         context.dataStore.edit { it[ALBUM_COLUMNS] = columns }
     }
@@ -50,5 +70,9 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         val ALBUM_SORT = stringPreferencesKey("album_sort")
         val ALBUM_OLDEST_FIRST = booleanPreferencesKey("album_oldest_first")
         val ALBUM_COLUMNS = intPreferencesKey("album_columns")
+        val RECENT_SEARCHES = stringPreferencesKey("recent_searches")
+        /** Unit separator: cannot be typed, so it never appears inside a search. */
+        const val SEARCH_SEPARATOR = "\u001F"
+        const val MAX_RECENT_SEARCHES = 8
     }
 }
