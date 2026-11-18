@@ -17,6 +17,9 @@ private const val DOWN_RATIO = 0.8f
 /** Upward drags (open the info sheet) must be clearly vertical so they never fight the pager. */
 private const val UP_RATIO = 1.2f
 
+/** How far apart the two presses of a double-tap may be. */
+private const val DOUBLE_TAP_SLOP_DP = 100f
+
 /**
  * Claims one-finger drags that are mostly vertical *before* the pager or zoomable image see them
  * (the Initial pass runs parent-first), so a diagonal swipe down closes the viewer instead of
@@ -34,9 +37,17 @@ fun Modifier.verticalDismissGestures(
     downOnly: Boolean = false,
 ): Modifier = pointerInput(Unit) {
     val slop = viewConfiguration.touchSlop
+    // Where and when the last quick tap ended, to recognise the second press of a double-tap.
+    var lastTapUpMs = Long.MIN_VALUE / 2
+    var lastTapUpAt = Offset.Zero
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         if (!enabled()) return@awaitEachGesture
+        // Tap, then press again and slide: the photo's one-finger zoom, not a swipe to close.
+        val secondTap = down.uptimeMillis - lastTapUpMs <= viewConfiguration.doubleTapTimeoutMillis &&
+            (down.position - lastTapUpAt).getDistance() <= DOUBLE_TAP_SLOP_DP * density
+        lastTapUpMs = Long.MIN_VALUE / 2
+        if (secondTap) return@awaitEachGesture
 
         val tracker = VelocityTracker()
         tracker.addPosition(down.uptimeMillis, down.position)
@@ -51,6 +62,10 @@ fun Modifier.verticalDismissGestures(
                 return@awaitEachGesture
             }
             if (change.changedToUpIgnoreConsumed()) {
+                if (!claimed && total.getDistance() <= slop) {
+                    lastTapUpMs = change.uptimeMillis
+                    lastTapUpAt = change.position
+                }
                 if (claimed) {
                     val v = tracker.calculateVelocity()
                     onEnd(total, v.x, v.y)

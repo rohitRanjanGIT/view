@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,7 +26,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -101,7 +100,6 @@ fun ViewerFilmstrip(
         flingBehavior = fling,
     ) {
         itemsIndexed(items, key = { _, item -> item.id }, contentType = { _, _ -> "thumb" }) { index, item ->
-            val shape = RoundedCornerShape(6.dp)
             MediaThumbnail(
                 item = item,
                 cellSizePx = itemPx,
@@ -109,8 +107,8 @@ fun ViewerFilmstrip(
                 modifier = Modifier
                     .width(ItemWidth)
                     .height(ItemHeight)
-                    .clip(shape)
-                    .then(if (index == currentIndex) Modifier.border(2.dp, Color.White, shape) else Modifier)
+                    .clipToBounds()
+                    .then(if (index == currentIndex) Modifier.border(2.dp, Color.White) else Modifier)
                     .clickable { onSelect(index) },
             )
         }

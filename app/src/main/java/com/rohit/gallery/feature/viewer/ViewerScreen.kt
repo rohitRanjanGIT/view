@@ -512,7 +512,7 @@ private fun ViewerContent(
                     { onOpenAlbum(currentItem.bucketId) }
                 },
                 scrollState = infoScroll,
-                bottomSpace = ActionBarHeight + 16.dp,
+                bottomSpace = ActionBarHeight + 24.dp,
                 modifier = Modifier
                     .align(androidx.compose.ui.Alignment.BottomCenter)
                     .fillMaxWidth()
@@ -553,7 +553,7 @@ private fun ViewerContent(
                 enter = fadeIn(tween(GalleryMotion.FADE_MS)),
                 exit = fadeOut(tween(GalleryMotion.FADE_MS)),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (playback != null) {
                         VideoControls(playback, onToggleMute = { muted = !muted })
                     }

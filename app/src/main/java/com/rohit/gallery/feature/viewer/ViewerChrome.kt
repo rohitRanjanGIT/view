@@ -140,7 +140,7 @@ fun ViewerActionBar(
     Box(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
             .height(ActionBarHeight),
     ) {
         start?.let { ActionCircle(it, container, content, Modifier.align(Alignment.CenterStart)) }
