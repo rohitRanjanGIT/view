@@ -246,6 +246,11 @@ describes the project for GitHub; keep its Features / Status sections in step wh
   opened from the button at the right of the pinned day header on Pictures; `ViewerRoute.searchQuery` pages matches.
 - **Back gestures (Phase 3):** NavHost `predictivePop*` slide; viewer uses `PredictiveBackHandler` and a picture of
   the grid taken on open (`ViewerBackdrop`, cells from `RegisterViewerCells`) drawn behind the photo with a gap.
+- **Viewer polish (2026-11-18/19):** layout from my reference screenshots (`ViewerChrome.kt`: two-line date bar + ⋮
+  menu, bottom Share / Favourite-Edit-Trash / Details bar), Play pill for motion photos and GIFs (GIFs still until
+  Play), filmstrip scrubbing (centred thumbnail is the photo, live), redesigned details panel with album and
+  Favourites links, double-tap-and-drag zoom no longer closes. Red heart badge on favourite thumbnails.
+- **Tabs (2026-11-19):** `HomeRoute` holds Pictures / Albums / Menu in one `HomePager` (pages follow the finger).
 
 ### Known gaps / deferred
 - Camera thumbnail opens Google Photos, not Gallery (parked by me; likely the system default app setting).
