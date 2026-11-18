@@ -1,18 +1,29 @@
 package com.rohit.gallery.feature.viewer
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,27 +34,54 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.rohit.gallery.core.data.mediastore.ExposureValues
 import com.rohit.gallery.core.data.mediastore.MediaDetails
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.ui.icons.GalleryIcons
 import java.text.DecimalFormat
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import java.util.Date
+import java.util.Locale
 
-private val DateTimeFormat: DateTimeFormatter =
-    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withZone(ZoneId.systemDefault())
+private val DayMonth = DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
+private val DayMonthYear = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
 
-fun formatDateTime(epochMs: Long): String = DateTimeFormat.format(Instant.ofEpochMilli(epochMs))
+/** "Today", "Yesterday", "12 November" this year, else "12 November 2025". */
+fun dayLabel(epochMs: Long, today: LocalDate = LocalDate.now()): String {
+    val date = Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).toLocalDate()
+    return when {
+        date == today -> "Today"
+        date == today.minusDays(1) -> "Yesterday"
+        date.year == today.year -> DayMonth.format(date)
+        else -> DayMonthYear.format(date)
+    }
+}
+
+/** The time of day, in the phone's 12 / 24-hour setting. */
+fun timeLabel(context: Context, epochMs: Long): String = DateFormat.getTimeFormat(context).format(Date(epochMs))
+
+/** "18 November 2026 at 22:53". */
+private fun fullDateLabel(context: Context, epochMs: Long): String {
+    val date = Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).toLocalDate()
+    return "${DayMonthYear.format(date)} at ${timeLabel(context, epochMs)}"
+}
 
 /**
- * Details panel, stacked under the photo. Asks for ACCESS_MEDIA_LOCATION the first time it is opened (tracked by the
- * caller via [askedForLocation]) because GPS tags are hidden from apps without it.
+ * Details panel, stacked under the photo: date, file name and place; camera, size and exposure; folder. Asks for
+ * ACCESS_MEDIA_LOCATION the first time it is opened (tracked by the caller via [askedForLocation]) because GPS tags
+ * are hidden from apps without it. [bottomSpace] keeps the last row clear of the action bar drawn over the panel.
  */
-
 @Composable
 fun InfoPanel(
     item: MediaItem,
@@ -52,6 +90,7 @@ fun InfoPanel(
     loadDetails: suspend (MediaItem) -> MediaDetails,
     scrollState: ScrollState,
     modifier: Modifier = Modifier,
+    bottomSpace: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val context = LocalContext.current
     var locationGranted by remember {
@@ -68,6 +107,7 @@ fun InfoPanel(
     }
 
     val details by produceState<MediaDetails?>(null, item.id, locationGranted) { value = loadDetails(item) }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         modifier = modifier,
@@ -79,42 +119,114 @@ fun InfoPanel(
                 .verticalScroll(scrollState)
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(top = 24.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(top = 24.dp, bottom = 16.dp + bottomSpace),
         ) {
             val d = details
-            Text(d?.fileName ?: "Details", style = MaterialTheme.typography.titleLarge)
             // Files opened from other apps may have no date or size.
-            if (item.sortDateMs > 0) InfoRow("Date", formatDateTime(item.sortDateMs))
-            d?.folder?.let { InfoRow("Folder", it) }
-            if (item.sizeBytes > 0) InfoRow("Size", formatFileSize(item.sizeBytes))
-            if (item.width > 0 && item.height > 0) {
-                InfoRow("Resolution", "${item.width} × ${item.height} (${megapixels(item)})")
+            if (item.sortDateMs > 0) {
+                Text(fullDateLabel(context, item.sortDateMs), style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(4.dp))
             }
-            InfoRow("Type", item.mimeType)
-            d?.camera?.let { InfoRow("Camera", it) }
-            d?.exposure?.takeIf { it.isNotEmpty() }?.let { InfoRow("Exposure", it.joinToString("  ·  ")) }
-            when {
-                d?.location != null -> InfoRow("GPS location", d.location)
-                d?.locationNeedsPermission == true ->
-                    InfoRow("GPS location", "Allow location access for media in system settings to see it")
+            (d?.fileName ?: item.displayName.ifEmpty { null })?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (d != null) {
+                Text(
+                    when {
+                        d.location != null -> d.location
+                        d.locationNeedsPermission -> "Location hidden: allow media location access in system settings"
+                        else -> "No location information"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = muted,
+                )
+            }
+
+            PanelDivider()
+
+            d?.camera?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+            }
+            Text(fileFacts(item), style = MaterialTheme.typography.bodyMedium, color = muted)
+            d?.exposure?.let {
+                Spacer(Modifier.height(12.dp))
+                ExposureBox(it)
+            }
+
+            d?.folder?.let { folder ->
+                PanelDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(GalleryIcons.Folder, contentDescription = null, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Text(folder, style = MaterialTheme.typography.bodyLarge)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(0.4f),
-        )
-        Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.6f))
+private fun PanelDivider() {
+    HorizontalDivider(Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+/** ISO, shutter, aperture and focal length in one rounded box, split by thin lines. */
+@Composable
+private fun ExposureBox(values: ExposureValues) {
+    val cells = listOfNotNull(
+        values.iso?.let { "ISO" to it },
+        values.shutter?.let { "" to it },
+        values.aperture?.let { "" to it },
+        values.focalLength?.let { "" to it },
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(16.dp))
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        cells.forEachIndexed { index, (label, value) ->
+            if (index > 0) {
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+                )
+            }
+            Text(
+                buildAnnotatedString {
+                    if (label.isNotEmpty()) {
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("$label ") }
+                    }
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(value) }
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
+}
+
+/** "12 MP | 3000 × 4000 | 2.7 MB | JPEG", plus the length for a video. */
+private fun fileFacts(item: MediaItem): String = buildList {
+    if (item.width > 0 && item.height > 0) {
+        if (!item.isVideo) add(megapixels(item))
+        add("${item.width} × ${item.height}")
+    }
+    if (item.isVideo && item.durationMs > 0) add(formatDuration(item.durationMs))
+    if (item.sizeBytes > 0) add(formatFileSize(item.sizeBytes))
+    item.mimeType.substringAfter('/', "").takeIf { it.isNotEmpty() }?.let { add(it.uppercase(Locale.ROOT)) }
+}.joinToString("  |  ")
+
+private fun formatDuration(ms: Long): String {
+    val s = ms / 1000
+    return if (s >= 3600) String.format(Locale.US, "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
+    else String.format(Locale.US, "%d:%02d", s / 60, s % 60)
 }
 
 private fun megapixels(item: MediaItem): String =

@@ -1,6 +1,21 @@
 package com.rohit.gallery.feature.viewer
 
+import android.app.Activity
+import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.ActivityInfo
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Share
+import coil3.decode.BitmapFactoryDecoder
+import coil3.memory.MemoryCache
 import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
@@ -13,7 +28,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.unit.IntSize
@@ -38,13 +52,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -54,22 +66,16 @@ import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -193,11 +199,15 @@ private fun ViewerContent(
     }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     HdrWindowEffect(enabled = traits.ultraHdr && settings?.ultraHdr != false)
-    // A motion photo's clip plays over it when the Motion pill is tapped, once, then the photo is back.
-    var motionPlaying by remember(currentItem.id) { mutableStateOf(false) }
+    // The Play pill: a motion photo's clip plays over it once, then the photo is back; a GIF stays on its first
+    // frame until Play, then loops until Pause. Both reset when another item comes on screen.
+    val isGif = currentItem.isGif
+    val playable = !currentItem.isVideo && (isGif || traits.motionPhoto)
+    var playing by remember(currentItem.id) { mutableStateOf(false) }
+    val motionPlaying = playing && traits.motionPhoto
     // "Play motion photos automatically": once, as soon as one is opened (and known to be one).
     LaunchedEffect(currentItem.id, traits.motionPhoto) {
-        if (traits.motionPhoto && settings?.motionAutoplay == true) motionPlaying = true
+        if (traits.motionPhoto && settings?.motionAutoplay == true) playing = true
     }
     var muted by rememberSaveable { mutableStateOf(false) }
     // "Start videos muted" sets the first value only; the mute button then works as usual for this visit.
@@ -282,6 +292,73 @@ private fun ViewerContent(
     val backdropHolder = LocalViewerBackdrop.current
     val backdrop = backdropHolder?.image
     val gapColor = MaterialTheme.colorScheme.background
+
+    // Favourite and trash go through the system's confirmation (skipped when "Skip confirmation" is allowed).
+    val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) viewModel.onWritten()
+    }
+    fun write(request: suspend () -> IntentSender?) {
+        scope.launch {
+            val sender = request()
+            if (sender == null) {
+                Toast.makeText(context, "Couldn't start that action", Toast.LENGTH_SHORT).show()
+            } else {
+                writeLauncher.launch(IntentSenderRequest.Builder(sender).build())
+            }
+        }
+    }
+    fun startOrToast(intent: Intent) {
+        runCatching { context.startActivity(intent) }
+            .onFailure { Toast.makeText(context, "No app can open this", Toast.LENGTH_SHORT).show() }
+    }
+    val canWrite = viewModel.canWrite(currentItem)
+    val bottomActions = if (viewModel.isTrash) {
+        BottomActions(
+            start = null,
+            middle = listOf(
+                ViewerAction(Icons.Filled.Refresh, "Restore", { trashActions.restore(currentItem) }),
+                ViewerAction(Icons.Outlined.Delete, "Delete forever", trashActions::askDelete),
+            ),
+        )
+    } else {
+        BottomActions(
+            start = ViewerAction(Icons.Outlined.Share, "Share", { startOrToast(viewModel.shareIntent(currentItem)) }),
+            middle = buildList {
+                if (canWrite) {
+                    val favorite = currentItem.isFavorite
+                    add(
+                        ViewerAction(
+                            if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            if (favorite) "Remove from favourites" else "Add to favourites",
+                            { write { viewModel.favoriteRequest(currentItem) } },
+                            tint = if (favorite) FavoriteRed else null,
+                        ),
+                    )
+                }
+                if (!currentItem.isVideo) {
+                    // Editing is handed to Google Photos for now (it saves a copy); our own editor comes later.
+                    add(
+                        ViewerAction(Icons.Outlined.Edit, "Edit", {
+                            if (!viewModel.openInEditor(currentItem)) {
+                                Toast.makeText(context, "No photo editor found", Toast.LENGTH_SHORT).show()
+                            }
+                        }),
+                    )
+                }
+                if (canWrite) add(ViewerAction(Icons.Outlined.Delete, "Move to trash", { write { viewModel.trashRequest(currentItem) } }))
+            },
+        )
+    }
+    fun viewerMenu(item: MediaItem): List<ViewerMenuEntry> = if (viewModel.isTrash) emptyList() else buildList {
+        fun intent(action: String) = Intent(action)
+            .setDataAndType(item.uri, item.mimeType.ifBlank { if (item.isVideo) "video/*" else "image/*" })
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Read-only hand-offs: the other app can use the file but never change it.
+        if (!item.isVideo) {
+            add(ViewerMenuEntry("Use as…") { startOrToast(Intent.createChooser(intent(Intent.ACTION_ATTACH_DATA), "Use as")) })
+        }
+        add(ViewerMenuEntry("Open with another app") { startOrToast(Intent.createChooser(intent(Intent.ACTION_VIEW), null)) })
+    }
 
     // System back gesture (not zoomed, details closed): the photo shrinks and leans towards the edge the swipe
     // started from, following the finger. Letting go flies it into its grid cell like a drag-down close;
@@ -397,8 +474,9 @@ private fun ViewerContent(
                     onZoomedChange = { zoomed = it },
                     onZoomState = { state -> currentZoom.state = state },
                     onTap = { if (showInfo) showInfo = false else chromeVisible = !chromeVisible },
+                    animateGif = isCurrent && playing,
                     motionClip = if (isCurrent && motionPlaying) {
-                        { clipModifier -> MotionClip(item, muted, onEnded = { motionPlaying = false }, modifier = clipModifier) }
+                        { clipModifier -> MotionClip(item, muted, onEnded = { playing = false }, modifier = clipModifier) }
                     } else {
                         null
                     },
@@ -414,48 +492,9 @@ private fun ViewerContent(
                 ViewerTopBar(
                     item = currentItem,
                     onBack = ::close,
-                    onInfo = { showInfo = !showInfo },
-                    showMotion = traits.motionPhoto,
-                    motionPlaying = motionPlaying,
-                    onMotion = { motionPlaying = !motionPlaying },
-                    onEdit = if (currentItem.isVideo || viewModel.isTrash) null else {
-                        {
-                            if (!viewModel.openInEditor(currentItem)) {
-                                Toast.makeText(context, "No photo editor found", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
+                    menu = viewerMenu(currentItem),
                     modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
                 )
-            }
-
-            // Filmstrip and video controls give way to the details panel.
-            AnimatedVisibility(
-                visible = chromeVisible && !showInfo,
-                enter = fadeIn(tween(GalleryMotion.FADE_MS)),
-                exit = fadeOut(tween(GalleryMotion.FADE_MS)),
-                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart),
-            ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer { alpha = chromeAlpha }
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))
-                        .navigationBarsPadding()
-                        .padding(vertical = 12.dp),
-                ) {
-                    if (viewModel.isTrash) {
-                        TrashViewerBar(onRestore = { trashActions.restore(currentItem) }, onDelete = trashActions::askDelete)
-                    }
-                    if (playback != null) {
-                        VideoControls(playback, onToggleMute = { muted = !muted })
-                    }
-                    ViewerFilmstrip(
-                        items = items,
-                        currentIndex = currentIndex,
-                        onSelect = { index -> scope.launch { pagerState.scrollToPage(index) } },
-                    )
-                }
             }
         }
 
@@ -466,6 +505,7 @@ private fun ViewerContent(
                 onAskedForLocation = { askedForLocation = true },
                 loadDetails = viewModel::loadDetails,
                 scrollState = infoScroll,
+                bottomSpace = ActionBarHeight + 16.dp,
                 modifier = Modifier
                     .align(androidx.compose.ui.Alignment.BottomCenter)
                     .fillMaxWidth()
@@ -487,8 +527,65 @@ private fun ViewerContent(
                     ),
             )
         }
+
+        // Bottom: video controls or the Play pill, the filmstrip, then the action bar. The action bar stays over the
+        // details panel (in its colours); the rest gives way to it.
+        Column(
+            Modifier
+                .align(androidx.compose.ui.Alignment.BottomStart)
+                .fillMaxWidth()
+                .graphicsLayer { alpha = chromeAlpha }
+                .background(
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f * (1f - infoProgress)))),
+                )
+                .navigationBarsPadding()
+                .padding(top = 12.dp, bottom = 4.dp),
+        ) {
+            AnimatedVisibility(
+                visible = chromeVisible && !showInfo,
+                enter = fadeIn(tween(GalleryMotion.FADE_MS)),
+                exit = fadeOut(tween(GalleryMotion.FADE_MS)),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (playback != null) {
+                        VideoControls(playback, onToggleMute = { muted = !muted })
+                    }
+                    if (playable) {
+                        PlayPill(
+                            playing = playing,
+                            onClick = { playing = !playing },
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally),
+                        )
+                    }
+                    ViewerFilmstrip(
+                        items = items,
+                        currentIndex = currentIndex,
+                        onSelect = { index -> scope.launch { pagerState.scrollToPage(index) } },
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = chromeVisible || showInfo,
+                enter = fadeIn(tween(GalleryMotion.FADE_MS)),
+                exit = fadeOut(tween(GalleryMotion.FADE_MS)),
+            ) {
+                ViewerActionBar(
+                    start = bottomActions.start,
+                    middle = bottomActions.middle,
+                    end = ViewerAction(
+                        if (showInfo) Icons.Filled.Info else Icons.Outlined.Info,
+                        "Details",
+                        { showInfo = !showInfo },
+                    ),
+                    onPanel = infoProgress,
+                )
+            }
+        }
     }
 }
+
+/** Left circle and middle pill of the bottom bar; the right circle is always Details. */
+private class BottomActions(val start: ViewerAction?, val middle: List<ViewerAction>)
 
 @Composable
 private fun ImagePage(
@@ -499,16 +596,31 @@ private fun ImagePage(
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
+    animateGif: Boolean = false,
     motionClip: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val cache = LocalThumbnailCache.current
     val context = LocalPlatformContext.current
     // The grid thumbnail is already in memory; show it while the full image decodes so the
     // open transition never flashes blank.
-    val request = remember(item.id, item.dateModifiedMs) {
+    val request = remember(item.id, item.dateModifiedMs, item.isGif && animateGif) {
         ImageRequest.Builder(context)
             .data(item.uri)
             .placeholder(cache.get(item.thumbKey)?.asImage())
+            .apply {
+                if (item.isGif) {
+                    // A GIF shows its first frame (plain bitmap decode) until Play; then the animated decoder.
+                    // Separate cache keys, so the still frame never stands in for the animation.
+                    val still = MemoryCache.Key("gif-still:${item.id}:${item.dateModifiedMs}")
+                    if (animateGif) {
+                        memoryCacheKey("gif-anim:${item.id}:${item.dateModifiedMs}")
+                        placeholderMemoryCacheKey(still)
+                    } else {
+                        memoryCacheKey(still)
+                        decoderFactory(BitmapFactoryDecoder.Factory())
+                    }
+                }
+            }
             .build()
     }
     val zoomState = rememberZoomableImageState()
@@ -547,49 +659,6 @@ private fun ImagePage(
         )
     }
 }
-@Composable
-private fun ViewerTopBar(
-    item: MediaItem,
-    onBack: () -> Unit,
-    onInfo: () -> Unit,
-    showMotion: Boolean,
-    motionPlaying: Boolean,
-    onMotion: () -> Unit,
-    onEdit: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)))
-            .statusBarsPadding()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-        }
-        Text(
-            // Files from other apps may carry no date at all.
-            if (item.sortDateMs > 0) formatDateTime(item.sortDateMs) else "",
-            style = MaterialTheme.typography.titleSmall,
-            color = Color.White,
-            modifier = Modifier.weight(1f),
-        )
-        if (showMotion) MotionButton(motionPlaying, onMotion)
-        if (onEdit != null) {
-            // Editing is handed to Google Photos for now (it saves a copy); our own editor comes later.
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = Color.White)
-            }
-        }
-        IconButton(onClick = onInfo) {
-            Icon(Icons.Filled.Info, contentDescription = "Details", tint = Color.White)
-        }
-    }
-}
-
 /**
  * Puts the window in HDR mode while an Ultra HDR photo is on screen, so its gain map lifts the highlights above
  * normal white. Back to the default mode for other photos and when the viewer goes away.
@@ -639,14 +708,19 @@ private fun ViewerPage(
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableImageState?) -> Unit,
     onTap: () -> Unit,
+    animateGif: Boolean,
     motionClip: (@Composable (Modifier) -> Unit)?,
 ) {
     if (item.isVideo) {
         VideoPage(item, isCurrent, playback, dragLayer, flightPlacement, onTap)
     } else {
-        ImagePage(item, isCurrent, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap, motionClip)
+        ImagePage(item, isCurrent, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap, animateGif, motionClip)
     }
 }
+
+private val MediaItem.isGif: Boolean get() = mimeType.equals("image/gif", ignoreCase = true)
+
+private val FavoriteRed = Color(0xFFFF4D6D)
 
 /** A video page: the cached thumbnail until the first frame is drawn, then the player surface. */
 @Composable
@@ -768,21 +842,4 @@ private fun MotionClip(item: MediaItem, muted: Boolean, onEnded: () -> Unit, mod
         keepContentOnReset = true,
         shutter = {},
     )
-}
-
-/** The "Motion" pill in the top bar: plays the clip of a motion photo. */
-@Composable
-private fun MotionButton(playing: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = if (playing) 0.35f else 0.18f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(4.dp))
-        Text("Motion", style = MaterialTheme.typography.labelLarge, color = Color.White)
-    }
 }

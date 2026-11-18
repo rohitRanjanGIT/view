@@ -24,8 +24,8 @@ data class MediaDetails(
     /** Folder relative to the storage root, e.g. `DCIM/Camera/`. */
     val folder: String?,
     val camera: String?,
-    /** Aperture, exposure, ISO and focal length, already formatted for display. */
-    val exposure: List<String>,
+    /** ISO, shutter speed, aperture and focal length, each already formatted (null when the file has none). */
+    val exposure: ExposureValues?,
     /** Decimal "lat, lon" text; null when the file has no location or it cannot be read. */
     val location: String?,
     /** True when location could not be read because ACCESS_MEDIA_LOCATION is not granted. */
@@ -43,7 +43,7 @@ class MediaInfoLoader @Inject constructor(
             PackageManager.PERMISSION_GRANTED
 
         var camera: String? = null
-        var exposure: List<String> = emptyList()
+        var exposure: ExposureValues? = null
         var location: String? = null
         if (item.isVideo) {
             location = runCatching { videoLocation(item) }.getOrNull()
@@ -53,10 +53,8 @@ class MediaInfoLoader @Inject constructor(
                 val uri = if (canReadLocation && item.isMediaStoreUri) MediaStore.setRequireOriginal(item.uri) else item.uri
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     val exif = ExifInterface(stream)
-                    camera = listOfNotNull(exif.getAttribute(ExifInterface.TAG_MAKE), exif.getAttribute(ExifInterface.TAG_MODEL))
-                        .joinToString(" ")
-                        .ifBlank { null }
-                    exposure = exposureLines(exif)
+                    camera = cameraName(exif.getAttribute(ExifInterface.TAG_MAKE), exif.getAttribute(ExifInterface.TAG_MODEL))
+                    exposure = exposureValues(exif)
                     if (canReadLocation) {
                         location = exif.latLong?.let { formatLocation(it[0], it[1]) }
                     }
@@ -111,14 +109,36 @@ class MediaInfoLoader @Inject constructor(
 internal fun formatLocation(lat: Double, lon: Double): String =
     String.format(Locale.US, "%.5f, %.5f", lat, lon)
 
-private fun exposureLines(exif: ExifInterface): List<String> = buildList {
-    exif.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0).takeIf { it > 0 }
-        ?.let { add(String.format(Locale.US, "f/%.1f", it)) }
-    exif.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0).takeIf { it > 0 }
-        ?.let { add(formatExposure(it)) }
-    exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.let { add("ISO $it") }
-    exif.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0).takeIf { it > 0 }
-        ?.let { add(String.format(Locale.US, "%.1f mm", it)) }
+/** The camera settings a photo was taken with, each formatted for display. */
+@Immutable
+data class ExposureValues(
+    val iso: String?,
+    val shutter: String?,
+    val aperture: String?,
+    val focalLength: String?,
+)
+
+private fun exposureValues(exif: ExifInterface): ExposureValues? {
+    val values = ExposureValues(
+        iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.takeIf { it.isNotBlank() },
+        shutter = exif.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0).takeIf { it > 0 }?.let(::formatExposure),
+        aperture = exif.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0).takeIf { it > 0 }
+            ?.let { String.format(Locale.US, "f/%.1f", it) },
+        focalLength = exif.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0).takeIf { it > 0 }
+            ?.let { String.format(Locale.US, "%.0f mm", it) },
+    )
+    return values.takeIf { listOf(it.iso, it.shutter, it.aperture, it.focalLength).any { v -> v != null } }
+}
+
+/** "motorola" + "motorola edge 60 pro" reads as "motorola edge 60 pro", not the make twice. */
+internal fun cameraName(make: String?, model: String?): String? {
+    val m = make?.trim().orEmpty()
+    val mo = model?.trim().orEmpty()
+    return when {
+        mo.isEmpty() -> m.ifEmpty { null }
+        m.isEmpty() || mo.startsWith(m, ignoreCase = true) -> mo
+        else -> "$m $mo"
+    }
 }
 
 internal fun formatExposure(seconds: Double): String =

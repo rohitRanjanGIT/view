@@ -6,15 +6,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,11 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -89,17 +78,3 @@ fun TrashViewerDialog(actions: TrashViewerActions, item: MediaItem) {
     )
 }
 
-/** Restore / Delete buttons shown over the bottom of the trash viewer. */
-@Composable
-fun TrashViewerBar(onRestore: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-        TextButton(onClick = onRestore) {
-            Icon(Icons.Filled.Refresh, contentDescription = null, tint = Color.White)
-            Text("Restore", color = Color.White, modifier = Modifier.padding(start = 8.dp))
-        }
-        TextButton(onClick = onDelete) {
-            Icon(Icons.Filled.Delete, contentDescription = null, tint = Color.White)
-            Text("Delete", color = Color.White, modifier = Modifier.padding(start = 8.dp))
-        }
-    }
-}

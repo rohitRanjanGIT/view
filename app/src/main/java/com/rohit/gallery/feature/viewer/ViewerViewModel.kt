@@ -1,7 +1,9 @@
 package com.rohit.gallery.feature.viewer
 
+import android.content.Intent
 import android.content.IntentSender
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -177,6 +179,23 @@ class ViewerViewModel @Inject constructor(
         runCatching { actions.deleteRequest(listOf(item)) }.getOrNull()
 
     suspend fun loadDetails(item: MediaItem): MediaDetails = infoLoader.load(item)
+
+    /** Share sheet for the photo on screen. */
+    fun shareIntent(item: MediaItem): Intent = actions.shareIntent(listOf(item))
+
+    /** Favourite / trash work only on MediaStore items (not on a file another app handed us). */
+    fun canWrite(item: MediaItem): Boolean = item.uri.authority == MediaStore.AUTHORITY
+
+    /** System confirmation to add or remove the favourite mark (skipped by Android with "Skip confirmation"). */
+    suspend fun favoriteRequest(item: MediaItem): IntentSender? =
+        runCatching { actions.favoriteRequest(listOf(item), favorite = !item.isFavorite) }.getOrNull()
+
+    /** System confirmation to move the photo to the trash (recoverable). */
+    suspend fun trashRequest(item: MediaItem): IntentSender? =
+        runCatching { actions.trashRequest(listOf(item)) }.getOrNull()
+
+    /** After favourite or trash went through: re-read the library so the change shows. */
+    fun onWritten() = repository.refresh()
 
     /** Viewer options from Settings; null for the few ms until read. */
     val settings: StateFlow<AppSettings?> = prefs.settings

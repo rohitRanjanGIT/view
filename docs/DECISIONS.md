@@ -322,3 +322,9 @@ Non-obvious technical choices, newest last.
 
 ## Filmstrip scrubbing (2026-11-18)
 Swiping the viewer filmstrip changes the photo live: whichever thumbnail is nearest the middle becomes the current page (`pagerState.scrollToPage`). Only user scrolls drive this (a drag, or the snap fling after it, tracked with a wrapping `FlingBehavior`), so our own animated scroll that follows the pager never selects the items it passes. `SnapPosition.Center` snapping leaves one thumbnail exactly centred.
+
+## Viewer layout and Play pill (2026-11-18)
+- Layout follows my reference screenshots (own implementation): two-line date top bar with a read-only ⋮ menu (Use as, Open with); bottom bar of Share circle, Favourite / Edit / Trash pill, Details circle. The bottom bar stays over the details panel and takes its colours, so the panel leaves `ActionBarHeight` of room.
+- Details panel: big date, file name, location; camera, "MP | size | bytes | type"; ISO / shutter / aperture / focal box (`ExposureValues`); folder.
+- GIFs stay still until Play: the still frame is a plain `BitmapFactoryDecoder` decode, the animation the normal animated decoder. Both get their own memory-cache keys, because Coil's key does not include the decoder and the still frame would otherwise stand in for the animation.
+- Pause and Folder icons are drawn in `core/ui/icons/GalleryIcons.kt` instead of adding the large extended icon set.
