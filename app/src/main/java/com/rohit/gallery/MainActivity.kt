@@ -6,6 +6,8 @@ import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -35,9 +37,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             CompositionLocalProvider(LocalThumbnailCache provides thumbnailCache) {
                 GalleryTheme {
-                    // A new external file (onNewIntent) starts a fresh back stack.
-                    key(externalStart) {
-                        GalleryNavHost(externalStart = externalStart, onExitExternal = ::finish)
+                    // There is no root Surface, so text and icons would default to black even in dark mode.
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                        // A new external file (onNewIntent) starts a fresh back stack.
+                        key(externalStart) {
+                            GalleryNavHost(externalStart = externalStart, onExitExternal = ::finish)
+                        }
                     }
                 }
             }
