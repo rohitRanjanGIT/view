@@ -50,3 +50,6 @@ val topLevelDestinations: List<TopLevelDestination<*>> = listOf(
 
 /** One album (folder), opened from the Albums tab. */
 @Serializable data class AlbumDetailRoute(val bucketId: Long)
+
+/** Pin, hide and reorder albums, opened from the Albums tab menu. */
+@Serializable data object EditAlbumsRoute

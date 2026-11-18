@@ -14,10 +14,11 @@ import kotlinx.coroutines.test.runTest
 class MediaRepositoryTest {
 
     private val fake = FakeMediaSource()
+    private val hidden = FakeHiddenAlbums()
 
     @Test
     fun `starts loading and does not query before a refresh`() = runTest {
-        val repo = MediaRepository(fake, backgroundScope)
+        val repo = MediaRepository(fake, hidden, backgroundScope)
         runCurrent()
         assertEquals(MediaIndexState.Loading, repo.state.value)
         assertEquals(0, fake.queryCount)
@@ -30,7 +31,7 @@ class MediaRepositoryTest {
             testItem(2, dateTakenMs = 3_000),
             testItem(3, dateTakenMs = 0, dateModifiedMs = 2_000), // falls back to modified date
         )
-        val repo = MediaRepository(fake, backgroundScope)
+        val repo = MediaRepository(fake, hidden, backgroundScope)
         runCurrent()
 
         repo.refresh()
@@ -42,7 +43,7 @@ class MediaRepositoryTest {
 
     @Test
     fun `media changes are debounced into a single query`() = runTest {
-        val repo = MediaRepository(fake, backgroundScope)
+        val repo = MediaRepository(fake, hidden, backgroundScope)
         runCurrent()
 
         repeat(5) { fake.changeEvents.emit(Unit) }
@@ -59,7 +60,7 @@ class MediaRepositoryTest {
     @Test
     fun `new camera photo appears after a change notification`() = runTest {
         fake.items = listOf(testItem(1, dateTakenMs = 1_000))
-        val repo = MediaRepository(fake, backgroundScope)
+        val repo = MediaRepository(fake, hidden, backgroundScope)
         runCurrent()
         repo.refresh()
         runCurrent()
@@ -76,7 +77,7 @@ class MediaRepositoryTest {
     @Test
     fun `failed first query shows empty instead of loading forever`() = runTest {
         fake.failure = SecurityException("no permission")
-        val repo = MediaRepository(fake, backgroundScope)
+        val repo = MediaRepository(fake, hidden, backgroundScope)
         runCurrent()
 
         repo.refresh()
@@ -88,7 +89,7 @@ class MediaRepositoryTest {
     @Test
     fun `failed refresh keeps the last good index`() = runTest {
         fake.items = listOf(testItem(1, dateTakenMs = 1_000))
-        val repo = MediaRepository(fake, backgroundScope)
+        val repo = MediaRepository(fake, hidden, backgroundScope)
         runCurrent()
         repo.refresh()
         runCurrent()
@@ -99,5 +100,25 @@ class MediaRepositoryTest {
 
         val ready = assertIs<MediaIndexState.Ready>(repo.state.value)
         assertEquals(listOf(1L), ready.items.map { it.id })
+    }
+
+    @Test
+    fun `hidden albums are left out of state but kept in allState`() = runTest {
+        fake.items = listOf(
+            testItem(1, dateTakenMs = 3_000, bucketId = 10),
+            testItem(2, dateTakenMs = 2_000, bucketId = 20),
+        )
+        val repo = MediaRepository(fake, hidden, backgroundScope)
+        repo.refresh()
+        runCurrent()
+
+        hidden.bucketIds.value = setOf(20L)
+        runCurrent()
+        assertEquals(listOf(1L), assertIs<MediaIndexState.Ready>(repo.state.value).items.map { it.id })
+        assertEquals(listOf(1L, 2L), assertIs<MediaIndexState.Ready>(repo.allState.value).items.map { it.id })
+
+        hidden.bucketIds.value = emptySet()
+        runCurrent()
+        assertEquals(listOf(1L, 2L), assertIs<MediaIndexState.Ready>(repo.state.value).items.map { it.id })
     }
 }

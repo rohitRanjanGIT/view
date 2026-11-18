@@ -45,6 +45,7 @@ import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
 import com.rohit.gallery.core.ui.components.ViewerReturnTarget
 import com.rohit.gallery.feature.albums.AlbumDetailScreen
 import com.rohit.gallery.feature.albums.AlbumsScreen
+import com.rohit.gallery.feature.albums.EditAlbumsScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.settings.MenuScreen
 import com.rohit.gallery.feature.trash.TrashScreen
@@ -118,8 +119,12 @@ fun GalleryNavHost(
                     topLevel<AlbumsRoute> {
                         AlbumsScreen(
                             onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
+                            onEditAlbums = { navController.navigate(EditAlbumsRoute) },
                             contentBottomPadding = contentBottomPadding,
                         )
+                    }
+                    topLevel<EditAlbumsRoute> {
+                        EditAlbumsScreen(onBack = { navController.popBackStack() })
                     }
                     topLevel<AlbumDetailRoute> {
                         AlbumDetailScreen(

@@ -3,31 +3,38 @@ package com.rohit.gallery.feature.albums
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rohit.gallery.core.data.repository.AlbumRepository
-import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
-import com.rohit.gallery.core.model.Album
-import com.rohit.gallery.core.model.buildAlbums
+import com.rohit.gallery.core.model.AlbumSort
+import com.rohit.gallery.core.model.OrganizedAlbums
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
+/** The Albums tab and the Edit albums screen: albums in the user's order, and the actions that change it. */
 @HiltViewModel
 class AlbumsViewModel @Inject constructor(
     private val repository: MediaRepository,
+    private val albums: AlbumRepository,
 ) : ViewModel() {
 
-    /** Albums, ordered by their newest item; null while the index is loading. */
-    val albums: StateFlow<List<Album>?> = repository.state
-        .map { state ->
-            when (state) {
-                MediaIndexState.Loading -> null
-                is MediaIndexState.Ready -> buildAlbums(state.items)
-            }
-        }
+    /** Albums in display order (hidden ones flagged); null while the index is loading. */
+    val organized: StateFlow<OrganizedAlbums?> = albums.organized
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun refresh() = repository.refresh()
+
+    fun setSort(sort: AlbumSort) = launch { albums.setSort(sort) }
+
+    fun setPinned(bucketId: Long, pinned: Boolean) = launch { albums.setPinned(bucketId, pinned) }
+
+    fun setHidden(bucketId: Long, hidden: Boolean) = launch { albums.setHidden(bucketId, hidden) }
+
+    fun saveCustomOrder(bucketIds: List<Long>) = launch { albums.saveCustomOrder(bucketIds) }
+
+    private fun launch(block: suspend () -> Unit) {
+        viewModelScope.launch { block() }
+    }
 }

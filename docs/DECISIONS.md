@@ -215,3 +215,20 @@ Non-obvious technical choices, newest last.
   `toUiState` (TimelineGrouping.kt) so the Pictures VM and `MediaListScreen` share it. `MediaListScreen` groups
   with `produceState` on `Dispatchers.Default` (blank for a few ms rather than a spinner flash). Trash keeps the
   flat `SelectableMediaGrid` (ordered by delete date), which still pinches 2 / 4 / 6.
+
+## Phase 3: album organisation
+- **Storage:** Room 2.8.5 (`gallery.db`, table `album_prefs`: hidden, pinnedAt, position per bucket id; schema
+  exported to `app/schemas`) and DataStore 1.3.0 (`settings`: album sort, oldest-first). Both built with Kotlin
+  <= 2.2, so readable by our 2.2.10 compiler. Only app-owned data: folders and files are never touched.
+- **Hidden means hidden everywhere** (my choice): `MediaRepository.state` is the index minus hidden buckets, so
+  Pictures, Favorites, Videos and the viewer all skip them with no per-screen code. `allState` keeps everything
+  for album management and the Move/Copy picker. `state` waits for the hidden list before its first Ready, so
+  hidden photos never flash on start. `HiddenAlbums` is an interface so the repository test needs no database.
+- **Pins** (my request): any album can be pinned; pinned albums lead in pin time order, so a new pin goes after
+  earlier ones. The rest follow the sort: Newest photo first (default), Name A-Z, Most items, Custom.
+- **Custom order:** dragging in Edit albums saves positions for all unpinned albums and switches the sort to
+  Custom. Albums never placed (new folders) lead the custom order. Pure ordering lives in `organizeAlbums`
+  (unit-tested).
+- **UI:** Albums tab menu (sort, Edit albums), long-press a card to pin/unpin or hide. Edit albums lists every
+  album (hidden ones dimmed) with pin / eye toggles and drag handles. Icons are drawn in `OrganizeIcons`
+  (material-icons-core has no pin/eye/drag icons).
