@@ -42,14 +42,21 @@ class AlbumRepository @Inject constructor(
         }
     }.flowOn(Dispatchers.Default)
 
-    suspend fun setHidden(bucketId: Long, hidden: Boolean) = update(bucketId) { it.copy(hidden = hidden) }
+    suspend fun setHidden(bucketIds: Collection<Long>, hidden: Boolean) = updateAll(bucketIds) { it.copy(hidden = hidden) }
 
-    /** A new pin gets the current time, so it is shown after the earlier pins. */
-    suspend fun setPinned(bucketId: Long, pinned: Boolean) = update(bucketId) {
-        when {
-            !pinned -> it.copy(pinnedAt = null)
-            it.pinnedAt != null -> it
-            else -> it.copy(pinnedAt = System.currentTimeMillis())
+    /**
+     * New pins get the current time (plus their place in [bucketIds]), so they go after the earlier pins and,
+     * when pinned together, keep the order given. Albums already pinned keep their place.
+     */
+    suspend fun setPinned(bucketIds: List<Long>, pinned: Boolean) {
+        val now = System.currentTimeMillis()
+        var next = 0L
+        updateAll(bucketIds) {
+            when {
+                !pinned -> it.copy(pinnedAt = null)
+                it.pinnedAt != null -> it
+                else -> it.copy(pinnedAt = now + next++)
+            }
         }
     }
 
@@ -62,7 +69,9 @@ class AlbumRepository @Inject constructor(
         prefs.setAlbumSort(AlbumSort.Custom)
     }
 
-    private suspend fun update(bucketId: Long, change: (AlbumPrefEntity) -> AlbumPrefEntity) {
-        dao.upsert(change(dao.get(bucketId) ?: AlbumPrefEntity(bucketId)))
+    /** Applies [change] to each album in order, in one write. */
+    private suspend fun updateAll(bucketIds: Collection<Long>, change: (AlbumPrefEntity) -> AlbumPrefEntity) {
+        val existing = dao.getAll().associateBy { it.bucketId }
+        dao.upsertAll(bucketIds.map { id -> change(existing[id] ?: AlbumPrefEntity(id)) })
     }
 }

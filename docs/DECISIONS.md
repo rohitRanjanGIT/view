@@ -232,3 +232,7 @@ Non-obvious technical choices, newest last.
 - **UI:** Albums tab menu (sort, Edit albums), long-press a card to pin/unpin or hide. Edit albums lists every
   album (hidden ones dimmed) with pin / eye toggles and drag handles. Icons are drawn in `OrganizeIcons`
   (material-icons-core has no pin/eye/drag icons).
+- **Bulk pin / hide** (my request): long-press selects albums in the Albums tab and in Edit albums (replacing
+  the earlier long-press menu). The bar's buttons reverse when they already apply to every selected album
+  (Pin -> Unpin, Hide -> Show), so hidden albums can be shown in bulk from Edit albums. Albums pinned together
+  get `now + index` in display order, so they keep that order after earlier pins. Writes are one `upsertAll`.

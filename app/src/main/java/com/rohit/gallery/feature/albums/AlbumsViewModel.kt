@@ -28,9 +28,9 @@ class AlbumsViewModel @Inject constructor(
 
     fun setSort(sort: AlbumSort) = launch { albums.setSort(sort) }
 
-    fun setPinned(bucketId: Long, pinned: Boolean) = launch { albums.setPinned(bucketId, pinned) }
+    fun setPinned(bucketIds: List<Long>, pinned: Boolean) = launch { albums.setPinned(bucketIds, pinned) }
 
-    fun setHidden(bucketId: Long, hidden: Boolean) = launch { albums.setHidden(bucketId, hidden) }
+    fun setHidden(bucketIds: List<Long>, hidden: Boolean) = launch { albums.setHidden(bucketIds, hidden) }
 
     fun saveCustomOrder(bucketIds: List<Long>) = launch { albums.saveCustomOrder(bucketIds) }
 

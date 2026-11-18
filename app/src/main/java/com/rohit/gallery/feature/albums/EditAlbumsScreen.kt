@@ -1,6 +1,11 @@
 package com.rohit.gallery.feature.albums
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,6 +52,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.AlbumEntry
 import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.OrganizeIcons
+import com.rohit.gallery.feature.selection.SelectionCheck
+import com.rohit.gallery.feature.selection.SelectionTopBar
 
 private val RowThumb = 48.dp
 private const val PINNED_HEADER = "pinned-header"
@@ -60,22 +67,47 @@ private const val OTHERS_HEADER = "others-header"
 fun EditAlbumsScreen(onBack: () -> Unit, viewModel: AlbumsViewModel = hiltViewModel()) {
     val organized by viewModel.organized.collectAsStateWithLifecycle()
     val current = organized
-    Column(Modifier.fillMaxSize()) {
-        Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+    val selection = rememberAlbumSelection()
+    BackHandler(enabled = selection.isSelecting) { selection.clear() }
+    val all = current?.let { it.pinned + it.others }.orEmpty()
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            if (selection.isSelecting) {
+                SelectionTopBar(count = selection.ids.size, onClose = selection::clear, onSelectAll = { selection.selectAll(all) })
+            } else {
+                Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                        Text("Edit albums", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
-                Text("Edit albums", style = MaterialTheme.typography.titleMedium)
+            }
+            if (current != null) {
+                AlbumEditList(
+                    pinned = current.pinned,
+                    others = current.others,
+                    selection = selection,
+                    onTogglePin = { viewModel.setPinned(listOf(it.album.bucketId), !it.pinned) },
+                    onToggleHidden = { viewModel.setHidden(listOf(it.album.bucketId), !it.hidden) },
+                    onReorder = viewModel::saveCustomOrder,
+                )
             }
         }
-        if (current != null) {
-            AlbumEditList(
-                pinned = current.pinned,
-                others = current.others,
-                onTogglePin = { viewModel.setPinned(it.album.bucketId, !it.pinned) },
-                onToggleHidden = { viewModel.setHidden(it.album.bucketId, !it.hidden) },
-                onReorder = viewModel::saveCustomOrder,
+        if (selection.isSelecting) {
+            AlbumSelectionBar(
+                entries = all.filter { it.album.bucketId in selection.ids },
+                onPin = { ids, pinned ->
+                    viewModel.setPinned(ids, pinned)
+                    selection.clear()
+                },
+                onHide = { ids, hidden ->
+                    viewModel.setHidden(ids, hidden)
+                    selection.clear()
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
@@ -85,6 +117,7 @@ fun EditAlbumsScreen(onBack: () -> Unit, viewModel: AlbumsViewModel = hiltViewMo
 private fun AlbumEditList(
     pinned: List<AlbumEntry>,
     others: List<AlbumEntry>,
+    selection: AlbumSelection,
     onTogglePin: (AlbumEntry) -> Unit,
     onToggleHidden: (AlbumEntry) -> Unit,
     onReorder: (List<Long>) -> Unit,
@@ -98,21 +131,25 @@ private fun AlbumEditList(
 
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(vertical = 8.dp),
+        // Room for the selection bar at the bottom.
+        contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
         modifier = Modifier.fillMaxSize().navigationBarsPadding(),
     ) {
         if (pinned.isNotEmpty()) {
             item(key = PINNED_HEADER) { SectionLabel("Pinned · in the order you pinned them") }
             items(pinned, key = { it.album.bucketId }) { entry ->
-                AlbumEditRow(entry, onTogglePin, onToggleHidden, dragHandle = null, modifier = Modifier.animateItem())
+                AlbumEditRow(entry, selection, onTogglePin, onToggleHidden, dragHandle = null, modifier = Modifier.animateItem())
             }
         }
-        item(key = OTHERS_HEADER) { SectionLabel(if (pinned.isEmpty()) "Drag to reorder" else "Albums · drag to reorder") }
+        item(key = OTHERS_HEADER) {
+            SectionLabel(if (pinned.isEmpty()) "Drag to reorder · long-press to select" else "Albums · drag to reorder")
+        }
         items(order, key = { it.album.bucketId }) { entry ->
             val id = entry.album.bucketId
             val dragging = drag.id == id
             AlbumEditRow(
                 entry = entry,
+                selection = selection,
                 onTogglePin = onTogglePin,
                 onToggleHidden = onToggleHidden,
                 dragHandle = Modifier.pointerInput(id) {
@@ -191,22 +228,42 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/** One album: thumbnail, name and count, pin and show/hide buttons, and a drag handle for unpinned albums. */
+/**
+ * One album: thumbnail, name and count, pin and show/hide buttons, and a drag handle for unpinned albums.
+ * Long-press selects it; while selecting, a tap toggles it and the per-row buttons make way for a check.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AlbumEditRow(
     entry: AlbumEntry,
+    selection: AlbumSelection,
     onTogglePin: (AlbumEntry) -> Unit,
     onToggleHidden: (AlbumEntry) -> Unit,
     dragHandle: Modifier?,
     modifier: Modifier = Modifier,
 ) {
     val thumbPx = with(LocalDensity.current) { RowThumb.roundToPx() }
-    Surface(color = MaterialTheme.colorScheme.background, modifier = modifier.fillMaxWidth()) {
+    val id = entry.album.bucketId
+    val selecting = selection.isSelecting
+    val haptic = LocalHapticFeedback.current
+    Surface(
+        color = if (id in selection.ids) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background,
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { if (selecting) selection.toggle(id) },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    selection.toggle(id)
+                },
+            ),
+    ) {
         Row(
-            Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (selecting) SelectionCheck(id in selection.ids)
             // Hidden albums are dimmed, but their buttons stay fully visible.
             val dim = if (entry.hidden) 0.4f else 1f
             MediaThumbnail(
@@ -223,6 +280,7 @@ private fun AlbumEditRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (selecting) return@Row
             IconButton(onClick = { onTogglePin(entry) }) {
                 Icon(
                     OrganizeIcons.Pin,

@@ -120,6 +120,7 @@ fun GalleryNavHost(
                         AlbumsScreen(
                             onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
                             onEditAlbums = { navController.navigate(EditAlbumsRoute) },
+                            onSelectionModeChange = { selectionActive = it },
                             contentBottomPadding = contentBottomPadding,
                         )
                     }
