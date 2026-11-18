@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Favorite
+import com.rohit.gallery.core.ui.components.FavoriteHeartRed
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,6 +98,7 @@ fun InfoPanel(
     modifier: Modifier = Modifier,
     bottomSpace: androidx.compose.ui.unit.Dp = 0.dp,
     onOpenAlbum: (() -> Unit)? = null,
+    onOpenFavorites: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var locationGranted by remember {
@@ -186,6 +189,23 @@ fun InfoPanel(
                             tint = muted,
                         )
                     }
+                }
+            }
+            // A favourite also links to Favourites.
+            if (onOpenFavorites != null) {
+                if (albumName == null && d?.folder == null) PanelDivider()
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onOpenFavorites)
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Favorite, contentDescription = null, tint = FavoriteHeartRed, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Text("Favourites", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Open favourites", tint = muted)
                 }
             }
         }

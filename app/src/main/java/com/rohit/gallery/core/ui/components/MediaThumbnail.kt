@@ -103,7 +103,7 @@ private fun FavoriteBadge(size: Dp, modifier: Modifier = Modifier) {
             tint = Color.Black.copy(alpha = 0.45f),
             modifier = Modifier.size(size + 3.dp),
         )
-        Icon(Icons.Filled.Favorite, contentDescription = null, tint = Color(0xFFFF4D6D), modifier = Modifier.size(size))
+        Icon(Icons.Filled.Favorite, contentDescription = null, tint = FavoriteHeartRed, modifier = Modifier.size(size))
     }
 }
 
@@ -148,3 +148,6 @@ private fun DurationBadge(durationMs: Long, showDuration: Boolean, modifier: Mod
         }
     }
 }
+
+/** The red of every favourite heart (grid badge, viewer button, details row). */
+val FavoriteHeartRed = Color(0xFFFF4D6D)

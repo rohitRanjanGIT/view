@@ -106,6 +106,7 @@ import coil3.request.ImageRequest
 import coil3.request.placeholder
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.data.mediastore.MediaTraits
+import com.rohit.gallery.core.ui.components.FavoriteHeartRed
 import com.rohit.gallery.core.ui.components.LocalThumbnailCache
 import com.rohit.gallery.core.ui.components.LocalViewerBackdrop
 import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
@@ -139,6 +140,7 @@ fun ViewerScreen(
     onBack: () -> Unit,
     onCurrentItemChanged: (Long?) -> Unit,
     onOpenAlbum: (bucketId: Long) -> Unit,
+    onOpenFavorites: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ViewerViewModel = hiltViewModel(),
 ) {
@@ -160,6 +162,7 @@ fun ViewerScreen(
             onBack = onBack,
             onCurrentItemChanged = onCurrentItemChanged,
             onOpenAlbum = onOpenAlbum,
+            onOpenFavorites = onOpenFavorites,
             viewModel = viewModel,
             modifier = modifier,
         )
@@ -173,6 +176,7 @@ private fun ViewerContent(
     onBack: () -> Unit,
     onCurrentItemChanged: (Long?) -> Unit,
     onOpenAlbum: (bucketId: Long) -> Unit,
+    onOpenFavorites: () -> Unit,
     viewModel: ViewerViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -334,7 +338,7 @@ private fun ViewerContent(
                             if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             if (favorite) "Remove from favourites" else "Add to favourites",
                             { write { viewModel.favoriteRequest(currentItem) } },
-                            tint = if (favorite) FavoriteRed else null,
+                            tint = if (favorite) FavoriteHeartRed else null,
                         ),
                     )
                 }
@@ -511,6 +515,7 @@ private fun ViewerContent(
                 onOpenAlbum = if (viewModel.isTrash || !canWrite || currentItem.bucketId == 0L) null else {
                     { onOpenAlbum(currentItem.bucketId) }
                 },
+                onOpenFavorites = if (currentItem.isFavorite && !viewModel.isTrash) onOpenFavorites else null,
                 scrollState = infoScroll,
                 bottomSpace = ActionBarHeight + 24.dp,
                 modifier = Modifier
@@ -727,7 +732,7 @@ private fun ViewerPage(
 
 private val MediaItem.isGif: Boolean get() = mimeType.equals("image/gif", ignoreCase = true)
 
-private val FavoriteRed = Color(0xFFFF4D6D)
+
 
 /** A video page: the cached thumbnail until the first frame is drawn, then the player surface. */
 @Composable
