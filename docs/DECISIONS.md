@@ -278,7 +278,7 @@ Non-obvious technical choices, newest last.
   stays still (`predictivePopEnterTransition = None`).
 - The viewer handles the gesture itself with `PredictiveBackHandler` (inner handlers win over the NavHost's): the
   photo shrinks to about 60 % (drag-down progress 0.9, so the background mostly fades and corners round) and
-  leans 96 dp towards the swiped edge, eased out so a short swipe already shows; chrome fades, and
+  leans 24 dp towards the swiped edge (mostly a centred shrink), eased out so a short swipe already shows; chrome fades, and
   releasing closes through the normal path, so the shared-element flight starts from where the photo is.
   Cancelling springs it back. Zoomed in or with details open, back keeps its old behaviour (zoom out / close
   details).

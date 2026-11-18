@@ -98,7 +98,7 @@ private val UpSwipeOpenDistance = 48.dp
 private const val BACK_MAX_PROGRESS = 0.9f
 
 /** How far the photo leans towards the swiped edge at the end of a back gesture. */
-private val BackLean = 96.dp
+private val BackLean = 24.dp
 
 /** Share of the screen height the details panel takes; the photo gets the rest. */
 private const val InfoPanelFraction = 0.46f
