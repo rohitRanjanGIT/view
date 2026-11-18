@@ -206,7 +206,8 @@ describes the project for GitHub; keep its Features / Status sections in step wh
   Merged manifests contain no `INTERNET` (re-check each build; Room/DataStore add only non-network permissions).
 - **Phase 3 done so far (all verified on my phone):** pinch density, album timelines, album organisation (pin /
   hide / sort / custom order / bulk select), Albums tab pinch, oldest-first albums, search, own back-gesture
-  animations (screens slide; viewer photo shrinks with the grid and a gap behind it), Edit via Google Photos.
+  animations (screens slide; viewer photo shrinks with the grid and a gap behind it).
+  Edit via Google Photos is built (`MediaActions.openInEditor`) but not yet tried on the phone.
 - **Phase 3 decisions:** no ML search for now. Settings is parked by me until later. Trash stays a flat grid.
 - **Next:** GIF / motion photo / Ultra HDR display, then Settings (parked by me). Own editor is planned for later.
 
