@@ -29,8 +29,6 @@ import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
@@ -75,7 +73,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -98,7 +95,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.asImage
 import coil3.compose.LocalPlatformContext
@@ -108,7 +104,6 @@ import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.data.mediastore.MediaTraits
 import com.rohit.gallery.core.ui.components.FavoriteHeartRed
 import com.rohit.gallery.core.ui.components.LocalThumbnailCache
-import com.rohit.gallery.core.ui.components.LocalViewerBackdrop
 import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
 import com.rohit.gallery.core.ui.components.thumbKey
 import kotlin.math.abs
@@ -142,7 +137,7 @@ fun ViewerScreen(
     onOpenAlbum: (bucketId: Long) -> Unit,
     onOpenFavorites: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ViewerViewModel = hiltViewModel(),
+    viewModel: ViewerViewModel,
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     val list = items
@@ -296,9 +291,6 @@ private fun ViewerContent(
         }
     }
     BackHandler(enabled = zoomed && !showInfo) { close() }
-    val backdropHolder = LocalViewerBackdrop.current
-    val backdrop = backdropHolder?.image
-    val gapColor = MaterialTheme.colorScheme.background
 
     // Favourite and trash go through the system's confirmation (skipped when "Skip confirmation" is allowed).
     val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -392,13 +384,7 @@ private fun ViewerContent(
     Box(
         modifier
             .fillMaxSize()
-            // While a gesture fades the black, the grid as it was when the viewer opened shows behind the photo.
-            // The photo's own cell is drawn empty there: it is the gap the photo flies back into.
-            .drawBehind {
-                if (backdrop == null || progress <= 0f) return@drawBehind
-                drawImage(backdrop, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()))
-                backdropHolder.cells[currentItem.id]?.let { cell -> drawRect(gapColor, topLeft = cell.topLeft, size = cell.size) }
-            }
+            // While a gesture fades the black, the grid underneath shows through, with a gap where this photo sits.
             .background(Color.Black.copy(alpha = dismissAlpha * (1f - 0.85f * progress))),
     ) {
         Box(

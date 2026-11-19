@@ -1,56 +1,68 @@
 package com.rohit.gallery.core.ui.components
 
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import com.rohit.gallery.core.ui.theme.GalleryMotion
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 
-val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
-
 /**
- * The media id currently taking part in the grid <-> viewer shared-element transition.
- * Only that one cell carries the shared-element modifier, so the other ~40 visible cells
- * stay as cheap as before.
+ * The photo a grid screen's viewer shows, for the grid underneath it. The viewer is drawn as a layer over the grid
+ * (the grid stays composed, so closing never has to rebuild it); this is how the two find each other.
  */
-val LocalSharedMediaId = compositionLocalOf<Long?> { null }
+interface SharedPhotoState {
+    /** The photo the viewer is showing or flying back with; null when there is no viewer. */
+    val activeId: Long?
 
-/**
- * The last item the viewer showed, for the grid that reappears when it closes: that grid scrolls the
- * item into view before its first frame, so you land on the photo you ended on (and the close flight
- * has a cell to fly to). A plain holder, not state: written by the viewer, taken once by the grid.
- */
-class ViewerReturnTarget {
-    var mediaId: Long? = null
+    /** True while the viewer is open (not while it closes): the grid then leaves a gap where [activeId] sits. */
+    val viewerShowing: Boolean
 
-    /** Returns the id and clears it, so only the first grid composed after the viewer uses it. */
-    fun take(): Long? = mediaId.also { mediaId = null }
+    /**
+     * True once the open flight has landed, until the viewer starts closing. The grid cell is not a shared element
+     * meanwhile: with both sides matched, the library keeps the photo's bounds from the end of the open flight and
+     * ignores the drag-down, so the close flight jumped back to full screen before gliding. Re-attached on close,
+     * the cell makes a fresh match that starts from where the finger let go.
+     */
+    val viewerSettled: Boolean
 }
 
-val LocalViewerReturnTarget = staticCompositionLocalOf { ViewerReturnTarget() }
+/** The viewer state of the screen this grid is on; null where no viewer can open (or the viewer itself). */
+val LocalSharedPhoto = staticCompositionLocalOf<SharedPhotoState?> { null }
 
-/** Marks this composable as the shared element for [mediaId] if a transition is in progress for it. */
+/**
+ * Marks this composable as the shared element for [mediaId] while a viewer shows it. On the grid side ([viewerSide]
+ * false) only the cell of the viewer's photo carries the modifier, so the other ~40 visible cells stay as cheap as
+ * before; that cell is visible while the viewer is not, and the photo flies between the two when this flips.
+ */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun Modifier.mediaSharedElement(mediaId: Long, force: Boolean = false): Modifier {
-    if (!force && LocalSharedMediaId.current != mediaId) return this
+fun Modifier.mediaSharedElement(mediaId: Long, viewerSide: Boolean = false): Modifier {
+    val photo = LocalSharedPhoto.current ?: return this
     val transitionScope = LocalSharedTransitionScope.current ?: return this
-    val visibilityScope = LocalAnimatedVisibilityScope.current ?: return this
+    // Only the matching cell recomposes when the viewer moves to another photo.
+    val shared by remember(photo, mediaId) { derivedStateOf { photo.activeId == mediaId } }
+    if (!viewerSide && !shared) return this
+    val visible = if (viewerSide) photo.viewerShowing else !photo.viewerShowing
+    val base = if (viewerSide) this else this.graphicsLayer { alpha = if (photo.viewerShowing) 0f else 1f }
+    if (!viewerSide && photo.viewerSettled) return base
     return with(transitionScope) {
-        this@mediaSharedElement.sharedElement(
+        base.sharedElementWithCallerManagedVisibility(
             sharedContentState = rememberSharedContentState(key = "media-$mediaId"),
-            animatedVisibilityScope = visibilityScope,
+            visible = visible,
             // Shrinking (viewer -> grid) is the close; it glides a little longer than the open.
             boundsTransform = { initial, target ->
                 if (initial.width > target.width) GalleryMotion.sharedBoundsClosing() else GalleryMotion.sharedBounds()
@@ -67,42 +79,26 @@ fun Modifier.mediaSharedElement(mediaId: Long, force: Boolean = false): Modifier
 @Composable
 fun rememberSharedTransitionActive(): () -> Boolean {
     val scope = LocalSharedTransitionScope.current
-    return androidx.compose.runtime.remember(scope) { { scope?.isTransitionActive == true } }
+    return remember(scope) { { scope?.isTransitionActive == true } }
 }
 
-/**
- * A picture of the screen taken as the viewer opens. The grid itself is not drawn while the viewer is open, so
- * this is what shows behind the photo when a back or drag-down gesture fades the viewer's black background.
- * Cleared once the viewer is gone.
- */
-class ViewerBackdrop {
-    var image by mutableStateOf<ImageBitmap?>(null)
-
-    /** Where each photo visible in [image] sits on screen (window coordinates), taken together with it. */
-    var cells: Map<Long, Rect> = emptyMap()
-
-    /** Set by the grid on screen: reports where its visible photos are, for [cells]. */
-    var locator: (() -> Map<Long, Rect>)? = null
-
-    /** Takes the cell positions now; call right before capturing [image]. */
-    fun takeCells() {
-        cells = locator?.invoke().orEmpty()
-    }
-}
+/** How long the viewer must rest on a photo before the grid underneath scrolls to it. */
+private const val FOLLOW_DELAY_MS = 350L
 
 /**
- * Registers [visibleCells] as the screen's cell locator while this grid is composed, so the viewer can leave a gap
- * where the photo it shows sits in the grid behind it.
+ * Keeps the viewer's photo in view in the grid underneath, so a close always has a cell to fly into and a drag-down
+ * shows the right part of the grid. [scrollTo] should scroll only when the photo is not already fully visible.
+ * Waits until the viewer rests on a photo (paging stays smooth); on close it runs at once.
  */
 @Composable
-fun RegisterViewerCells(visibleCells: () -> Map<Long, Rect>) {
-    val backdrop = LocalViewerBackdrop.current ?: return
-    val latest = androidx.compose.runtime.rememberUpdatedState(visibleCells)
-    androidx.compose.runtime.DisposableEffect(backdrop) {
-        val locator: () -> Map<Long, Rect> = { latest.value() }
-        backdrop.locator = locator
-        onDispose { if (backdrop.locator === locator) backdrop.locator = null }
+fun FollowViewerPhoto(scrollTo: suspend (mediaId: Long) -> Unit) {
+    val photo = LocalSharedPhoto.current ?: return
+    val latest by rememberUpdatedState(scrollTo)
+    LaunchedEffect(photo) {
+        snapshotFlow { photo.activeId to photo.viewerShowing }.collectLatest { (id, showing) ->
+            if (id == null) return@collectLatest
+            if (showing) delay(FOLLOW_DELAY_MS)
+            latest(id)
+        }
     }
 }
-
-val LocalViewerBackdrop = staticCompositionLocalOf<ViewerBackdrop?> { null }

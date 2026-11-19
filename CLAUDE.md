@@ -209,6 +209,13 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   oldest-first albums, search, own back-gesture animations, Edit hand-off to Google Photos, GIF / motion photo /
   Ultra HDR, Settings, the viewer redesign, favourite hearts, tabs that slide with the finger.
 - **Decisions:** no ML search for now. Trash stays a flat grid. Own editor later (Edit hands off to Google Photos).
+- **Committed and pushed, not yet tried by me (2026-11-19): viewer as an overlay over the grid.** Build clean,
+  unit tests pass, verified with a 10x recording (swipe-down glides from the release point into the cell). Still to
+  check with me on the phone: swipe-down from Pictures (also after paging to
+  another photo); open/close from an album, Favourites, Search; close with back gesture and the ← button; details
+  panel → album row → back (viewer should still be open). Files: `navigation/ViewerOverlay.kt` (new),
+  `GalleryNavHost.kt`, `SharedTransition.kt`, `ViewerViewModel.kt`, `ViewerScreen.kt`, `SharedFlight.kt`,
+  `TimelineScreen.kt`, `MediaGrid.kt`, `Motion.kt` (close 380 ms). See DECISIONS "Viewer overlay".
 - **Next (pick with me):**
   1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes
      after sharing). Proposed 2026-11-18; my answers on notification vs in-app card, delay (5 min suggested), and
@@ -231,8 +238,13 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   bubble, search button on the pinned header, return-to-photo after the viewer closes (`ViewerReturnTarget`).
 - **Viewer** (`feature/viewer/`):
   - Pager, Telephoto zoom (double-tap-and-drag zoom works: `DismissGestures` ignores the second press of a
-    double-tap), shared-element open 180 ms / close 250 ms decelerating (`GalleryMotion`, chosen by direction in
-    `mediaSharedElement`), drag-to-dismiss into the grid cell, own back gesture over a picture of the grid.
+    double-tap), shared-element open 180 ms / close 380 ms eased (`GalleryMotion`, chosen by direction in
+    `mediaSharedElement`), drag-to-dismiss into the grid cell, own back gesture with the live grid behind.
+  - **The viewer is a layer, not a screen** (see "Where we are"): every `topLevel` destination hosts a
+    `ViewerHost` + `ViewerOverlay` drawn over its own grid, so the grid stays composed. `ViewerRoute` remains a nav
+    destination only for external intents. `ViewerViewModel` is assisted-injected with its route
+    (`rememberViewerViewModelFactory`), its store is `ViewerSessions` (entry-scoped, cleared when a visit closes).
+    Grids follow the viewer's photo with `FollowViewerPhoto` (scroll it into view underneath).
   - Chrome (`ViewerChrome.kt`): two-line date top bar (Today / Yesterday / date over time) with a dark tall fade and a
     ⋮ menu (Use as, Open with: read-only hand-offs); bottom bar: Share circle, Favourite / Edit / Trash pill, Details
     circle (Trash viewer: Restore / Delete forever). Play pill above the filmstrip for motion photos (clip plays once)
@@ -297,6 +309,12 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   `-p` PNG takes ~1.3 s) into `/data/local/tmp` (not `/sdcard`, which would add files to the gallery), pull, and
   stitch a contact sheet with a small PowerShell + inline C# script (`System.Drawing`). Restore the scale after.
 - **Timing:** temporary `Log.d` lines read with `adb logcat -d -s <TAG>:D`; remove them before committing.
+- **Frame timing (jank):** `adb shell dumpsys gfxinfo com.rohit.gallery reset`, I do the gesture, then
+  `dumpsys gfxinfo com.rohit.gallery framestats`; per frame use `FrameCompleted - IntendedVsync` and the gap between
+  `IntendedVsync`s (read columns by header name). A 10x recording hides stalls (0.3 s is tiny next to a 3.8 s
+  animation), so check feel problems at the real 0.7 scale with framestats first.
+- I can drive the viewer myself for a recording when I say so: one `input tap` to open a photo (view only), then
+  one `input motionevent DOWN/MOVE.../UP` swipe while an on-device `screencap` loop runs in the background.
 
 ### Gotchas learned (do not re-learn these)
 - **JAVA_HOME** may be unset in the shell: `export JAVA_HOME="C:/Program Files/Android/Android Studio/jbr"`
@@ -314,9 +332,14 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 - Sticky headers ignore `contentPadding`: inset the list with `windowInsetsPadding` instead.
 - One-shot UI commands (like a fast-scroll drag target) go through a conflated `Channel`, not state: state is
   re-applied whenever its effect restarts (that caused the "grid jumps back" glitch).
-- Shared elements: only the tapped cell and the viewer's current page carry the shared modifier. Drag-dismiss moves
-  the flight frame by *layout* (`FlightPlacement`), because the flight starts from layout bounds and ignores
-  graphics-layer transforms.
+- Shared elements: only the viewer's photo cell and the viewer's current page carry the shared modifier
+  (`sharedElementWithCallerManagedVisibility`, visibility = viewer showing or not). Drag-dismiss moves the flight
+  frame by *layout* (`FlightPlacement`), because the flight starts from layout bounds and ignores graphics-layer
+  transforms. **The grid cell must not stay matched while the viewer is idle** (`viewerSettled`): with an active
+  match the library keeps the bounds from the end of the open flight and ignores the drag, so the close flight
+  jumped back to full screen. Re-attaching the cell at close makes a fresh match from the release point.
+- Rebuilding a grid destination costs ~170-235 ms in a debug build (all three Home pages + LazyColumn subcompose);
+  any animation started in that frame loses that much of its time. Keep grids composed instead of rebuilding them.
 - Coil memory-cache hits for the viewer need the same request Telephoto builds: page size, `Precision.INEXACT`,
   `maxBitmapSize(Size.ORIGINAL)`.
 - Don't run `python`/`python3` in the shell (hangs). `.gitignore` must use `build/` (not `/build`).

@@ -4,10 +4,8 @@ import android.content.Intent
 import android.content.IntentSender
 import android.net.Uri
 import android.provider.MediaStore
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import com.rohit.gallery.core.data.mediastore.ExternalMediaResolver
 import com.rohit.gallery.core.data.mediastore.MediaDetails
 import com.rohit.gallery.core.data.mediastore.MediaInfoLoader
@@ -24,9 +22,17 @@ import com.rohit.gallery.core.data.mediastore.MediaTraitsReader
 import com.rohit.gallery.feature.search.SearchIndex
 import com.rohit.gallery.feature.search.parseSearchNow
 import com.rohit.gallery.navigation.ViewerRoute
-import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import java.time.ZoneId
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -51,10 +57,13 @@ private sealed interface ExternalTarget {
     data class Single(val item: MediaItem?) : ExternalTarget
 }
 
+/**
+ * One viewer session. Created with its [route] (see [rememberViewerViewModelFactory]) rather than from navigation
+ * arguments, because the viewer is a layer over the grid screen it was opened from, not a screen of its own.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class ViewerViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+class ViewerViewModel @AssistedInject constructor(
+    @Assisted private val route: ViewerRoute,
     private val repository: MediaRepository,
     private val source: MediaStoreDataSource,
     private val traitsReader: MediaTraitsReader,
@@ -64,8 +73,6 @@ class ViewerViewModel @Inject constructor(
     private val externalResolver: ExternalMediaResolver,
     val playbackPositions: PlaybackPositionStore,
 ) : ViewModel() {
-
-    private val route = savedStateHandle.toRoute<ViewerRoute>()
 
     /** True when another app opened this viewer; closing it finishes the activity. */
     val isExternal: Boolean = route.externalUri != null
@@ -208,4 +215,22 @@ class ViewerViewModel @Inject constructor(
         /** How long an external MediaStore URI may wait for the index before it is shown on its own. */
         const val INDEX_WAIT_MS = 2_000L
     }
+}
+
+@AssistedFactory
+interface ViewerViewModelFactory {
+    fun create(route: ViewerRoute): ViewerViewModel
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface ViewerViewModelEntryPoint {
+    fun viewerViewModelFactory(): ViewerViewModelFactory
+}
+
+/** Makes [ViewerViewModel]s for a route, with their dependencies from Hilt. */
+@Composable
+fun rememberViewerViewModelFactory(): ViewerViewModelFactory {
+    val app = LocalContext.current.applicationContext
+    return remember(app) { EntryPointAccessors.fromApplication(app, ViewerViewModelEntryPoint::class.java).viewerViewModelFactory() }
 }

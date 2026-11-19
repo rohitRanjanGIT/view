@@ -34,8 +34,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -47,9 +45,8 @@ import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.GridGeometry
 import com.rohit.gallery.core.ui.components.GridZoomState
 import com.rohit.gallery.core.ui.components.KeepGridZoomAnchor
-import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
+import com.rohit.gallery.core.ui.components.FollowViewerPhoto
 import com.rohit.gallery.core.ui.components.MediaThumbnail
-import com.rohit.gallery.core.ui.components.RegisterViewerCells
 import com.rohit.gallery.core.ui.components.ZoomAnchorCell
 import com.rohit.gallery.core.ui.components.ZoomOverlay
 import com.rohit.gallery.core.ui.components.mediaSharedElement
@@ -95,19 +92,17 @@ fun SelectableMediaGrid(
     val cellWidth = (windowWidthPx - gapPx * (columns - 1)) / columns
     val cellPx = cellWidth.toInt()
 
-    // Back from the viewer: bring the item it ended on into view before the first frame (see ViewerReturnTarget).
-    val returnTarget = LocalViewerReturnTarget.current
+    // While the viewer is open over this grid, keep its photo in view underneath (see FollowViewerPhoto).
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
     val statusBarPx = WindowInsets.statusBars.getTop(density)
-    remember {
-        val id = returnTarget.take() ?: return@remember
-        val gridIndex = (indexById[id] ?: return@remember) + if (header != null) 1 else 0
+    FollowViewerPhoto { id ->
+        val gridIndex = (indexById[id] ?: return@FollowViewerPhoto) + if (header != null) 1 else 0
         // Rows that fit fully between the title bar and the bottom padding (an estimate is enough here).
         val chromePx = with(density) { (ReturnChromeHeight + 96.dp).roundToPx() } + statusBarPx
         val fullRows = ((windowHeightPx - chromePx) / cellPx.coerceAtLeast(1) - 1).coerceAtLeast(1)
         val first = gridState.firstVisibleItemIndex
         if (gridIndex < first || gridIndex >= first + fullRows * columns) {
-            gridState.requestScrollToItem((gridIndex - columns * (fullRows / 2)).coerceAtLeast(0))
+            gridState.scrollToItem((gridIndex - columns * (fullRows / 2)).coerceAtLeast(0))
         }
     }
 
@@ -150,23 +145,6 @@ fun SelectableMediaGrid(
         ),
         indexOf = { indexById[it] },
     )
-
-    // Where the visible photos are on screen, for the viewer's backdrop (it leaves a gap at the open photo).
-    val gridOrigin = remember { object { var value = Offset.Zero } }
-    RegisterViewerCells {
-        val info = gridState.layoutInfo
-        val origin = gridOrigin.value
-        val visibleBottom = origin.y + info.viewportSize.height - info.afterContentPadding
-        val cells = HashMap<Long, Rect>()
-        info.visibleItemsInfo.forEach { cell ->
-            val id = cell.key as? Long ?: return@forEach
-            val left = origin.x + cell.offset.x
-            val top = origin.y + cell.offset.y
-            val rect = Rect(left, maxOf(top, origin.y), left + cell.size.width, minOf(top + cell.size.height, visibleBottom))
-            if (rect.height > 0f) cells[id] = rect
-        }
-        cells
-    }
 
     val pointer = remember { object { var position: Offset? = null } }
     var dragActive by remember { mutableStateOf(false) }
@@ -223,7 +201,6 @@ fun SelectableMediaGrid(
             contentPadding = PaddingValues(bottom = 96.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .onPlaced { gridOrigin.value = it.positionInWindow() }
                 .zoomLayer(zoom)
                 // Records the grid as it draws, so a column switch can snapshot the old grid.
                 .drawWithContent {

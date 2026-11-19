@@ -62,7 +62,7 @@ fun SharedFlightFrame(
             modifier = Modifier
                 .aspectRatio(bitmap.width.toFloat() / bitmap.height)
                 .then(if (placement != null) Modifier.flightPlacement(placement) else Modifier)
-                .mediaSharedElement(item.id, force = true)
+                .mediaSharedElement(item.id, viewerSide = true)
                 .graphicsLayer { alpha = if (transitionActive()) 1f else 0f },
         )
     }

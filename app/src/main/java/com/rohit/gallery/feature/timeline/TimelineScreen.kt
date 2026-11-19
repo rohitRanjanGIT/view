@@ -39,7 +39,6 @@ import com.rohit.gallery.core.ui.components.ZoomAnchorCell
 import com.rohit.gallery.core.ui.components.ZoomOverlay
 import com.rohit.gallery.core.ui.components.pinchToZoom
 import com.rohit.gallery.core.ui.components.zoomLayer
-import com.rohit.gallery.core.ui.components.LocalViewerReturnTarget
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.util.Locale
 import kotlinx.coroutines.channels.Channel
@@ -69,8 +68,6 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -86,7 +83,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.MediaThumbnail
-import com.rohit.gallery.core.ui.components.RegisterViewerCells
+import com.rohit.gallery.core.ui.components.FollowViewerPhoto
 import com.rohit.gallery.core.ui.components.mediaSharedElement
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import com.rohit.gallery.feature.selection.SelectionActionsBar
@@ -227,7 +224,7 @@ fun TimelineGrid(
         if (underStatusBar) 0 else with(density) { SecondaryTitleBarHeight.roundToPx() }
     val visiblePx = LocalWindowInfo.current.containerSize.height -
         topChromePx - with(density) { contentBottomPadding.roundToPx() }
-    ScrollToReturnedItem(listState, content, scrollMap, headerPx, rowPx, visiblePx)
+    FollowViewerItem(listState, content, scrollMap, headerPx, rowPx, visiblePx)
 
     val zoom = remember { GridZoomState() }
     val gridLayer = rememberGraphicsLayer()
@@ -267,29 +264,6 @@ fun TimelineGrid(
             y = (row.offset - info.viewportStartOffset + cellSizePx / 2).toFloat(),
         )
         return ZoomAnchorCell(items[column].id, centre)
-    }
-
-    // Where the visible photos are on screen, for the viewer's backdrop (it leaves a gap at the open photo).
-    // Cells under the pinned day header or the bottom padding are cut to what is actually visible.
-    val listOrigin = remember { object { var value = Offset.Zero } }
-    RegisterViewerCells {
-        val info = listState.layoutInfo
-        val origin = listOrigin.value
-        val visibleTop = origin.y + headerPx
-        val visibleBottom = origin.y + info.viewportSize.height - info.afterContentPadding
-        val cells = HashMap<Long, Rect>()
-        info.visibleItemsInfo.forEach { row ->
-            val key = row.key as? String ?: return@forEach
-            if (!key.startsWith(ROW_KEY_PREFIX)) return@forEach
-            val items = currentContent.rowsByFirstId[key.removePrefix(ROW_KEY_PREFIX).toLongOrNull()] ?: return@forEach
-            val top = origin.y + row.offset - info.viewportStartOffset
-            items.forEachIndexed { column, item ->
-                val left = origin.x + column * (cellSizePx + gapPx)
-                val rect = Rect(left, maxOf(top, visibleTop), left + cellSizePx, minOf(top + cellSizePx, visibleBottom))
-                if (rect.height > 0f) cells[item.id] = rect
-            }
-        }
-        cells
     }
 
     // While drag-selecting, scroll when the finger is near the top or bottom edge. The pointer
@@ -352,7 +326,6 @@ fun TimelineGrid(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .onPlaced { listOrigin.value = it.positionInWindow() }
             .zoomLayer(zoom)
             // Records the grid into a layer as it draws, so a density switch can snapshot the old grid.
             .drawWithContent {
@@ -412,12 +385,11 @@ fun TimelineGrid(
 }
 
 /**
- * When this grid reappears after the viewer closes, scrolls the photo the viewer ended on into view
- * (centered) unless it is already fully visible. Runs once, during the first composition, through
- * [LazyListState.requestScrollToItem], so the very first frame is already in place for the close flight.
+ * While the viewer is open over this grid, keeps the photo it shows in view underneath (centered) unless it is
+ * already fully visible, so the close flight always has a cell to land in (see [FollowViewerPhoto]).
  */
 @Composable
-private fun ScrollToReturnedItem(
+private fun FollowViewerItem(
     listState: LazyListState,
     content: TimelineUiState.Content,
     map: TimelineScrollMap,
@@ -425,21 +397,30 @@ private fun ScrollToReturnedItem(
     rowPx: Int,
     visiblePx: Int,
 ) {
-    val returnTarget = LocalViewerReturnTarget.current
-    remember {
-        val id = returnTarget.take() ?: return@remember
-        val itemIndex = content.indexById[id] ?: return@remember
-        val rowIndex = lazyRowIndexOf(content.days, itemIndex) ?: return@remember
-        val rowTop = map.offsetOf(rowIndex, 0)
-        val top = map.offsetOf(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+    val latest by rememberUpdatedState(FollowGeometry(content, map, headerPx, rowPx, visiblePx))
+    FollowViewerPhoto { id ->
+        val g = latest
+        val itemIndex = g.content.indexById[id] ?: return@FollowViewerPhoto
+        val rowIndex = lazyRowIndexOf(g.content.days, itemIndex) ?: return@FollowViewerPhoto
+        val rowTop = g.map.offsetOf(rowIndex, 0)
+        val top = g.map.offsetOf(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
         // The pinned day header covers the top of the list.
-        val fullyVisible = rowTop >= top + headerPx && rowTop + rowPx <= top + visiblePx
+        val fullyVisible = rowTop >= top + g.headerPx && rowTop + g.rowPx <= top + g.visiblePx
         if (!fullyVisible) {
-            val (index, offset) = map.positionAt((rowTop - (visiblePx - rowPx) / 2).coerceAtLeast(0L))
-            listState.requestScrollToItem(index, offset)
+            val (index, offset) = g.map.positionAt((rowTop - (g.visiblePx - g.rowPx) / 2).coerceAtLeast(0L))
+            listState.scrollToItem(index, offset)
         }
     }
 }
+
+/** What [FollowViewerItem] needs from the latest composition. */
+private class FollowGeometry(
+    val content: TimelineUiState.Content,
+    val map: TimelineScrollMap,
+    val headerPx: Int,
+    val rowPx: Int,
+    val visiblePx: Int,
+)
 
 /** Fast-scroll handle for the timeline, with the month under the handle in a bubble while dragging. */
 @Composable
