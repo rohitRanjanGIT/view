@@ -159,6 +159,8 @@ fun rememberReachState(): ReachState = rememberSaveable(saver = ReachState.Saver
  * that the grid can't use (pulling down at its top) moves it down, and a push up first brings it back up.
  * [title] and [subtitle] show in the space above it, and [actions] (the screen's icons) in a row just above the grid.
  * [topInset] is how far below this area's top the grid's own content starts (the status bar, for Pictures).
+ * [actionsOffset] moves the icon row down from its place just above the grid (Pictures puts it on the first day
+ * header's line, where its search icon sits when the grid is up).
  */
 @Composable
 fun ReachDown(
@@ -168,6 +170,7 @@ fun ReachDown(
     topInset: Dp = 0.dp,
     state: ReachState = rememberReachState(),
     actions: (@Composable RowScope.() -> Unit)? = null,
+    actionsOffset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -235,7 +238,7 @@ fun ReachDown(
         Box(Modifier.fillMaxSize().offset { IntOffset(0, state.offset.roundToInt()) }) { content() }
         // Drawn over the grid: on Pictures the grid's own background reaches up under the icon row.
         ReachTitle(title, subtitle, state, topInset)
-        if (actions != null) ReachActions(state, topInset, actions)
+        if (actions != null) ReachActions(state, topInset + actionsOffset, actions)
     }
 }
 

@@ -167,6 +167,8 @@ private fun TimelineContent(
                         topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                         state = reach,
                         actions = { if (!selecting) SearchIcon(onOpenSearch) },
+                        // On the "Today" line, as when the grid is up (a 48 dp icon row centred on the day header).
+                        actionsOffset = DayHeaderHeight / 2 + 24.dp,
                     ) {
                         TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
                     }
