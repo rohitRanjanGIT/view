@@ -80,6 +80,7 @@ fun SelectableMediaGrid(
 ) {
     val gridState = rememberLazyGridState()
     val haptic = LocalHapticFeedback.current
+    val press = rememberGridPressState()
     val scope = rememberCoroutineScope()
     val currentList by rememberUpdatedState(list)
     val indexById = remember(list) { HashMap<Long, Int>(list.size * 2).also { m -> list.forEachIndexed { i, it -> m[it.id] = i } } }
@@ -230,6 +231,8 @@ fun SelectableMediaGrid(
                         pointer.position = null
                         selection.endDrag()
                     },
+                    onPress = { pos, untilLongPressMs -> itemAt(pos)?.let { press.press(it.item.id, untilLongPressMs) } },
+                    onPressEnd = { press.release() },
                 ),
         ) {
             if (header != null) item(key = HEADER_KEY, span = { GridItemSpan(maxLineSpan) }) {
@@ -241,7 +244,7 @@ fun SelectableMediaGrid(
                 )
             }
             items(list, key = { it.id }) { item ->
-                Box(Modifier.aspectRatio(1f).mediaSharedElement(item.id)) {
+                Box(Modifier.aspectRatio(1f).pressScale(press, item.id).mediaSharedElement(item.id)) {
                     MediaThumbnail(item, cellPx, Modifier.fillMaxSize())
                     if (selection.isSelecting) {
                         SelectionCheck(item.id in selection.ids, Modifier.align(Alignment.TopStart).padding(6.dp))

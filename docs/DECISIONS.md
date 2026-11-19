@@ -367,3 +367,9 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   this too instead of nothing) and pulling a swipe-down photo back above its start. `rubberBandInverse` lets a drag
   resume from a stretched position without a jump. Grids, pagers and the filmstrip already had Android's stretch
   overscroll, and pinch past 2 columns / month view already resisted, so they were left as they are.
+- **Press feedback on grid cells** (item 5): cells had none (one custom gesture detector, no `clickable`). Now
+  `gridGestures` reports a press after the finger rests 70 ms (a scroll view's content-touch delay, so starting a
+  scroll never flashes a cell); the cell then sinks towards 0.92 over the rest of the long-press wait (a hint that
+  a long-press is coming) and springs back with a little give when the touch becomes a tap, scroll or long-press.
+  `GridPressState` holds the pressed id and one `Animatable`; cells read it only inside `graphicsLayer`, so pressing
+  never recomposes the grid. Buttons, menu rows and album cards keep Android's ripple (familiar platform feedback).

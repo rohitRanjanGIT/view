@@ -91,6 +91,9 @@ import com.rohit.gallery.feature.selection.SelectionCheck
 import com.rohit.gallery.feature.selection.SelectionState
 import com.rohit.gallery.feature.selection.SelectionTopBar
 import com.rohit.gallery.feature.selection.gridGestures
+import com.rohit.gallery.feature.selection.GridPressState
+import com.rohit.gallery.feature.selection.pressScale
+import com.rohit.gallery.feature.selection.rememberGridPressState
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -232,6 +235,7 @@ fun TimelineGrid(
 
     val currentContent by rememberUpdatedState(content)
     val haptic = LocalHapticFeedback.current
+    val press = rememberGridPressState()
     val scope = rememberCoroutineScope()
 
     /** The cell under [position] (this list's coordinates), or null on a header, gap or empty space. */
@@ -355,6 +359,8 @@ fun TimelineGrid(
                     pointer.position = null
                     selection.endDrag()
                 },
+                onPress = { pos, untilLongPressMs -> itemAt(pos)?.let { press.press(it.item.id, untilLongPressMs) } },
+                onPressEnd = { press.release() },
             ),
         contentPadding = PaddingValues(bottom = contentBottomPadding),
     ) {
@@ -368,7 +374,7 @@ fun TimelineGrid(
                 key = { row -> rowKey(row) },
                 contentType = { "row" },
             ) { row ->
-                ThumbnailRow(row, columns, cellSizePx, selection)
+                ThumbnailRow(row, columns, cellSizePx, selection, press)
             }
         }
     }
@@ -502,7 +508,7 @@ private fun DayHeader(label: String) {
 }
 
 @Composable
-private fun ThumbnailRow(row: List<MediaItem>, columns: Int, cellSizePx: Int, selection: SelectionState) {
+private fun ThumbnailRow(row: List<MediaItem>, columns: Int, cellSizePx: Int, selection: SelectionState, press: GridPressState) {
     val selecting = selection.isSelecting
     Row(
         modifier = Modifier
@@ -514,6 +520,7 @@ private fun ThumbnailRow(row: List<MediaItem>, columns: Int, cellSizePx: Int, se
             val cellModifier = Modifier
                 .weight(1f)
                 .aspectRatio(1f)
+                .pressScale(press, item.id)
                 .mediaSharedElement(item.id)
             if (selecting) {
                 SelectableThumbnail(item, cellSizePx, selection, cellModifier)
