@@ -49,30 +49,21 @@ fun rememberAlbumSelection(): AlbumSelection = rememberSaveable(saver = AlbumSel
 
 /**
  * Bulk actions for the selected albums. Each button reverses when it already applies to all of them:
- * Pin becomes Unpin when every selected album is pinned, Hide becomes Show when every one is hidden.
+ * Pin becomes Unpin when every selected album is pinned.
  * [entries] are the selected albums in display order (a bulk pin keeps that order).
  */
 @Composable
 fun AlbumSelectionBar(
     entries: List<AlbumEntry>,
     onPin: (ids: List<Long>, pinned: Boolean) -> Unit,
-    onHide: (ids: List<Long>, hidden: Boolean) -> Unit,
     onLock: ((ids: List<Long>) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val ids = entries.map { it.album.bucketId }
     val enabled = entries.isNotEmpty()
     val allPinned = enabled && entries.all { it.pinned }
-    val allHidden = enabled && entries.all { it.hidden }
     FloatingActionPill(modifier) {
         ActionItem(OrganizeIcons.Pin, if (allPinned) "Unpin" else "Pin", enabled, { onPin(ids, !allPinned) }, Modifier.pillSlot())
-        ActionItem(
-            if (allHidden) OrganizeIcons.Visible else OrganizeIcons.Hidden,
-            if (allHidden) "Show" else "Hide",
-            enabled,
-            { onHide(ids, !allHidden) },
-            Modifier.pillSlot(),
-        )
         if (onLock != null) ActionItem(Icons.Filled.Lock, "Lock", enabled, { onLock(ids) }, Modifier.pillSlot())
     }
 }

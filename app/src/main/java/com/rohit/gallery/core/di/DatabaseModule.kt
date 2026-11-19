@@ -7,8 +7,6 @@ import com.rohit.gallery.core.data.db.GalleryDatabase
 import com.rohit.gallery.core.data.db.VaultDao
 import com.rohit.gallery.core.data.vault.VaultStorage
 import java.io.File
-import com.rohit.gallery.core.data.repository.HiddenAlbums
-import com.rohit.gallery.core.data.repository.RoomHiddenAlbums
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -35,11 +33,4 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideVaultStorage(@ApplicationContext context: Context): VaultStorage = VaultStorage(File(context.filesDir, "vault"))
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class HiddenAlbumsModule {
-    @Binds
-    abstract fun bindHiddenAlbums(impl: RoomHiddenAlbums): HiddenAlbums
 }

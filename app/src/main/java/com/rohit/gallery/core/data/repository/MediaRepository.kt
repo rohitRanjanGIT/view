@@ -12,9 +12,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -41,24 +38,12 @@ sealed interface MediaIndexState {
 @Singleton
 class MediaRepository @Inject constructor(
     private val source: MediaSource,
-    hiddenAlbums: HiddenAlbums,
     @ApplicationScope scope: CoroutineScope,
 ) {
     private val _state = MutableStateFlow<MediaIndexState>(MediaIndexState.Loading)
 
-    /** Everything in MediaStore, hidden albums included (for album management and the album picker). */
-    val allState: StateFlow<MediaIndexState> = _state.asStateFlow()
-
-    /**
-     * What the app shows: the index without the albums the user hid. Waits for the hidden list before the
-     * first Ready, so hidden photos never flash on start.
-     */
-    val state: StateFlow<MediaIndexState> = combine(_state, hiddenAlbums.bucketIds) { index, hidden ->
-        when {
-            index !is MediaIndexState.Ready || hidden.isEmpty() -> index
-            else -> MediaIndexState.Ready(index.items.filterNot { it.bucketId in hidden })
-        }
-    }.stateIn(scope, SharingStarted.Eagerly, MediaIndexState.Loading)
+    /** Everything in MediaStore (photos moved into Locked are no longer there). */
+    val state: StateFlow<MediaIndexState> = _state.asStateFlow()
 
     private val refreshRequests = Channel<Unit>(Channel.CONFLATED)
 

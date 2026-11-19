@@ -151,6 +151,8 @@ fun GalleryNavHost(
                                 )
                                 1 -> AlbumsScreen(
                                     onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
+                                    // The only way in: pull down on Albums and hold for 2 seconds.
+                                    onOpenLocked = { navController.navigate(VaultRoute) },
                                     onEditAlbums = { navController.navigate(EditAlbumsRoute) },
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
@@ -159,7 +161,6 @@ fun GalleryNavHost(
                                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
                                     onOpenVideos = { navController.navigate(VideosRoute) },
                                     onOpenTrash = { navController.navigate(TrashRoute) },
-                                    onOpenLocked = { navController.navigate(VaultRoute) },
                                     onOpenSettings = { navController.navigate(SettingsRoute) },
                                     modifier = Modifier.padding(bottom = contentBottomPadding),
                                 )

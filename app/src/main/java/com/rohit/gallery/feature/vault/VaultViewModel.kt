@@ -33,7 +33,7 @@ class VaultViewModel @Inject constructor(
 
     /** Locked items grouped by the album they were locked from, newest album first. */
     val albums: StateFlow<List<AlbumEntry>?> = vault.items
-        .map { list -> list?.let { buildAlbums(it).map { album -> AlbumEntry(album, hidden = false, pinned = false) } } }
+        .map { list -> list?.let { buildAlbums(it).map { album -> AlbumEntry(album, pinned = false) } } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Photo selection (the Photos page and an album's page share it; it is cleared when switching). */

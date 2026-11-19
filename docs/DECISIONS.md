@@ -487,3 +487,12 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   or Back closes it. Own `draggable` with 1:1 tracking, rubber band past open, projection on release. The grid's
   columns are not squeezed: grids size cells from the window width, and re-laying them out during the drag would
   cost frames.
+
+## Hidden albums merged into Locked (2026-11-19, user's call)
+- Hidden albums are gone: no Hide / Show action, nothing in Edit albums, no filtering. `MediaRepository` has one
+  `state` (the old filtered `state` / unfiltered `allState` pair is merged); `HiddenAlbums` and its DI binding are
+  deleted. The Room `hidden` column stays (no migration; nothing reads it). Albums the user had hidden simply show
+  again (the user confirmed there were none worth keeping).
+- Locked is the one private place, and its only door is a gesture: on the Albums tab, pull down (the thumb-reach
+  pull) past halfway and keep holding for 2 s (`ReachDown` `onHold`); a long-press buzz, then Locked opens and asks
+  for the screen lock. No Menu row, no visible hint, so nobody browsing the phone learns it exists.

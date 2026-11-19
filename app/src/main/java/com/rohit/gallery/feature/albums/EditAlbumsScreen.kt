@@ -60,7 +60,7 @@ private const val PINNED_HEADER = "pinned-header"
 private const val OTHERS_HEADER = "others-header"
 
 /**
- * Edit albums: every album, hidden ones included (dimmed). Pin / unpin and hide / show each one; drag the
+ * Edit albums: every album. Pin / unpin each one; drag the
  * unpinned albums by their handle to set a custom order (which switches the sort to Custom).
  */
 @Composable
@@ -91,7 +91,6 @@ fun EditAlbumsScreen(onBack: () -> Unit, viewModel: AlbumsViewModel = hiltViewMo
                     others = current.others,
                     selection = selection,
                     onTogglePin = { viewModel.setPinned(listOf(it.album.bucketId), !it.pinned) },
-                    onToggleHidden = { viewModel.setHidden(listOf(it.album.bucketId), !it.hidden) },
                     onReorder = viewModel::saveCustomOrder,
                 )
             }
@@ -101,10 +100,6 @@ fun EditAlbumsScreen(onBack: () -> Unit, viewModel: AlbumsViewModel = hiltViewMo
                 entries = all.filter { it.album.bucketId in selection.ids },
                 onPin = { ids, pinned ->
                     viewModel.setPinned(ids, pinned)
-                    selection.clear()
-                },
-                onHide = { ids, hidden ->
-                    viewModel.setHidden(ids, hidden)
                     selection.clear()
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -119,7 +114,6 @@ private fun AlbumEditList(
     others: List<AlbumEntry>,
     selection: AlbumSelection,
     onTogglePin: (AlbumEntry) -> Unit,
-    onToggleHidden: (AlbumEntry) -> Unit,
     onReorder: (List<Long>) -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -138,7 +132,7 @@ private fun AlbumEditList(
         if (pinned.isNotEmpty()) {
             item(key = PINNED_HEADER) { SectionLabel("Pinned · in the order you pinned them") }
             items(pinned, key = { it.album.bucketId }) { entry ->
-                AlbumEditRow(entry, selection, onTogglePin, onToggleHidden, dragHandle = null, modifier = Modifier.animateItem())
+                AlbumEditRow(entry, selection, onTogglePin, dragHandle = null, modifier = Modifier.animateItem())
             }
         }
         item(key = OTHERS_HEADER) {
@@ -151,7 +145,6 @@ private fun AlbumEditList(
                 entry = entry,
                 selection = selection,
                 onTogglePin = onTogglePin,
-                onToggleHidden = onToggleHidden,
                 dragHandle = Modifier.pointerInput(id) {
                     detectDragGestures(
                         onDragStart = {
@@ -238,7 +231,6 @@ private fun AlbumEditRow(
     entry: AlbumEntry,
     selection: AlbumSelection,
     onTogglePin: (AlbumEntry) -> Unit,
-    onToggleHidden: (AlbumEntry) -> Unit,
     dragHandle: Modifier?,
     modifier: Modifier = Modifier,
 ) {
@@ -264,18 +256,16 @@ private fun AlbumEditRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (selecting) SelectionCheck(id in selection.ids)
-            // Hidden albums are dimmed, but their buttons stay fully visible.
-            val dim = if (entry.hidden) 0.4f else 1f
             MediaThumbnail(
                 item = entry.album.cover,
                 cellSizePx = thumbPx,
-                modifier = Modifier.size(RowThumb).clip(RoundedCornerShape(10.dp)).alpha(dim),
+                modifier = Modifier.size(RowThumb).clip(RoundedCornerShape(10.dp)),
                 showBadge = false,
             )
-            Column(Modifier.weight(1f).alpha(dim)) {
+            Column(Modifier.weight(1f)) {
                 Text(entry.album.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    if (entry.hidden) "${entry.album.count} · Hidden" else "${entry.album.count}",
+                    "${entry.album.count}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -286,12 +276,6 @@ private fun AlbumEditRow(
                     OrganizeIcons.Pin,
                     contentDescription = if (entry.pinned) "Unpin" else "Pin to top",
                     tint = if (entry.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                )
-            }
-            IconButton(onClick = { onToggleHidden(entry) }) {
-                Icon(
-                    if (entry.hidden) OrganizeIcons.Hidden else OrganizeIcons.Visible,
-                    contentDescription = if (entry.hidden) "Show album" else "Hide album",
                 )
             }
             if (dragHandle != null) {

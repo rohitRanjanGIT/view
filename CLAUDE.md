@@ -168,7 +168,7 @@ com.rohit.gallery
 - [ ] Editor: crop, rotate, flip, basic adjustments, filters; save as copy. (LATER, my call: for now the viewer's
   Edit button hands the photo to Google Photos' editor with read-only access, so it can only save a copy.)
 - [x] Search: by date, album, file name, media type (in memory). ML Kit labels/text skipped for now (my call).
-- [x] Hidden albums, pinned albums, custom album order, sort options, oldest-first albums.
+- [x] Pinned albums (hidden albums removed 2026-11-19: Locked replaces them), custom album order, sort options, oldest-first albums.
 - [x] Settings screen (theme, wallpaper colours, viewer options, remembered grid sizes and video positions,
   skip-confirmation via MANAGE_MEDIA, About).
 - [x] GIF, motion-photo and HDR/Ultra HDR display support (samples in `Pictures/Gallery test` on my phone).
@@ -223,7 +223,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   photo flies home), 4 rubber-banding. Verified: 5 press feedback on grid cells. Verified: 6 haptics. Verified: 7 frosted bars (Haze 1.7.2). Committed, not yet tried by me: 8 typography (size-specific tracking) and the
   "Remove animations" check. That completes the pass. See DECISIONS "Fluid viewer
   gestures".
-- **Committed, not yet tried by me (2026-11-19): Locked (vault).** Menu > Locked, lock from selection More menu,
+- **Committed, not yet tried by me (2026-11-19): Locked (vault).** Opened only by pulling down on Albums and holding 2 s (no Menu row), lock from selection More menu,
   viewer menu, Albums tab. Test with copies only (e.g. `Pictures/Gallery test`). See DECISIONS "Locked".
   Second round: Photos / Albums pages in Locked, one-tap locking and trash Undo with Skip confirmation on.
 - **Next (pick with me):**
@@ -272,8 +272,8 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 - **Pinch density:** `GridZoom.kt` / `PinchToZoom.kt` / `GridZoomAnchor.kt`. Pictures 2/4/6 + month; album lists
   share one size; Trash a flat 2/4/6 grid. All remembered across launches (`GridSizeKey` in `AppPreferences`).
 - **Album organisation:** Room `gallery.db` (`AlbumPrefEntity`: hidden, pinnedAt, position; schema in `app/schemas/`),
-  DataStore `AppPreferences` (album sort, albums per row, oldest-first). Hidden albums filtered out of
-  `MediaRepository.state` (`allState` is unfiltered, used by Move/Copy). Edit albums screen.
+  DataStore `AppPreferences` (album sort, albums per row, oldest-first). Edit albums screen (pin, reorder).
+  Hidden albums were removed (the `hidden` column stays in Room, unused).
 - **Search:** `feature/search/` (`parseSearch` / `SearchIndex` / suggestions, recent searches in DataStore).
 - **Settings** (`feature/settings/`): theme, wallpaper colours, start muted, motion autoplay, Ultra HDR, skip
   confirmation pop-ups (`MANAGE_MEDIA` special access), About. `AppSettings` read before the first frame.

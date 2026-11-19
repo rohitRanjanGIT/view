@@ -43,7 +43,3 @@ class FakeMediaSource : MediaSource {
 
     override fun changes(): Flow<Unit> = changeEvents
 }
-
-class FakeHiddenAlbums : com.rohit.gallery.core.data.repository.HiddenAlbums {
-    override val bucketIds = kotlinx.coroutines.flow.MutableStateFlow<Set<Long>>(emptySet())
-}

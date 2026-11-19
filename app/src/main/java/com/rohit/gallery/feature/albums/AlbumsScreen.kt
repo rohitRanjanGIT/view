@@ -12,7 +12,6 @@ import com.rohit.gallery.core.ui.components.frostedChrome
 import com.rohit.gallery.core.ui.components.rememberChromeHaze
 import com.rohit.gallery.core.ui.components.LocalChromeHaze
 import androidx.compose.runtime.CompositionLocalProvider
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
@@ -72,7 +71,6 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextOverflow
@@ -107,13 +105,14 @@ private val CardPlacement = spring(stiffness = Spring.StiffnessMediumLow, visibi
 private val ALBUM_GAP = 12.dp
 
 /**
- * The Albums tab: pinned albums first (in pin order), then the rest in the chosen sort; hidden ones are left
- * out. Long-press selects albums for a bulk pin / unpin or hide.
+ * The Albums tab: pinned albums first (in pin order), then the rest in the chosen sort. Long-press
+ * selects albums to pin / unpin or lock. Pulling down and holding for 2 seconds opens Locked (its only way in).
  */
 @Composable
 fun AlbumsScreen(
     onOpenAlbum: (Album) -> Unit,
     onEditAlbums: () -> Unit,
+    onOpenLocked: () -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
     contentBottomPadding: Dp,
     modifier: Modifier = Modifier,
@@ -124,7 +123,6 @@ fun AlbumsScreen(
         val organized by viewModel.organized.collectAsStateWithLifecycle()
         val columns by viewModel.columns.collectAsStateWithLifecycle()
         val current = organized
-        val context = LocalContext.current
         val selection = rememberAlbumSelection()
 
         // The nav host hides its bottom bar while selecting; this screen shows its own action bar instead.
@@ -166,6 +164,8 @@ fun AlbumsScreen(
                             subtitle = albumCountLabel(list.size),
                             state = reach,
                             actions = { AlbumsMenu(current?.sort ?: AlbumSort.Newest, viewModel::setSort, onEditAlbums) },
+                            // Locked has no button anywhere: pull down here and hold for 2 seconds.
+                            onHold = onOpenLocked,
                         ) {
                             AlbumGrid(
                                 list = list,
@@ -185,14 +185,6 @@ fun AlbumsScreen(
                     onPin = { ids, pinned ->
                         viewModel.setPinned(ids, pinned)
                         selection.clear()
-                    },
-                    onHide = { ids, hidden ->
-                        viewModel.setHidden(ids, hidden)
-                        selection.clear()
-                        if (hidden) {
-                            val what = if (ids.size == 1) "Album hidden" else "${ids.size} albums hidden"
-                            Toast.makeText(context, "$what. Show them again in Edit albums.", Toast.LENGTH_SHORT).show()
-                        }
                     },
                     onLock = { ids ->
                         // The whole album moves into Locked; it disappears from Albums once the originals are deleted.

@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.map
 
 /**
  * Albums derived from the in-memory media index (so always in step with the timeline), ordered and filtered
- * by the user's choices: pins, hidden albums, sort and custom order (Room + DataStore).
+ * by the user's choices: pins, sort and custom order (Room + DataStore).
  */
 @Singleton
 class AlbumRepository @Inject constructor(
@@ -27,22 +27,20 @@ class AlbumRepository @Inject constructor(
     private val dao: AlbumPrefDao,
     private val prefs: AppPreferences,
 ) {
-    /** Every album, hidden ones included, newest photo first: the Move/Copy album picker. */
-    val albums: Flow<List<Album>> = repository.allState
+    /** Every album, newest photo first: the Move/Copy album picker. */
+    val albums: Flow<List<Album>> = repository.state
         .map { state -> if (state is MediaIndexState.Ready) buildAlbums(state.items) else emptyList() }
         .flowOn(Dispatchers.Default)
 
     /** Albums in display order with the user's choices; null while the index is loading. */
-    val organized: Flow<OrganizedAlbums?> = combine(repository.allState, dao.observeAll(), prefs.albumSort) { state, rows, sort ->
+    val organized: Flow<OrganizedAlbums?> = combine(repository.state, dao.observeAll(), prefs.albumSort) { state, rows, sort ->
         if (state !is MediaIndexState.Ready) {
             null
         } else {
-            val byBucket = rows.associate { it.bucketId to AlbumPref(it.hidden, it.pinnedAt, it.position) }
+            val byBucket = rows.associate { it.bucketId to AlbumPref(it.pinnedAt, it.position) }
             organizeAlbums(buildAlbums(state.items), byBucket, sort)
         }
     }.flowOn(Dispatchers.Default)
-
-    suspend fun setHidden(bucketIds: Collection<Long>, hidden: Boolean) = updateAll(bucketIds) { it.copy(hidden = hidden) }
 
     /**
      * New pins get the current time (plus their place in [bucketIds]), so they go after the earlier pins and,

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -53,10 +55,14 @@ import com.rohit.gallery.core.ui.theme.GalleryMotion
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** How far the grid comes down when pulled: this share of the area it fills. */
 private const val REACH_FRACTION = 0.3f
+
+/** How long a pull-down has to be held for [ReachDown]'s onHold. */
+private const val HOLD_MS = 2_000L
 
 /** Top of the band the big title is centred in: just under where screens keep their top bar. */
 private val TitleBandTop = 72.dp
@@ -87,7 +93,7 @@ class ReachState internal constructor(expanded: Boolean) {
     /** Where the wrapped area starts on screen, px: the title and icons are placed in screen terms. */
     internal var windowTop by mutableFloatStateOf(0f)
 
-    internal var dragging = false
+    internal var dragging by mutableStateOf(false)
         private set
 
     /** Finger travel before rubber-banding, so a drag past the open position keeps tracking smoothly. */
@@ -171,6 +177,7 @@ fun ReachDown(
     state: ReachState = rememberReachState(),
     actions: (@Composable RowScope.() -> Unit)? = null,
     actionsOffset: Dp = 0.dp,
+    onHold: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -216,6 +223,19 @@ fun ReachDown(
         }
     }
 
+
+    // Pull down and keep holding: after [HOLD_MS] a buzz, then [onHold] (the Albums tab's hidden way into Locked).
+    if (onHold != null) {
+        val latestHold by rememberUpdatedState(onHold)
+        val holding by remember(state) { derivedStateOf { state.dragging && state.offset > state.maxPx / 2 } }
+        LaunchedEffect(holding) {
+            if (holding) {
+                delay(HOLD_MS)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                latestHold()
+            }
+        }
+    }
 
     val density = LocalDensity.current
     // Where the grid's top lands when it is down, in screen terms: the same on every screen, whatever sits above.

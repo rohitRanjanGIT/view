@@ -24,7 +24,7 @@ class AlbumsViewModel @Inject constructor(
     private val prefs: AppPreferences,
 ) : ViewModel() {
 
-    /** Albums in display order (hidden ones flagged); null while the index is loading. */
+    /** Albums in display order; null while the index is loading. */
     val organized: StateFlow<OrganizedAlbums?> = albums.organized
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -40,12 +40,10 @@ class AlbumsViewModel @Inject constructor(
 
     fun setPinned(bucketIds: List<Long>, pinned: Boolean) = launch { albums.setPinned(bucketIds, pinned) }
 
-    fun setHidden(bucketIds: List<Long>, hidden: Boolean) = launch { albums.setHidden(bucketIds, hidden) }
-
-    /** Every photo and video in [bucketIds] (hidden albums too), to lock whole albums. */
+    /** Every photo and video in [bucketIds], to lock whole albums. */
     fun itemsIn(bucketIds: List<Long>): List<MediaItem> {
         val ids = bucketIds.toSet()
-        return (repository.allState.value as? MediaIndexState.Ready)?.items.orEmpty().filter { it.bucketId in ids }
+        return (repository.state.value as? MediaIndexState.Ready)?.items.orEmpty().filter { it.bucketId in ids }
     }
 
     fun saveCustomOrder(bucketIds: List<Long>) = launch { albums.saveCustomOrder(bucketIds) }

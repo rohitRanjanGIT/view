@@ -45,13 +45,4 @@ class AlbumOrganizerTest {
         assertEquals(listOf(3L, 4L, 2L, 1L), ids(prefs, AlbumSort.Custom))
     }
 
-    @Test
-    fun `hidden albums are flagged and left out of visible`() {
-        val prefs = mapOf(2L to AlbumPref(hidden = true), 4L to AlbumPref(hidden = true, pinnedAt = 1))
-        val organized = organizeAlbums(albums, prefs, AlbumSort.Newest)
-        assertEquals(listOf(1L, 3L), organized.visible.map { it.album.bucketId })
-        assertEquals(listOf(4L), organized.pinned.map { it.album.bucketId })
-        assertEquals(listOf(true), organized.pinned.map { it.hidden })
-        assertEquals(4, organized.pinned.size + organized.others.size)
-    }
 }
