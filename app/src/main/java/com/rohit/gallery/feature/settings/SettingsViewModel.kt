@@ -7,11 +7,19 @@ import androidx.lifecycle.viewModelScope
 import com.rohit.gallery.core.data.prefs.AppPreferences
 import com.rohit.gallery.core.data.prefs.AppSettings
 import com.rohit.gallery.core.data.prefs.ThemeMode
+import com.rohit.gallery.core.data.vault.VaultRepository
+import com.rohit.gallery.feature.vault.LockProgress
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +33,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val prefs: AppPreferences,
+    private val vault: VaultRepository,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -51,6 +60,54 @@ class SettingsViewModel @Inject constructor(
     fun setMotionAutoplay(enabled: Boolean) = change { it.copy(motionAutoplay = enabled) }
 
     fun setUltraHdr(enabled: Boolean) = change { it.copy(ultraHdr = enabled) }
+
+    /** Locked is turned on; null until read. */
+    val lockedEnabled: StateFlow<Boolean?> = prefs.lockedEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** How many photos and videos are in Locked; null while counting. */
+    val lockedCount: StateFlow<Int?> = vault.items
+        .map { it?.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val _turningOff = MutableStateFlow<LockProgress?>(null)
+
+    /** Progress while turning Locked off moves everything back out. */
+    val turningOff: StateFlow<LockProgress?> = _turningOff.asStateFlow()
+
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 2)
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    fun turnOnLocked() {
+        viewModelScope.launch { prefs.setLockedEnabled(true) }
+    }
+
+    /**
+     * Turns Locked off (the screen has already asked for the screen lock and confirmed). Everything in it goes back to
+     * the album it came from first; only when every item made it does the switch go off. If some couldn't be moved,
+     * Locked stays on and keeps them, so nothing is ever left behind in a folder with no way in.
+     */
+    fun turnOffLocked() {
+        if (_turningOff.value != null) return
+        viewModelScope.launch {
+            // Waits for the real count: a not-yet-loaded list must never read as "empty" and skip moving items out.
+            val total = vault.items.filterNotNull().first().size
+            if (total > 0) {
+                _turningOff.value = LockProgress(0, total)
+                val result = try {
+                    vault.unlockAll { done, all -> _turningOff.value = LockProgress(done, all) }
+                } finally {
+                    _turningOff.value = null
+                }
+                if (result.failed > 0) {
+                    _messages.tryEmit("${result.failed} couldn't be moved back, so Locked stays on. Try again.")
+                    return@launch
+                }
+                _messages.tryEmit("Moved ${result.done} back to their albums. Locked is off.")
+            }
+            prefs.setLockedEnabled(false)
+        }
+    }
 
     /** Call when returning from the system "media management" screen, where the user may have changed it. */
     fun refreshManageMedia() {

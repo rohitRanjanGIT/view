@@ -483,7 +483,7 @@ private fun ViewerContent(
     }
     fun viewerMenu(item: MediaItem): List<ViewerMenuEntry> = if (viewModel.isTrash || viewModel.isVault) emptyList() else buildList {
         // Moves the photo into Locked (copied and checked first, then the original is deleted with Android's confirmation).
-        if (viewModel.canWrite(item)) add(ViewerMenuEntry("Lock") { locker.lock(listOf(item)) })
+        if (locker.enabled && viewModel.canWrite(item)) add(ViewerMenuEntry("Lock") { locker.lock(listOf(item)) })
         fun intent(action: String) = Intent(action)
             .setDataAndType(item.uri, item.mimeType.ifBlank { if (item.isVideo) "video/*" else "image/*" })
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

@@ -127,6 +127,13 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         context.dataStore.edit { it[LOCK_HINT_SHOWN] = true }
     }
 
+    /** Locked (the private folder) is on: its Lock actions and its hidden way in exist. On by default. */
+    val lockedEnabled: Flow<Boolean> = context.dataStore.data.map { it[LOCKED_ENABLED] ?: true }.distinctUntilChanged()
+
+    suspend fun setLockedEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[LOCKED_ENABLED] = enabled }
+    }
+
     private companion object {
         val ALBUM_SORT = stringPreferencesKey("album_sort")
         val ALBUM_OLDEST_FIRST = booleanPreferencesKey("album_oldest_first")
@@ -139,6 +146,7 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         val ULTRA_HDR = booleanPreferencesKey("ultra_hdr")
         val VIDEO_POSITIONS = stringPreferencesKey("video_positions")
         val LOCK_HINT_SHOWN = booleanPreferencesKey("lock_hint_shown")
+        val LOCKED_ENABLED = booleanPreferencesKey("locked_enabled")
         /** Unit separator: cannot be typed, so it never appears inside a search. */
         const val SEARCH_SEPARATOR = "\u001F"
         const val MAX_RECENT_SEARCHES = 8

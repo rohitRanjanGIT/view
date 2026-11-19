@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +57,11 @@ class LockProgress(val done: Int, val total: Int)
  * so locking takes one tap. Without it, the first lock explains how to turn it on (once), then Android asks as usual.
  */
 @Stable
-class VaultLocker internal constructor(private val start: (List<MediaItem>) -> Unit) {
+class VaultLocker internal constructor(
+    /** False while Locked is turned off in Settings: screens then leave out their Lock actions. */
+    val enabled: Boolean,
+    private val start: (List<MediaItem>) -> Unit,
+) {
     fun lock(items: List<MediaItem>) = start(items)
 }
 
@@ -68,6 +73,7 @@ fun rememberVaultLocker(onLocked: (Int) -> Unit = {}): VaultLocker {
     val entry = remember(app) { EntryPointAccessors.fromApplication(app, VaultEntryPoint::class.java) }
     val repository = remember(entry) { entry.vaultRepository() }
     val prefs = remember(entry) { entry.appPreferences() }
+    val enabled by prefs.lockedEnabled.collectAsState(initial = true)
     val scope = rememberCoroutineScope()
     val latestOnLocked by rememberUpdatedState(onLocked)
     var progress by remember { mutableStateOf<LockProgress?>(null) }
@@ -119,9 +125,9 @@ fun rememberVaultLocker(onLocked: (Int) -> Unit = {}): VaultLocker {
         }
     }
 
-    val locker = remember(repository) {
-        VaultLocker { items ->
-            if (items.isEmpty() || progress != null || hintFor != null) return@VaultLocker
+    val locker = remember(repository, enabled) {
+        VaultLocker(enabled) { items ->
+            if (!enabled || items.isEmpty() || progress != null || hintFor != null) return@VaultLocker
             scope.launch {
                 val canSkip = MediaStore.canManageMedia(context)
                 if (!canSkip && !prefs.lockHintShown.first()) hintFor = items else copyAndDelete(items)

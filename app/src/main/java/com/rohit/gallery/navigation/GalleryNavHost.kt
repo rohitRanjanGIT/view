@@ -178,7 +178,7 @@ fun GalleryNavHost(
                         )
                     }
                     topLevel<SettingsRoute>(navController) {
-                        SettingsScreen(onBack = { navController.popBackStack() })
+                        SettingsScreen(onBack = { navController.popBackStack() }, onOpenLocked = { navController.navigate(VaultRoute) })
                     }
                     topLevel<EditAlbumsRoute>(navController) {
                         EditAlbumsScreen(onBack = { navController.popBackStack() })

@@ -46,15 +46,20 @@ private const val AUTHENTICATORS = BIOMETRIC_STRONG or DEVICE_CREDENTIAL
  * Android's own unlock prompt: fingerprint or face, with the phone's PIN, pattern or password as the fallback. No
  * separate app PIN, so there is nothing extra to forget.
  */
-fun promptVaultUnlock(activity: Activity, onResult: (VaultAuthResult) -> Unit) {
+fun promptVaultUnlock(
+    activity: Activity,
+    title: String = "Open Locked",
+    subtitle: String = "Your locked photos and videos",
+    onResult: (VaultAuthResult) -> Unit,
+) {
     val manager = activity.getSystemService(BiometricManager::class.java)
     if (manager == null || manager.canAuthenticate(AUTHENTICATORS) != BiometricManager.BIOMETRIC_SUCCESS) {
         onResult(VaultAuthResult.NoScreenLock)
         return
     }
     BiometricPrompt.Builder(activity)
-        .setTitle("Open Locked")
-        .setSubtitle("Your locked photos and videos")
+        .setTitle(title)
+        .setSubtitle(subtitle)
         .setAllowedAuthenticators(AUTHENTICATORS)
         .build()
         .authenticate(

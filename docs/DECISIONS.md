@@ -496,3 +496,9 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
 - Locked is the one private place, and its only door is a gesture: on the Albums tab, pull down (the thumb-reach
   pull) past halfway and keep holding for 2 s (`ReachDown` `onHold`); a long-press buzz, then Locked opens and asks
   for the screen lock. No Menu row, no visible hint, so nobody browsing the phone learns it exists.
+- **Locked on / off in Settings** (2026-11-19): a "Locked folder" switch (DataStore `locked_enabled`, on by default)
+  and, while on, an "Open Locked" row. Off hides every Lock action (viewer menu, selection More, Albums selection) and
+  the 2 s hold (`VaultLocker.enabled`). Turning off asks for the screen lock first (one switch would otherwise pour
+  the private photos back into the gallery), then `unlockAll` moves everything back to its albums with a progress
+  dialog (Back blocked); the switch only goes off when every item made it, otherwise Locked stays on and keeps the
+  rest. The count is awaited, never assumed empty.

@@ -233,7 +233,7 @@ fun SelectionActionsBar(
         },
         onMove = if (allowTransfer) ({ picker = TransferKind.Move }) else null,
         onCopy = if (allowTransfer) ({ picker = TransferKind.Copy }) else null,
-        onLock = if (allowTransfer) ({ locker.lock(controller.selectedItems()) }) else null,
+        onLock = if (allowTransfer && locker.enabled) ({ locker.lock(controller.selectedItems()) }) else null,
         modifier = modifier,
     )
 

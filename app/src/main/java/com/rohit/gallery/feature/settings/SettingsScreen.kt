@@ -1,5 +1,14 @@
 package com.rohit.gallery.feature.settings
 
+import androidx.activity.compose.BackHandler
+import android.widget.Toast
+import androidx.activity.compose.LocalActivity
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import com.rohit.gallery.feature.vault.VaultAuthResult
+import com.rohit.gallery.feature.vault.promptVaultUnlock
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -46,7 +55,7 @@ import com.rohit.gallery.core.data.prefs.ThemeMode
  * confirmation" row re-checks the system permission on every resume because the user flips it in another screen.
  */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenLocked: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val canManageMedia by viewModel.canManageMedia.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -101,6 +110,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                     }
                 },
             )
+
+            LockedSection(viewModel, onOpenLocked)
 
             SectionTitle("About")
             InfoRow("Version", viewModel.versionName.ifEmpty { "Unknown" })
@@ -210,3 +221,86 @@ private val Libraries = listOf(
     "Telephoto (Saket Narayan)",
     "Media3 / ExoPlayer",
 )
+
+/**
+ * Locked on / off, and a way in while it is on. Turning it off moves everything in it back to its albums, so it asks
+ * for the screen lock first: otherwise anyone holding the unlocked phone could pour the private photos back into the
+ * gallery with one switch.
+ */
+@Composable
+private fun LockedSection(viewModel: SettingsViewModel, onOpenLocked: () -> Unit) {
+    val enabled by viewModel.lockedEnabled.collectAsStateWithLifecycle()
+    val count by viewModel.lockedCount.collectAsStateWithLifecycle()
+    val turningOff by viewModel.turningOff.collectAsStateWithLifecycle()
+    var confirmOff by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val activity = LocalActivity.current
+    LaunchedEffect(viewModel) { viewModel.messages.collect { Toast.makeText(context, it, Toast.LENGTH_LONG).show() } }
+
+    val on = enabled ?: return
+    SectionTitle("Locked")
+    SwitchRow(
+        title = "Locked folder",
+        subtitle = if (on) "Photos only Gallery can open, with your fingerprint or screen lock" else "Off: no Lock option anywhere",
+        checked = on,
+        onCheckedChange = { want -> if (want) viewModel.turnOnLocked() else confirmOff = true },
+    )
+    if (on) InfoRow("Open Locked", "Asks for your fingerprint or screen lock", onClick = onOpenLocked)
+
+    if (confirmOff) {
+        // Unknown count (still loading) is treated as "has items": it never skips the screen-lock check.
+        val empty = count == 0
+        AlertDialog(
+            onDismissRequest = { confirmOff = false },
+            title = { Text("Turn off Locked?") },
+            text = {
+                Text(
+                    if (empty) {
+                        "Locked is empty. The Lock options will disappear; you can turn it back on here."
+                    } else {
+                        val what = count?.let { if (it == 1) "The 1 item" else "The $it items" } ?: "Everything"
+                        "$what in Locked will go back to the albums they came from, where other apps can see them " +
+                            "again. You'll confirm with your fingerprint or screen lock."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmOff = false
+                    if (empty || activity == null) {
+                        if (empty) viewModel.turnOffLocked()
+                    } else {
+                        promptVaultUnlock(activity, title = "Turn off Locked", subtitle = "Moves your locked photos back to their albums") { result ->
+                            when (result) {
+                                VaultAuthResult.Success -> viewModel.turnOffLocked()
+                                // Without a screen lock Locked was never protected; nothing extra to guard.
+                                VaultAuthResult.NoScreenLock -> viewModel.turnOffLocked()
+                                is VaultAuthResult.Failed -> Unit
+                            }
+                        }
+                    }
+                }) { Text("Turn off") }
+            },
+            dismissButton = { TextButton(onClick = { confirmOff = false }) { Text("Cancel") } },
+        )
+    }
+
+    // Stay here until every item is back in its album (leaving would cancel the move halfway).
+    BackHandler(enabled = turningOff != null) { }
+    turningOff?.let { progress ->
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {},
+            title = { Text("Turning off Locked…") },
+            text = {
+                Column {
+                    Text("Moving ${progress.done} of ${progress.total} back to their albums.", style = MaterialTheme.typography.bodyMedium)
+                    LinearProgressIndicator(
+                        progress = { if (progress.total == 0) 0f else progress.done.toFloat() / progress.total },
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    )
+                }
+            },
+        )
+    }
+}

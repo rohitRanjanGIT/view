@@ -131,6 +131,7 @@ fun AlbumsScreen(
         BackHandler(enabled = selection.isSelecting) { selection.clear() }
 
         val haze = rememberChromeHaze()
+        // Also says whether Locked is turned on (Settings): off, there is no Lock action and no hold to open it.
         val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
         val list = current?.visible
         // Held here so the header's small title can fade out while the big one shows (grid pulled down).
@@ -165,7 +166,7 @@ fun AlbumsScreen(
                             state = reach,
                             actions = { AlbumsMenu(current?.sort ?: AlbumSort.Newest, viewModel::setSort, onEditAlbums) },
                             // Locked has no button anywhere: pull down here and hold for 2 seconds.
-                            onHold = onOpenLocked,
+                            onHold = if (locker.enabled) onOpenLocked else null,
                         ) {
                             AlbumGrid(
                                 list = list,
@@ -186,10 +187,8 @@ fun AlbumsScreen(
                         viewModel.setPinned(ids, pinned)
                         selection.clear()
                     },
-                    onLock = { ids ->
-                        // The whole album moves into Locked; it disappears from Albums once the originals are deleted.
-                        locker.lock(viewModel.itemsIn(ids))
-                    },
+                    // The whole album moves into Locked; it disappears from Albums once the originals are deleted.
+                    onLock = if (locker.enabled) { ids -> locker.lock(viewModel.itemsIn(ids)) } else null,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
