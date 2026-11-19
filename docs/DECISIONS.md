@@ -355,3 +355,9 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
 - **Interruptible:** the details panel follows the finger 1:1 (`infoDrag`) and is an `Animatable`, so it can be grabbed
   mid-animation; a photo springing back (`settle`) is cancelled when a new drag starts, continuing from where it is.
 - Not done: grabbing the photo during the close flight itself (the viewer is already closing then).
+- **No input lock while closing** (fix, 2026-11-19): the closing viewer layer used to swallow every touch until the
+  flight had fully settled; with the spring's long, invisible tail that ate the next tap (felt like ~1 s before a new
+  photo would open). Now the layer stops blocking as soon as it closes, and once its fade is done it is clipped to an
+  empty shape so hit testing skips it entirely (the flying photo is drawn by the shared-transition overlay, so it is
+  unaffected). A tap on the grid during a close ends that close at once (`finishClose`) and opens the new photo.
+  Flights also count as landed within 1.5 px (`FlightThreshold`) instead of 0.5 px.

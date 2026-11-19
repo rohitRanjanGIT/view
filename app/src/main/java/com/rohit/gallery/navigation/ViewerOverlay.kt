@@ -19,7 +19,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.ViewModel
@@ -126,6 +133,10 @@ class ViewerSessions : ViewModel(), ViewModelStoreOwner {
     override fun onCleared() = viewModelStore.clear()
 }
 
+private val NoHitShape = object : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) = Outline.Rectangle(Rect.Zero)
+}
+
 /**
  * Draws [host]'s viewer over the screen while it is open, and keeps it until the close flight into the grid has
  * landed. Fades in like the old viewer screen did and fades out as it closes.
@@ -150,6 +161,11 @@ fun ViewerOverlay(
         val viewModel: ViewerViewModel = viewModel(viewModelStoreOwner = sessions, key = "viewer-$session") {
             factory.create(route)
         }
+        // The closing viewer is fully faded out, so touches go straight through to the grid (only the flying photo
+        // is still drawn, and that is drawn by the shared-transition overlay, not by this layer).
+        var passThrough by remember { mutableStateOf(false) }
+        // Clear this visit's view model when the layer goes, also when a tap on the grid ends the close early.
+        DisposableEffect(Unit) { onDispose { if (host.route == null) sessions.viewModelStore.clear() } }
         val fade = remember { Animatable(0f) }
         LaunchedEffect(Unit) { fade.animateTo(1f, tween(GalleryMotion.FADE_MS)) }
         // Once the open flight has landed, unlink the grid cell (see SharedPhotoState.viewerSettled).
@@ -162,22 +178,33 @@ fun ViewerOverlay(
         if (host.closing) {
             LaunchedEffect(Unit) {
                 coroutineScope {
-                    launch { fade.animateTo(0f, tween(GalleryMotion.FADE_MS)) }
+                    launch {
+                        fade.animateTo(0f, tween(GalleryMotion.FADE_MS))
+                        passThrough = true
+                    }
                     // Let the flight start, then wait for it to land.
                     withFrameNanos { }
                     withFrameNanos { }
                     snapshotFlow { transitionScope?.isTransitionActive == true }.first { !it }
                 }
                 host.finishClose()
-                sessions.viewModelStore.clear()
             }
         }
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = fade.value }
-                // Touches never reach the grid underneath while the viewer is there.
-                .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
+                .graphicsLayer {
+                    alpha = fade.value
+                    // Clipped to nothing, the layer (and everything in it) is skipped by hit testing.
+                    if (passThrough) {
+                        clip = true
+                        shape = NoHitShape
+                    }
+                }
+                // Touches never reach the grid underneath while the viewer is open; while it closes they do.
+                .then(
+                    if (host.closing) Modifier else Modifier.pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
+                ),
         ) {
             ViewerScreen(
                 onBack = { host.close() },

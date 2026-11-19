@@ -6,7 +6,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.animation.core.VectorizedFiniteAnimationSpec
-import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -34,14 +33,14 @@ object GalleryMotion {
     fun <T> dragReturn() = fluid<T>(response = 0.35f, dampingRatio = 0.85f)
 
     /** Grid -> viewer: no gesture to inherit, so critically damped. */
-    fun sharedBounds(): FiniteAnimationSpec<Rect> = fluid(response = OPEN_RESPONSE, visibilityThreshold = Rect.VisibilityThreshold)
+    fun sharedBounds(): FiniteAnimationSpec<Rect> = fluid(response = OPEN_RESPONSE, visibilityThreshold = FlightThreshold)
 
     /**
      * Viewer -> grid. [velocity] (px/s) is how fast the finger was moving when it let go: the flight starts at that
      * speed, so there is no seam between dragging the photo and it flying into its cell. Zero for a back press.
      */
     fun sharedBoundsClosing(velocity: Offset): FiniteAnimationSpec<Rect> =
-        VelocityHandoff(fluid(response = CLOSE_RESPONSE, visibilityThreshold = Rect.VisibilityThreshold), velocity.capped())
+        VelocityHandoff(fluid(response = CLOSE_RESPONSE, visibilityThreshold = FlightThreshold), velocity.capped())
 
     /**
      * Where a fling would come to rest, past the point it was released at (Apple's projection: exponential decay,
@@ -53,6 +52,12 @@ object GalleryMotion {
     const val OPEN_RESPONSE = 0.28f
     const val CLOSE_RESPONSE = 0.4f
     private const val MAX_HANDOFF_VELOCITY = 6000f
+
+    /**
+     * A flight counts as landed within 1.5 px of its cell. The default (0.5 px) kept the spring creeping invisibly
+     * for a further ~0.1 s, and the viewer layer only goes once the flight has landed.
+     */
+    private val FlightThreshold = Rect(1.5f, 1.5f, 1.5f, 1.5f)
 
     const val FADE_MS = 140
 

@@ -93,7 +93,9 @@ fun GalleryNavHost(
 
     /** Opens [host]'s viewer at [item]: starts its decode right away, then tags the cell and shows the viewer. */
     fun openViewer(host: ViewerHost, item: MediaItem, route: ViewerRoute) {
-        if (host.route != null) return
+        if (host.route != null && !host.closing) return
+        // A tap while the last photo is still flying home: land it now and open the new one straight away.
+        if (host.closing) host.finishClose()
         prefetchViewerImage(context, item, windowSize.width, windowSize.height)
         // Tag the grid cell first so the shared element exists on both sides.
         host.prepare(item.id)
