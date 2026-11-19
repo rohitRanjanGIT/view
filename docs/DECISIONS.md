@@ -361,3 +361,9 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   empty shape so hit testing skips it entirely (the flying photo is drawn by the shared-transition overlay, so it is
   unaffected). A tap on the grid during a close ends that close at once (`finishClose`) and opens the new photo.
   Flights also count as landed within 1.5 px (`FlightThreshold`) instead of 0.5 px.
+- **Rubber-banding** (item 4): `GalleryMotion.rubberBand` is Apple's curve (`o·d·c / (d + c·o)`, c = 0.55), capped at
+  12 % of the screen height (`StretchFraction`). Used where the viewer used to stop dead: pulling the details panel
+  past fully open (it grows taller, bottom fixed, then springs back; swiping up on the photo while it is open now does
+  this too instead of nothing) and pulling a swipe-down photo back above its start. `rubberBandInverse` lets a drag
+  resume from a stretched position without a jump. Grids, pagers and the filmstrip already had Android's stretch
+  overscroll, and pinch past 2 columns / month view already resisted, so they were left as they are.

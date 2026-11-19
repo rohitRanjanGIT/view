@@ -128,6 +128,9 @@ private const val DISMISS_DECELERATION = 0.995f
 private val FlickBackVelocity = 150.dp
 private val DismissDistance = 120.dp
 
+/** Most the photo or details panel can be stretched past its limit, as a share of the screen height. */
+private const val StretchFraction = 0.12f
+
 /** How far the photo shrinks at the end of a back gesture, as drag-down progress (0.9: about 60 % size, the
  * background mostly faded, corners rounded like a card). */
 private const val BACK_MAX_PROGRESS = 0.9f
@@ -255,7 +258,10 @@ private fun ViewerContent(
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
     val flickBackPx = with(LocalDensity.current) { FlickBackVelocity.toPx() }
     // Plain holder (not state): per-gesture bookkeeping that must not trigger recomposition.
-    val swipe = remember { object { var mode = SwipeMode.None; var infoStart = 0f; var infoTravel = 0f } }
+    val swipe = remember { object { var mode = SwipeMode.None; var infoStart = 0f; var infoTravel = 0f; var dismissRaw = 0f } }
+    // How far past their limits the photo and the details panel can be stretched, at most.
+    val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
+    val stretchPx = screenHeightPx * StretchFraction
     val settleJobs = remember { mutableListOf<Job>() }
     val infoScroll = rememberScrollState()
     val progress = maxOf((dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f), backShrink * BACK_MAX_PROGRESS)
@@ -300,21 +306,24 @@ private fun ViewerContent(
     val info = remember { Animatable(if (showInfo) 1f else 0f) }
     var infoDrag by remember { mutableStateOf<Float?>(null) }
     val infoProgress = infoDrag ?: info.value
-    val panelPx = LocalWindowInfo.current.containerSize.height * InfoPanelFraction
+    val panelPx = screenHeightPx * InfoPanelFraction
     LaunchedEffect(showInfo) {
         // Buttons, taps and Back; a released swipe has already started its own animation towards this target.
         val target = if (showInfo) 1f else 0f
         if (infoDrag == null && info.targetValue != target) info.animateTo(target, GalleryMotion.sheet())
     }
-    // [dy]: finger movement in px, down closes.
+    // [dy]: finger movement in px, down closes. Past fully open the panel stretches taller with growing resistance.
     fun dragInfo(dy: Float) {
         if (infoDrag == null) {
-            swipe.infoStart = info.value
+            // Grabbed while still stretched: resume from the finger position that stretch corresponds to.
+            val shown = info.value
+            swipe.infoStart = if (shown > 1f) 1f + GalleryMotion.rubberBandInverse((shown - 1f) * panelPx, stretchPx) / panelPx else shown
             swipe.infoTravel = 0f
             scope.launch { info.stop() }
         }
         swipe.infoTravel += dy
-        infoDrag = (swipe.infoStart - swipe.infoTravel / panelPx).coerceIn(0f, 1f)
+        val raw = swipe.infoStart - swipe.infoTravel / panelPx
+        infoDrag = if (raw > 1f) 1f + GalleryMotion.rubberBand((raw - 1f) * panelPx, stretchPx) / panelPx else raw.coerceAtLeast(0f)
     }
     // Opens or closes towards where the swipe was heading, starting at its speed ([velocityY] px/s, down closes).
     fun releaseInfo(velocityY: Float) {
@@ -451,19 +460,24 @@ private fun ViewerContent(
                         // What a swipe does is decided once, when it starts, and never changes mid-swipe
                         // (otherwise closing the details could carry on into closing the viewer).
                         if (swipe.mode == SwipeMode.None) {
-                            swipe.mode = when {
-                                delta.y < 0 -> if (showInfo) SwipeMode.Ignore else SwipeMode.OpenInfo
-                                showInfo -> SwipeMode.CloseInfo
-                                else -> SwipeMode.Dismiss
+                            // Up, or any swipe with the details open, moves the panel (up past open stretches it).
+                            swipe.mode = if (delta.y < 0 || showInfo) SwipeMode.Info else SwipeMode.Dismiss
+                            if (swipe.mode == SwipeMode.Dismiss) {
+                                stopSettle()
+                                // Grabbed while springing back above its resting place: resume from the matching
+                                // finger position, so the photo doesn't jump.
+                                swipe.dismissRaw = if (dragY < 0f) GalleryMotion.rubberBandInverse(dragY, stretchPx) else dragY
                             }
-                            if (swipe.mode == SwipeMode.Dismiss) stopSettle()
                         }
                         when (swipe.mode) {
                             // The photo stays put; the panel follows the finger.
-                            SwipeMode.OpenInfo, SwipeMode.CloseInfo -> dragInfo(delta.y)
+                            SwipeMode.Info -> dragInfo(delta.y)
                             SwipeMode.Dismiss -> {
                                 dragX += delta.x
-                                dragY = (dragY + delta.y).coerceAtLeast(0f)
+                                // Pulled back above where it started, the photo resists instead of stopping dead.
+                                swipe.dismissRaw += delta.y
+                                val raw = swipe.dismissRaw
+                                dragY = if (raw >= 0f) raw else GalleryMotion.rubberBand(raw, stretchPx)
                             }
                             else -> Unit
                         }
@@ -473,7 +487,7 @@ private fun ViewerContent(
                         swipe.mode = SwipeMode.None
                         val velocity = Offset(velocityX, velocityY)
                         when (mode) {
-                            SwipeMode.OpenInfo, SwipeMode.CloseInfo -> releaseInfo(velocityY)
+                            SwipeMode.Info -> releaseInfo(velocityY)
                             SwipeMode.Dismiss -> {
                                 // Decide by where the swipe is heading, not where the finger stopped; flicking back
                                 // up always keeps the viewer.
@@ -492,7 +506,7 @@ private fun ViewerContent(
                     onCancel = {
                         val mode = swipe.mode
                         swipe.mode = SwipeMode.None
-                        if (mode == SwipeMode.OpenInfo || mode == SwipeMode.CloseInfo) releaseInfo(0f) else settle()
+                        if (mode == SwipeMode.Info) releaseInfo(0f) else settle()
                     },
                 ),
         ) {
@@ -559,8 +573,9 @@ private fun ViewerContent(
                 modifier = Modifier
                     .align(androidx.compose.ui.Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .fillMaxHeight(InfoPanelFraction)
-                    .graphicsLayer { translationY = (1f - infoProgress) * size.height }
+                    // Stretched past open, the panel grows taller (bottom stays put) instead of leaving a gap.
+                    .fillMaxHeight(InfoPanelFraction * infoProgress.coerceAtLeast(1f))
+                    .graphicsLayer { translationY = (1f - infoProgress.coerceAtMost(1f)) * size.height }
                     // Swiping down on the panel (when scrolled to its top) closes it and returns to the photo.
                     .verticalDismissGestures(
                         enabled = { infoScroll.value == 0 },
@@ -824,7 +839,7 @@ private fun VideoPage(
 
 
 /** What the current vertical swipe on the photo does; fixed at the start of the swipe. */
-private enum class SwipeMode { None, OpenInfo, CloseInfo, Dismiss, Ignore }
+private enum class SwipeMode { None, Info, Dismiss }
 
 /** Width / height of the photo as shown (the decoded thumbnail knows the real orientation); 0 if unknown. */
 private fun contentAspect(item: MediaItem, thumbnail: ImageBitmap?): Float = when {

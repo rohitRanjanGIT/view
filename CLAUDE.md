@@ -218,7 +218,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   `TimelineScreen.kt`, `MediaGrid.kt`, `Motion.kt` (close 380 ms). See DECISIONS "Viewer overlay".
 - **Committed, not yet tried by me (2026-11-19): Apple-style fluid viewer gestures** (items 1-3 of the
   /apple-design pass: springs with velocity handoff into the close flight, momentum projection, 1:1 interruptible
-  details panel). See DECISIONS "Fluid viewer gestures". Remaining items of that pass: 4 rubber-banding, 5 press
+  details panel). See DECISIONS "Fluid viewer gestures". Item 4 (rubber-banding in the viewer) also done. Remaining: 5 press
   feedback, 6 haptics, 7 translucent chrome (blur library undecided), 8 type + reduced motion.
 - **Next (pick with me):**
   1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes

@@ -10,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import kotlin.math.PI
+import kotlin.math.abs
 
 /**
  * Shared motion specs. Springs are described the way Apple's fluid-interface guidance does: a damping ratio (1 = no
@@ -48,6 +49,25 @@ object GalleryMotion {
      */
     fun project(velocity: Float, decelerationRate: Float = 0.998f): Float =
         velocity / 1000f * decelerationRate / (1f - decelerationRate)
+
+    /**
+     * How far something dragged [overshoot] px past its limit actually moves: the further past, the less it follows,
+     * never more than [dimension]. Apple's rubber-band curve; a hard stop reads as frozen, resistance as "no more".
+     */
+    fun rubberBand(overshoot: Float, dimension: Float, constant: Float = 0.55f): Float {
+        if (dimension <= 0f) return 0f
+        val sign = if (overshoot < 0f) -1f else 1f
+        val o = abs(overshoot)
+        return sign * (o * dimension * constant) / (dimension + constant * o)
+    }
+
+    /** The finger overshoot that [rubberBand] turns into [shown]; lets a drag resume from a stretched position. */
+    fun rubberBandInverse(shown: Float, dimension: Float, constant: Float = 0.55f): Float {
+        if (dimension <= 0f) return 0f
+        val sign = if (shown < 0f) -1f else 1f
+        val y = abs(shown).coerceAtMost(dimension * 0.999f)
+        return sign * (y * dimension) / (constant * (dimension - y))
+    }
 
     const val OPEN_RESPONSE = 0.28f
     const val CLOSE_RESPONSE = 0.4f
