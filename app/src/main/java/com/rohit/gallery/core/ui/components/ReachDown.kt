@@ -172,14 +172,14 @@ fun rememberReachState(): ReachState = rememberSaveable(saver = ReachState.Saver
 /**
  * Wraps a scrolling grid ([content]) with pull-down-to-reach. The grid's own scrolling is untouched: only a drag
  * that the grid can't use (pulling down at its top) moves it down, and a push up first brings it back up.
- * [title] and [subtitle] show in the space above it, and [actions] (the screen's icons) in a row just above the grid.
+ * [title] (null when the screen's bar already shows its name) and [subtitle] show in the space above it, and [actions] (the screen's icons) in a row just above the grid.
  * [topInset] is how far below this area's top the grid's own content starts (the status bar, for Pictures).
  * [actionsOffset] moves the icon row down from its place just above the grid (Pictures puts it on the first day
  * header's line, where its search icon sits when the grid is up).
  */
 @Composable
 fun ReachDown(
-    title: String,
+    title: String?,
     subtitle: String?,
     modifier: Modifier = Modifier,
     topInset: Dp = 0.dp,
@@ -286,7 +286,7 @@ fun ReachDown(
  * the usual top bar and the icon row above the grid, measured on screen, so it sits at the same height everywhere.
  */
 @Composable
-private fun ReachTitle(title: String, subtitle: String?, state: ReachState, topInset: Dp) {
+private fun ReachTitle(title: String?, subtitle: String?, state: ReachState, topInset: Dp) {
     val density = LocalDensity.current
     val statusBarPx = WindowInsets.statusBars.getTop(density)
     val bandTopPx = statusBarPx + with(density) { TitleBandTop.toPx() }
@@ -308,20 +308,23 @@ private fun ReachTitle(title: String, subtitle: String?, state: ReachState, topI
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
+            if (title != null) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
             if (!subtitle.isNullOrEmpty()) {
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
+                    // Without a title above it (the screen's bar already names it), the count is the heading.
+                    style = if (title != null) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = if (title != null) 4.dp else 0.dp),
                 )
             }
         }

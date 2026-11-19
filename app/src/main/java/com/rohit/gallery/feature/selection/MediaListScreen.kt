@@ -138,7 +138,7 @@ fun MediaListScreen(
                     }
                     // Pull down at the top to bring the photos into thumb reach. A new [contentKey] (another album)
                     // starts a fresh grid, scrolled to the top.
-                    else -> ReachDown(title = title, subtitle = remember(items) { mediaCountLabel(items) }, state = reach, actions = titleActions) {
+                    else -> ReachDown(title = null, subtitle = remember(items) { mediaCountLabel(items) }, state = reach, actions = titleActions) {
                         key(contentKey) {
                             // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
                             if (asTimeline) {
