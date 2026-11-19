@@ -89,6 +89,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.model.mediaCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
+import com.rohit.gallery.core.ui.components.ReachTopIcons
+import com.rohit.gallery.core.ui.components.rememberReachState
 import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.FollowViewerPhoto
@@ -145,6 +147,8 @@ private fun TimelineContent(
     BackHandler(enabled = selecting) { selection.clear() }
     // The selection bars float over the grid as frosted glass; the grid keeps scrolling underneath.
     val haze = rememberChromeHaze()
+    // Pull-down-to-reach, held here so the search button can ride down with the grid.
+    val reach = rememberReachState()
 
     Box(Modifier.fillMaxSize()) {
         when (val s = state) {
@@ -160,11 +164,13 @@ private fun TimelineContent(
                         title = "Pictures",
                         subtitle = counts,
                         topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                        state = reach,
+                        actions = { if (!selecting) SearchIcon(onOpenSearch) },
                     ) {
                         TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
                     }
                 }
-                if (!selecting) SearchButton(onOpenSearch, Modifier.align(Alignment.TopEnd))
+                if (!selecting) ReachTopIcons(reach, Modifier.align(Alignment.TopEnd)) { SearchButton(onOpenSearch) }
                 if (selecting) {
                     CompositionLocalProvider(LocalChromeHaze provides haze) {
                         SelectionBars(viewModel, s, selection, Modifier.matchParentSize())
@@ -511,9 +517,14 @@ private fun TimelineFastScroller(
 @Composable
 private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier.windowInsetsPadding(WindowInsets.statusBars).height(DayHeaderHeight), Alignment.Center) {
-        IconButton(onClick = onClick) {
-            Icon(Icons.Filled.Search, contentDescription = "Search")
-        }
+        SearchIcon(onClick)
+    }
+}
+
+@Composable
+private fun SearchIcon(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(Icons.Filled.Search, contentDescription = "Search")
     }
 }
 

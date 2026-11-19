@@ -47,6 +47,8 @@ import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.model.mediaCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
+import com.rohit.gallery.core.ui.components.ReachState
+import com.rohit.gallery.core.ui.components.ReachTopIcons
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.key
 
@@ -113,7 +115,7 @@ fun MediaListScreen(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().hazeSource(haze)) {
             if (!selection.isSelecting) {
-                TitleBar(title, onBack, titleActions, titleAlpha = { 1f - reach.progress })
+                TitleBar(title, onBack, titleActions, reach)
             } else {
                 SelectionTopBar(
                     count = selection.ids.size,
@@ -129,7 +131,7 @@ fun MediaListScreen(
                 }
                 // Pull down at the top to bring the photos into thumb reach. A new [contentKey] (another album)
                 // starts a fresh grid, scrolled to the top.
-                else -> ReachDown(title = title, subtitle = remember(items) { mediaCountLabel(items) }, state = reach) {
+                else -> ReachDown(title = title, subtitle = remember(items) { mediaCountLabel(items) }, state = reach, actions = titleActions) {
                     key(contentKey) {
                         // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
                         if (asTimeline) {
@@ -190,7 +192,7 @@ private fun TitleBar(
     title: String,
     onBack: () -> Unit,
     actions: @Composable RowScope.() -> Unit,
-    titleAlpha: () -> Float,
+    reach: ReachState,
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -202,9 +204,10 @@ private fun TitleBar(
             }
             Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).graphicsLayer { alpha = titleAlpha() },
+                modifier = Modifier.weight(1f).graphicsLayer { alpha = 1f - reach.progress },
             )
-            actions()
+            // Back stays up here; the other icons ride down with the grid while it is pulled down.
+            ReachTopIcons(reach, content = actions)
         }
     }
 }

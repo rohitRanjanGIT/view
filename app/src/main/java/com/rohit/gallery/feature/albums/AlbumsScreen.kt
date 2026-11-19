@@ -3,6 +3,8 @@ package com.rohit.gallery.feature.albums
 import com.rohit.gallery.core.model.albumCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
+import com.rohit.gallery.core.ui.components.ReachState
+import com.rohit.gallery.core.ui.components.ReachTopIcons
 import com.rohit.gallery.feature.vault.rememberVaultLocker
 import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
@@ -148,7 +150,7 @@ fun AlbumsScreen(
                         sort = current?.sort ?: AlbumSort.Newest,
                         onSort = viewModel::setSort,
                         onEditAlbums = onEditAlbums,
-                        titleAlpha = { 1f - reach.progress },
+                        reach = reach,
                         modifier = Modifier.statusBarsPadding(),
                     )
                 }
@@ -159,7 +161,12 @@ fun AlbumsScreen(
                     }
                     else -> columns?.let { cols ->
                         // Pull down at the top to bring the albums into thumb reach.
-                        ReachDown(title = "Albums", subtitle = albumCountLabel(list.size), state = reach) {
+                        ReachDown(
+                            title = "Albums",
+                            subtitle = albumCountLabel(list.size),
+                            state = reach,
+                            actions = { AlbumsMenu(current?.sort ?: AlbumSort.Newest, viewModel::setSort, onEditAlbums) },
+                        ) {
                             AlbumGrid(
                                 list = list,
                                 columns = cols,
@@ -333,10 +340,9 @@ private fun AlbumsHeader(
     sort: AlbumSort,
     onSort: (AlbumSort) -> Unit,
     onEditAlbums: () -> Unit,
-    titleAlpha: () -> Float,
+    reach: ReachState,
     modifier: Modifier = Modifier,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -344,38 +350,45 @@ private fun AlbumsHeader(
         Text(
             "Albums",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.weight(1f).graphicsLayer { alpha = titleAlpha() },
+            modifier = Modifier.weight(1f).graphicsLayer { alpha = 1f - reach.progress },
         )
-        Box {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "Album options")
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                Text(
-                    "Sort by",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                AlbumSort.entries.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option.label) },
-                        onClick = {
-                            menuOpen = false
-                            onSort(option)
-                        },
-                        trailingIcon = { if (option == sort) Icon(Icons.Filled.Check, contentDescription = "Selected") },
-                    )
-                }
-                HorizontalDivider()
+        ReachTopIcons(reach) { AlbumsMenu(sort, onSort, onEditAlbums) }
+    }
+}
+
+/** The Albums tab's ⋮ menu: sort options and Edit albums. */
+@Composable
+private fun AlbumsMenu(sort: AlbumSort, onSort: (AlbumSort) -> Unit, onEditAlbums: () -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { menuOpen = true }) {
+            Icon(Icons.Filled.MoreVert, contentDescription = "Album options")
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            Text(
+                "Sort by",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            AlbumSort.entries.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text("Edit albums") },
+                    text = { Text(option.label) },
                     onClick = {
                         menuOpen = false
-                        onEditAlbums()
+                        onSort(option)
                     },
+                    trailingIcon = { if (option == sort) Icon(Icons.Filled.Check, contentDescription = "Selected") },
                 )
             }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Edit albums") },
+                onClick = {
+                    menuOpen = false
+                    onEditAlbums()
+                },
+            )
         }
     }
 }
