@@ -1,5 +1,10 @@
 package com.rohit.gallery.feature.albums
 
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.rohit.gallery.feature.selection.NewAlbumDialog
 import com.rohit.gallery.core.model.albumCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
@@ -114,6 +119,8 @@ fun AlbumsScreen(
     onOpenAlbum: (Album) -> Unit,
     onEditAlbums: () -> Unit,
     onOpenLocked: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onCreateAlbum: (name: String) -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
     contentBottomPadding: Dp,
     modifier: Modifier = Modifier,
@@ -139,6 +146,22 @@ fun AlbumsScreen(
         val list = current?.visible
         // Held here so the header's small title can fade out while the big one shows (grid pulled down).
         val reach = rememberReachState()
+        // New album (+), Search and the ⋮ menu: in the header, and riding above the grid while it is pulled down.
+        var naming by rememberSaveable { mutableStateOf(false) }
+        val icons: @Composable RowScope.() -> Unit = {
+            IconButton(onClick = { naming = true }) { Icon(Icons.Filled.Add, contentDescription = "New album") }
+            IconButton(onClick = onOpenSearch) { Icon(Icons.Filled.Search, contentDescription = "Search") }
+            AlbumsMenu(current?.sort ?: AlbumSort.Newest, viewModel::setSort, onEditAlbums)
+        }
+        if (naming) {
+            NewAlbumDialog(
+                onCreate = { name ->
+                    naming = false
+                    onCreateAlbum(name)
+                },
+                onDismiss = { naming = false },
+            )
+        }
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().hazeSource(haze)) {
                 if (selection.isSelecting) {
@@ -149,9 +172,7 @@ fun AlbumsScreen(
                     )
                 } else {
                     AlbumsHeader(
-                        sort = current?.sort ?: AlbumSort.Newest,
-                        onSort = viewModel::setSort,
-                        onEditAlbums = onEditAlbums,
+                        icons = icons,
                         reach = reach,
                         modifier = Modifier.statusBarsPadding(),
                     )
@@ -167,7 +188,7 @@ fun AlbumsScreen(
                             title = "Albums",
                             subtitle = albumCountLabel(list.size),
                             state = reach,
-                            actions = { AlbumsMenu(current?.sort ?: AlbumSort.Newest, viewModel::setSort, onEditAlbums) },
+                            actions = icons,
                             // Locked has no button anywhere: pull down here and hold for 2 seconds.
                             onHold = if (locker.enabled) onOpenLocked else null,
                         ) {
@@ -332,9 +353,7 @@ internal fun AlbumGrid(
 /** "Albums" title with a menu: sort options and Edit albums. */
 @Composable
 private fun AlbumsHeader(
-    sort: AlbumSort,
-    onSort: (AlbumSort) -> Unit,
-    onEditAlbums: () -> Unit,
+    icons: @Composable RowScope.() -> Unit,
     reach: ReachState,
     modifier: Modifier = Modifier,
 ) {
@@ -343,7 +362,7 @@ private fun AlbumsHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ReachBarTitle(reach, "Albums", MaterialTheme.typography.headlineMedium, Modifier.weight(1f))
-        ReachTopIcons(reach) { AlbumsMenu(sort, onSort, onEditAlbums) }
+        ReachTopIcons(reach, content = icons)
     }
 }
 

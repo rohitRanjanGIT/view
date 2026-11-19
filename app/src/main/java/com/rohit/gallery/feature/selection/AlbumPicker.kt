@@ -102,7 +102,7 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NewAlbumDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
+fun NewAlbumDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var touched by remember { mutableStateOf(false) }
     val error = albumNameError(name)

@@ -54,6 +54,7 @@ import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
 import com.rohit.gallery.feature.albums.AlbumDetailScreen
 import com.rohit.gallery.feature.albums.AlbumsScreen
 import com.rohit.gallery.feature.albums.EditAlbumsScreen
+import com.rohit.gallery.feature.albums.NewAlbumScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.search.SearchScreen
 import com.rohit.gallery.feature.settings.MenuScreen
@@ -153,6 +154,8 @@ fun GalleryNavHost(
                                     onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
                                     // The only way in: pull down on Albums and hold for 2 seconds.
                                     onOpenLocked = { navController.navigate(VaultRoute) },
+                                    onOpenSearch = { navController.navigate(SearchRoute) },
+                                    onCreateAlbum = { name -> navController.navigate(NewAlbumRoute(name)) },
                                     onEditAlbums = { navController.navigate(EditAlbumsRoute) },
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
@@ -179,6 +182,9 @@ fun GalleryNavHost(
                     }
                     topLevel<SettingsRoute>(navController) {
                         SettingsScreen(onBack = { navController.popBackStack() }, onOpenLocked = { navController.navigate(VaultRoute) })
+                    }
+                    composable<NewAlbumRoute> {
+                        NewAlbumScreen(onClose = { navController.popBackStack() })
                     }
                     topLevel<EditAlbumsRoute>(navController) {
                         EditAlbumsScreen(onBack = { navController.popBackStack() })

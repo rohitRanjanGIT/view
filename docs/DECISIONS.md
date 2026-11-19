@@ -514,3 +514,8 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   is no album, so it disappears. Same confirmation rules as trashing photos (Skip confirmation on: at once + Undo
   bar; off: Android asks). The folder itself may remain on storage, empty: MediaStore gives no way to remove
   directories, and asking for all-files access for that is not worth it.
+- **Albums tab: + (new album) and Search** (2026-11-19), next to the ⋮ (also in the icon row above the pulled-down
+  grid). Android only knows an album once a file is in it, so + asks for a name, then opens `NewAlbumScreen`: the
+  whole library like Pictures, where a tap picks a photo (never opens the viewer), and a pill with Copy here / Move
+  here (the existing `SelectionActions` copy / move into `MediaTransfer.newAlbum`; Move asks Android first). It
+  closes once the photos are in (`SelectionActions.finished`).

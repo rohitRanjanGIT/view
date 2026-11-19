@@ -136,6 +136,11 @@ class SelectionActions(
         }
     }
 
+    private val _finished = MutableSharedFlow<TransferResult>(extraBufferCapacity = 1)
+
+    /** Each finished move or copy (for a screen that closes once its photos are in place). */
+    val finished: SharedFlow<TransferResult> = _finished.asSharedFlow()
+
     private fun runTransfer(verb: String, items: List<MediaItem>, work: suspend () -> TransferResult) {
         scope.launch {
             _busy.value = true
@@ -144,6 +149,7 @@ class SelectionActions(
             } finally {
                 _busy.value = false
             }
+            _finished.tryEmit(result)
             selection.clear()
             repository.refresh()
             _messages.tryEmit(
