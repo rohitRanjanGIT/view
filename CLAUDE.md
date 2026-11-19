@@ -231,7 +231,9 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     longer zooms grids. Selection mode ends when the last item is deselected. Delete album (to Trash).
   - **New album:** Albums tab + asks a name, then a picker (tap to pick, Copy here / Move here). Verified by Claude on
     the phone (made "Test album" with one copied screenshot; still there, delete it with ⋮ > Delete album).
-    **+ inside an album** (add photos to an existing album): committed, not yet tried by anyone.
+    **+ inside an album** (add photos to an existing album): committed, not yet tried by anyone. Album review fixes
+    (2026-11-19, not yet tried on the phone): folder rules, double-tap guard, Stop, name clash, picker order; see
+    DECISIONS "Album fixes after a review".
 - **Git:** pushed up to `0ec32f3` (Delete album). Committed after that, not pushed: Albums + / search,
   New album, + inside an album, this handoff. Push when I say so.
 - **Next (pick with me):**

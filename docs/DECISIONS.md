@@ -523,3 +523,19 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   (`NewAlbumRoute(name, bucketId)`): the library minus what is already in that album, Copy here / Move here into the
   album's own folder (`MediaTransfer.destinationOf` its cover). Verified on the phone: + on Albums → "Test album" →
   one photo → Copy here made the album with the copy.
+- **Album fixes after a review** (2026-11-19):
+  - **Folders Android refuses:** MediaStore takes photos only under `DCIM/` / `Pictures/`, videos under `DCIM/` /
+    `Movies/` / `Pictures/` (`folderAccepts`). Move / Copy skip what can't go into the target and say why; the
+    "Add to" picker only lists what fits (a Movies album offers videos) and shows a message instead of a grid for
+    Download / WhatsApp folders. Chosen over writing into Download through the Downloads collection: simpler, and
+    Download isn't a real album.
+  - **One transfer at a time:** `SelectionActions.working` is set on the tap itself, so a double tap can't copy
+    twice; a declined Move prompt calls `cancelMove()`.
+  - **Progress with Stop:** `TransferProgressDialog` shows "n of N" and Stop. A copy stops mid-file too (own
+    256 KB loop checks the job) and the half-written copy is removed; a move stops before the next item.
+  - **Names:** a new album can't take an existing album's name (any case: folders ignore case, so it would merge).
+    The typed name survives rotation.
+  - **Picker:** albums in the Albums tab's order, without the album you are in.
+  - **Delete album** drops the albums' pins / custom places (`AlbumRepository.forget`), so a later album with the
+    same folder starts fresh; Undo puts them back.
+  - Back in the photo picker clears the picks first; + in an album waits for the album to load.

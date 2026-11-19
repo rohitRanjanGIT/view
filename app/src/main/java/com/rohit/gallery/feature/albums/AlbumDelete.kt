@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
+import com.rohit.gallery.core.data.repository.AlbumRepository
 import com.rohit.gallery.core.data.repository.MediaRepository
 import com.rohit.gallery.core.domain.MediaActions
 import com.rohit.gallery.core.model.MediaItem
@@ -29,6 +30,8 @@ interface AlbumDeleteEntryPoint {
     fun mediaActions(): MediaActions
 
     fun mediaRepository(): MediaRepository
+
+    fun albumRepository(): AlbumRepository
 }
 
 /**
@@ -51,6 +54,7 @@ fun rememberAlbumDeleter(onDeleted: () -> Unit = {}): AlbumDeleter {
     val entry = remember(app) { EntryPointAccessors.fromApplication(app, AlbumDeleteEntryPoint::class.java) }
     val actions = remember(entry) { entry.mediaActions() }
     val repository = remember(entry) { entry.mediaRepository() }
+    val albumRepository = remember(entry) { entry.albumRepository() }
     val scope = rememberCoroutineScope()
     val undoBar = LocalUndoBar.current
     val latestOnDeleted by rememberUpdatedState(onDeleted)
@@ -64,12 +68,18 @@ fun rememberAlbumDeleter(onDeleted: () -> Unit = {}): AlbumDeleter {
         if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
         repository.refresh()
         latestOnDeleted()
+        // The albums are gone: drop their pins / custom places (kept aside in case of Undo). Not in the
+        // composition's scope: the album screen closes right now, which would cancel it.
+        val forgotten = albumRepository.forgetAsync(items.map { it.bucketId }.distinct())
         if (undoBar != null && runCatching { MediaStore.canManageMedia(context) }.getOrDefault(false)) {
             val what = if (albums == 1) "album" else "$albums albums"
             undoBar.show(
                 "Moved $what to trash",
                 undo = { actions.restoreRequest(items.map { it.copy(isTrashed = true) }) },
-                onUndone = repository::refresh,
+                onUndone = {
+                    repository.refresh()
+                    albumRepository.restoreAsync(forgotten)
+                },
             )
         }
     }

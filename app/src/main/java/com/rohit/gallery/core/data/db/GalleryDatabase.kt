@@ -35,6 +35,9 @@ interface AlbumPrefDao {
 
     @Upsert
     suspend fun upsertAll(prefs: List<AlbumPrefEntity>)
+
+    @Query("DELETE FROM album_prefs WHERE bucketId IN (:bucketIds)")
+    suspend fun deleteAll(bucketIds: List<Long>)
 }
 
 // Version 2 added the vault table (a new table only, so Room migrates it from the exported schemas).

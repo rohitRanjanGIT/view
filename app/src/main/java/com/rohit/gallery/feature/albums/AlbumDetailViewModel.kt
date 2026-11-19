@@ -88,6 +88,7 @@ class AlbumDetailViewModel @Inject constructor(
         transfer = transfer,
         repository = repository,
         albumRepository = albumRepository,
+        currentBucket = { currentBucket.value },
     )
 
     private companion object {

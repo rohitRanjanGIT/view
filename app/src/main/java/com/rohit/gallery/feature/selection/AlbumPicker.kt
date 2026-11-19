@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,8 @@ fun AlbumPickerSheet(
     albums: List<Album>,
     onPick: (album: Album?, newName: String?) -> Unit,
     onDismiss: () -> Unit,
+    /** Every album's name, including any left out of [albums]: a new album can't take one of them. */
+    existingNames: List<String> = albums.map { it.name },
 ) {
     var creating by remember { mutableStateOf(false) }
 
@@ -79,7 +82,7 @@ fun AlbumPickerSheet(
         }
     }
 
-    if (creating) NewAlbumDialog(onCreate = { onPick(null, it) }, onDismiss = { creating = false })
+    if (creating) NewAlbumDialog(existingNames, onCreate = { onPick(null, it) }, onDismiss = { creating = false })
 }
 
 @Composable
@@ -101,11 +104,13 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
     }
 }
 
+/** Asks for a new album's name. [existingNames] are taken (a match would pour the photos into that album). */
 @Composable
-fun NewAlbumDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var touched by remember { mutableStateOf(false) }
-    val error = albumNameError(name)
+fun NewAlbumDialog(existingNames: List<String>, onCreate: (String) -> Unit, onDismiss: () -> Unit) {
+    // Saveable: the typed name survives a rotation.
+    var name by rememberSaveable { mutableStateOf("") }
+    var touched by rememberSaveable { mutableStateOf(false) }
+    val error = albumNameError(name, existingNames)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New album") },

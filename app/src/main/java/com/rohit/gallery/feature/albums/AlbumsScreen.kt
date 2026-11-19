@@ -155,6 +155,7 @@ fun AlbumsScreen(
         }
         if (naming) {
             NewAlbumDialog(
+                existingNames = list?.map { it.album.name }.orEmpty(),
                 onCreate = { name ->
                     naming = false
                     onCreateAlbum(name)

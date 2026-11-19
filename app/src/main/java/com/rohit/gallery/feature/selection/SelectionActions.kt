@@ -10,10 +10,19 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.dp
+import com.rohit.gallery.core.domain.folderAccepts
+import com.rohit.gallery.core.domain.folderLabel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,22 +67,33 @@ class SelectionActions(
     private val transfer: MediaTransfer,
     private val repository: MediaRepository,
     albumRepository: AlbumRepository,
+    /** The album this grid shows, if any: it is no target for its own photos. Read when the picker opens. */
+    val currentBucket: () -> Long? = { null },
 ) {
-    /** Albums to offer as a move/copy target. */
-    val albums: StateFlow<List<Album>> = albumRepository.albums
+    /** Albums to offer as a move/copy target, in the Albums tab's order (pins, sort, custom order). */
+    val albums: StateFlow<List<Album>> = albumRepository.organized
+        .map { organized -> organized?.visible?.map { it.album }.orEmpty() }
         .stateIn(scope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _busy = MutableStateFlow(false)
+    private val _progress = MutableStateFlow<TransferProgress?>(null)
 
-    /** True while a copy or move is running (copying big videos takes a while). */
-    val busy: StateFlow<Boolean> = _busy
+    /** The copy or move running now, with how far it got; null when idle (copying big videos takes a while). */
+    val progress: StateFlow<TransferProgress?> = _progress
+
+    /**
+     * True from the tap on Copy / Move until the work is over (or Android's prompt was declined). Guards against
+     * a second tap starting the same copy twice. UI calls only, so main thread only.
+     */
+    private var working = false
+    private var job: Job? = null
+    private var stopped = false
 
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
 
     /** One-off messages for a toast (results of move/copy). */
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
-    private var pendingMove: Pair<List<MediaItem>, Destination>? = null
+    private var pendingMove: PendingMove? = null
 
     /** The selected items that still exist. */
     fun selectedItems(): List<MediaItem> {
@@ -114,53 +134,167 @@ class SelectionActions(
             null
         }
 
-    /** Starts a move: returns the system write confirmation, then [finishMove] does the work once it is accepted. */
+    /**
+     * The selected items Android allows in [dest], plus a note on the rest (photos can't go into Download/, for
+     * one). Null, with a message, when none of them can go there.
+     */
+    private fun allowedIn(items: List<MediaItem>, dest: Destination): Pair<List<MediaItem>, String?>? {
+        val (ok, refused) = items.partition { folderAccepts(dest.relativePath, it.isVideo) }
+        val what = when {
+            refused.all { it.isVideo } -> "videos"
+            refused.none { it.isVideo } -> "photos"
+            else -> "photos or videos"
+        }
+        val note = if (refused.isEmpty()) null else "Android doesn't allow $what in ${folderLabel(dest.relativePath)}"
+        if (ok.isEmpty()) {
+            _messages.tryEmit(note ?: "Nothing to do")
+            return null
+        }
+        return ok to note?.let { "${refused.size} skipped: $it" }
+    }
+
+    /**
+     * Starts a move: returns the system write confirmation, then [finishMove] does the work once it is accepted
+     * (or [cancelMove] if it was declined). Null when there is nothing to start; any reason is in [messages].
+     */
     suspend fun moveRequest(album: Album?, newName: String?): IntentSender? {
-        val items = selectedItems().takeIf { it.isNotEmpty() } ?: return null
-        val dest = destination(album, newName) ?: return null
-        pendingMove = items to dest
-        return runCatching { transfer.writeRequest(items) }.getOrNull()
+        if (working) return null
+        val selected = selectedItems().takeIf { it.isNotEmpty() } ?: return null
+        working = true
+        val dest = destination(album, newName)
+        val allowed = dest?.let { allowedIn(selected, it) }
+        if (dest == null || allowed == null) {
+            working = false
+            return null
+        }
+        val (items, note) = allowed
+        val sender = runCatching { transfer.writeRequest(items) }.getOrNull()
+        if (sender == null) {
+            working = false
+            _messages.tryEmit("Couldn't start that action")
+            return null
+        }
+        pendingMove = PendingMove(items, dest, note)
+        return sender
     }
 
     fun finishMove() {
-        val (items, dest) = pendingMove ?: return
+        val move = pendingMove ?: run {
+            working = false
+            return
+        }
         pendingMove = null
-        runTransfer("Moved", items) { transfer.move(items, dest) }
+        runTransfer("Moved", move.items, move.note) { onProgress -> transfer.move(move.items, move.destination, onProgress) }
+    }
+
+    /** Android's move prompt was declined: nothing happens, and Move / Copy can be tapped again. */
+    fun cancelMove() {
+        pendingMove = null
+        working = false
     }
 
     fun copyTo(album: Album?, newName: String?) {
-        val items = selectedItems().takeIf { it.isNotEmpty() } ?: return
+        if (working) return
+        val selected = selectedItems().takeIf { it.isNotEmpty() } ?: return
+        working = true
         scope.launch {
-            val dest = destination(album, newName) ?: return@launch
-            runTransfer("Copied", items) { transfer.copy(items, dest) }
+            val dest = destination(album, newName)
+            val allowed = dest?.let { allowedIn(selected, it) }
+            if (dest == null || allowed == null) {
+                working = false
+                return@launch
+            }
+            val (items, note) = allowed
+            runTransfer("Copied", items, note) { onProgress -> transfer.copy(items, dest, onProgress) }
         }
+    }
+
+    /** Stops the running copy or move after the current item (a copy also stops mid-file). */
+    fun stop() {
+        stopped = true
+        job?.cancel()
     }
 
     private val _finished = MutableSharedFlow<TransferResult>(extraBufferCapacity = 1)
 
-    /** Each finished move or copy (for a screen that closes once its photos are in place). */
+    /** Each finished move or copy (for a screen that closes once its photos are in place). Not sent when stopped. */
     val finished: SharedFlow<TransferResult> = _finished.asSharedFlow()
 
-    private fun runTransfer(verb: String, items: List<MediaItem>, work: suspend () -> TransferResult) {
-        scope.launch {
-            _busy.value = true
-            val result = try {
-                work()
+    private fun runTransfer(
+        verb: String,
+        items: List<MediaItem>,
+        note: String?,
+        work: suspend (onProgress: (handled: Int, done: Int) -> Unit) -> TransferResult,
+    ) {
+        stopped = false
+        var done = 0
+        _progress.value = TransferProgress(verb, 0, items.size)
+        job = scope.launch {
+            var result: TransferResult? = null
+            try {
+                result = work { handled, ok ->
+                    done = ok
+                    _progress.value = TransferProgress(verb, handled, items.size)
+                }
             } finally {
-                _busy.value = false
-            }
-            _finished.tryEmit(result)
-            selection.clear()
-            repository.refresh()
-            _messages.tryEmit(
+                _progress.value = null
+                job = null
+                working = false
+                selection.clear()
+                repository.refresh()
+                val r = result
                 when {
-                    result.failed == 0 -> "$verb ${items.size} ${if (items.size == 1) "item" else "items"}"
-                    result.done == 0 -> "Couldn't complete that"
-                    else -> "$verb ${result.done}, ${result.failed} failed"
-                },
-            )
+                    r != null -> {
+                        _finished.tryEmit(r)
+                        _messages.tryEmit(transferMessage(verb, items.size, r, note))
+                    }
+                    stopped -> _messages.tryEmit("Stopped. $verb $done of ${items.size}")
+                    else -> _messages.tryEmit("Couldn't complete that")
+                }
+            }
         }
     }
+}
+
+/** A copy or move under way: [handled] of [total] items so far. */
+data class TransferProgress(val verb: String, val handled: Int, val total: Int)
+
+private class PendingMove(val items: List<MediaItem>, val destination: Destination, val note: String?)
+
+/** The toast after a copy or move. [note] says what was skipped before it started, if anything. */
+internal fun transferMessage(verb: String, count: Int, result: TransferResult, note: String?): String {
+    val main = when {
+        result.failed == 0 -> "$verb $count ${if (count == 1) "item" else "items"}"
+        result.done == 0 -> "Couldn't complete that"
+        else -> "$verb ${result.done}, ${result.failed} failed"
+    }
+    return if (note == null) main else "$main. $note"
+}
+
+/**
+ * The progress dialog for a running copy or move, with a count and Stop. Back can't dismiss it (a half-done
+ * move should be stopped on purpose, not by a stray swipe).
+ */
+@Composable
+fun TransferProgressDialog(controller: SelectionActions, title: String? = null) {
+    val progress by controller.progress.collectAsStateWithLifecycle()
+    val p = progress ?: return
+    AlertDialog(
+        onDismissRequest = {},
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = controller::stop) { Text("Stop") } },
+        title = { Text(title ?: if (p.verb == "Moved") "Moving…" else "Copying…") },
+        text = {
+            Column {
+                if (p.handled == 0) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(progress = { p.handled.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
+                }
+                Text("${p.handled} of ${p.total}", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+    )
 }
 
 /**
@@ -197,7 +331,7 @@ fun SelectionActionsBar(
     }
     // Moving needs its own write confirmation; the move itself runs once it is accepted.
     val moveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) controller.finishMove()
+        if (result.resultCode == Activity.RESULT_OK) controller.finishMove() else controller.cancelMove()
     }
 
     fun launch(launcher: androidx.activity.result.ActivityResultLauncher<IntentSenderRequest>, request: suspend () -> IntentSender?) {
@@ -215,7 +349,6 @@ fun SelectionActionsBar(
     val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
     var picker by remember { mutableStateOf<TransferKind?>(null) }
     val albums by controller.albums.collectAsStateWithLifecycle()
-    val busy by controller.busy.collectAsStateWithLifecycle()
     LaunchedEffect(controller) {
         controller.messages.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
@@ -244,26 +377,26 @@ fun SelectionActionsBar(
     )
 
     picker?.let { kind ->
+        // The album shown here is no target for its own photos (Copy would only duplicate them).
+        val current = remember(kind) { controller.currentBucket() }
         AlbumPickerSheet(
             title = if (kind == TransferKind.Move) "Move to album" else "Copy to album",
-            albums = albums,
+            albums = albums.filter { it.bucketId != current },
+            existingNames = albums.map { it.name },
             onDismiss = { picker = null },
             onPick = { album, newName ->
                 picker = null
                 if (kind == TransferKind.Copy) {
                     controller.copyTo(album, newName)
                 } else {
-                    launch(moveLauncher) { controller.moveRequest(album, newName) }
+                    // Failures explain themselves in a toast (controller.messages).
+                    scope.launch {
+                        val sender = controller.moveRequest(album, newName) ?: return@launch
+                        moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
+                    }
                 }
             },
         )
     }
-    if (busy) {
-        AlertDialog(
-            onDismissRequest = {},
-            confirmButton = {},
-            title = { Text("Working…") },
-            text = { LinearProgressIndicator(Modifier.fillMaxWidth()) },
-        )
-    }
+    TransferProgressDialog(controller)
 }

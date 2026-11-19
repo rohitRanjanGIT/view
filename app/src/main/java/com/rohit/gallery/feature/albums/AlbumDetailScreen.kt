@@ -51,7 +51,8 @@ fun AlbumDetailScreen(
         onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
         titleActions = {
             // Add photos from anywhere in the library into this album.
-            IconButton(onClick = { onAddPhotos(bucketId, title) }) {
+            // Only once the album is loaded, so the picker knows the album's real name.
+            IconButton(onClick = { onAddPhotos(bucketId, title) }, enabled = !items.isNullOrEmpty()) {
                 Icon(Icons.Filled.Add, contentDescription = "Add photos")
             }
             OrderMenu(

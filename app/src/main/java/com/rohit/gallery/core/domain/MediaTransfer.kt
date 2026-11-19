@@ -8,7 +8,10 @@ import com.rohit.gallery.core.model.MediaItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** Where moved or copied media goes: a folder path relative to the storage root, like `Pictures/Trip/`. */
@@ -19,8 +22,11 @@ data class TransferResult(val done: Int, val failed: Int)
 /** Normalises a folder path to the form MediaStore wants: no leading slash, one trailing slash. */
 fun normalizeRelativePath(path: String): String = path.trim('/').let { if (it.isEmpty()) "" else "$it/" }
 
-/** Why a typed album name can't be used, or null if it is fine. */
-fun albumNameError(name: String): String? {
+/**
+ * Why a typed album name can't be used, or null if it is fine. [existingNames] are the albums already there:
+ * a new album with one of those names (folders ignore upper / lower case) would quietly pour into that folder.
+ */
+fun albumNameError(name: String, existingNames: Collection<String> = emptyList()): String? {
     val n = name.trim()
     return when {
         n.isEmpty() -> "Enter a name"
@@ -28,9 +34,27 @@ fun albumNameError(name: String): String? {
         n.startsWith(".") -> "Name can't start with a dot"
         n.any { it == '/' || it == '\\' || it == ':' || it == '*' || it == '?' || it == '"' || it == '<' || it == '>' || it == '|' } ->
             "Name can't contain / \\ : * ? \" < > |"
+        existingNames.any { it.trim().equals(n, ignoreCase = true) } -> "An album with this name already exists"
         else -> null
     }
 }
+
+/**
+ * Whether Android lets an app put a photo ([isVideo] false) or video into [relativePath]. MediaStore only takes
+ * photos under DCIM/ or Pictures/, and videos under DCIM/, Movies/ or Pictures/; anything else (Download/,
+ * Android/media/..., Music/) is refused.
+ */
+fun folderAccepts(relativePath: String, isVideo: Boolean): Boolean {
+    val top = relativePath.trim('/').substringBefore('/')
+    val allowed = if (isVideo) VIDEO_FOLDERS else IMAGE_FOLDERS
+    return allowed.any { it.equals(top, ignoreCase = true) }
+}
+
+private val IMAGE_FOLDERS = listOf("DCIM", "Pictures")
+private val VIDEO_FOLDERS = listOf("DCIM", "Movies", "Pictures")
+
+/** "Download" for `Download/`, "WhatsApp Images" for `Android/media/.../WhatsApp Images/`: for messages. */
+fun folderLabel(relativePath: String): String = relativePath.trim('/').substringAfterLast('/').ifEmpty { relativePath }
 
 /**
  * Moves and copies media between albums (folders).
@@ -62,10 +86,18 @@ class MediaTransfer @Inject constructor(
         MediaStore.createWriteRequest(resolver, items.map { it.uri }).intentSender
     }
 
-    /** Moves [items] into [destination]. Call only after the write request was accepted. */
-    suspend fun move(items: List<MediaItem>, destination: Destination): TransferResult = withContext(Dispatchers.IO) {
+    /**
+     * Moves [items] into [destination]. Call only after the write request was accepted. [onProgress] gets how many
+     * are handled so far. Cancelling stops before the next item (each move is a single quick update).
+     */
+    suspend fun move(
+        items: List<MediaItem>,
+        destination: Destination,
+        onProgress: (handled: Int, done: Int) -> Unit = { _, _ -> },
+    ): TransferResult = withContext(Dispatchers.IO) {
         var done = 0
-        for (item in items) {
+        for ((i, item) in items.withIndex()) {
+            ensureActive()
             val ok = candidatePaths(item, destination).any { path ->
                 runCatching {
                     val values = ContentValues().apply { put(MediaStore.MediaColumns.RELATIVE_PATH, path) }
@@ -73,21 +105,40 @@ class MediaTransfer @Inject constructor(
                 }.getOrDefault(false)
             }
             if (ok) done++
+            onProgress(i + 1, done)
         }
         TransferResult(done, items.size - done)
     }
 
-    /** Copies [items] into [destination] as new files; the originals stay where they are. */
-    suspend fun copy(items: List<MediaItem>, destination: Destination): TransferResult = withContext(Dispatchers.IO) {
+    /**
+     * Copies [items] into [destination] as new files; the originals stay where they are. Cancelling stops mid-file
+     * too (a big video), and the half-written copy is removed.
+     */
+    suspend fun copy(
+        items: List<MediaItem>,
+        destination: Destination,
+        onProgress: (handled: Int, done: Int) -> Unit = { _, _ -> },
+    ): TransferResult = withContext(Dispatchers.IO) {
+        val job = coroutineContext[Job]
         var done = 0
-        for (item in items) {
-            val ok = candidatePaths(item, destination).any { path -> runCatching { copyOne(item, path) }.getOrDefault(false) }
+        for ((i, item) in items.withIndex()) {
+            ensureActive()
+            val ok = candidatePaths(item, destination).any { path ->
+                try {
+                    copyOne(item, path) { job?.isActive != false }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    false
+                }
+            }
             if (ok) done++
+            onProgress(i + 1, done)
         }
         TransferResult(done, items.size - done)
     }
 
-    private fun copyOne(item: MediaItem, relativePath: String): Boolean {
+    private fun copyOne(item: MediaItem, relativePath: String, active: () -> Boolean): Boolean {
         val name = resolver.query(item.uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) else null
         } ?: return false
@@ -108,7 +159,17 @@ class MediaTransfer @Inject constructor(
         try {
             val input = resolver.openInputStream(item.uri) ?: error("no input")
             val output = resolver.openOutputStream(target) ?: error("no output")
-            input.use { src -> output.use { dst -> src.copyTo(dst) } }
+            input.use { src ->
+                output.use { dst ->
+                    val buffer = ByteArray(256 * 1024)
+                    while (true) {
+                        if (!active()) throw CancellationException("Copy stopped")
+                        val read = src.read(buffer)
+                        if (read < 0) break
+                        dst.write(buffer, 0, read)
+                    }
+                }
+            }
             resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             return true
         } catch (e: Exception) {
