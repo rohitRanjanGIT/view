@@ -1,5 +1,7 @@
 package com.rohit.gallery.feature.albums
 
+import com.rohit.gallery.core.ui.components.frostedChrome
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,7 +69,7 @@ fun AlbumSelectionBar(
     val enabled = entries.isNotEmpty()
     val allPinned = enabled && entries.all { it.pinned }
     val allHidden = enabled && entries.all { it.hidden }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
+    Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome()) {
         Row(Modifier.navigationBarsPadding().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
             ActionItem(OrganizeIcons.Pin, if (allPinned) "Unpin" else "Pin", enabled, { onPin(ids, !allPinned) }, Modifier.weight(1f))
             ActionItem(

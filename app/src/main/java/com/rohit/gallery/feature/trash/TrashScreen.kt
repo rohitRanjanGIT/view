@@ -1,5 +1,7 @@
 package com.rohit.gallery.feature.trash
 
+import com.rohit.gallery.core.ui.components.frostedChrome
+import androidx.compose.ui.graphics.Color
 import android.app.Activity
 import android.content.IntentSender
 import android.widget.Toast
@@ -77,7 +79,7 @@ fun TrashScreen(
         onOpenMedia = onOpenMedia,
         gridHeader = "Items here are deleted automatically after 30 days.",
     ) { modifier ->
-        Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
+        Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome()) {
             Row(
                 Modifier.navigationBarsPadding().padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,

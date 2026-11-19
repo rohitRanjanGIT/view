@@ -1,5 +1,11 @@
 package com.rohit.gallery.feature.selection
 
+import androidx.compose.ui.graphics.Color
+import dev.chrisbanes.haze.hazeSource
+import com.rohit.gallery.core.ui.components.frostedChrome
+import com.rohit.gallery.core.ui.components.rememberChromeHaze
+import com.rohit.gallery.core.ui.components.LocalChromeHaze
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,8 +97,9 @@ fun MediaListScreen(
     val level by sizes.level.collectAsStateWithLifecycle()
     val columns by sizes.trashColumns.collectAsStateWithLifecycle()
 
+    val haze = rememberChromeHaze()
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().hazeSource(haze)) {
             if (!selection.isSelecting) {
                 TitleBar(title, onBack, titleActions)
             } else {
@@ -116,7 +123,10 @@ fun MediaListScreen(
             }
         }
 
-        if (selection.isSelecting) selectionBar(Modifier.align(Alignment.BottomCenter))
+        if (selection.isSelecting) {
+            // Frosted over the grid, which scrolls on underneath it.
+            CompositionLocalProvider(LocalChromeHaze provides haze) { selectionBar(Modifier.align(Alignment.BottomCenter)) }
+        }
     }
 }
 

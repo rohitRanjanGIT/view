@@ -1,5 +1,10 @@
 package com.rohit.gallery.navigation
 
+import androidx.compose.ui.graphics.Color
+import dev.chrisbanes.haze.hazeSource
+import com.rohit.gallery.core.ui.components.frostedChrome
+import com.rohit.gallery.core.ui.components.rememberChromeHaze
+import com.rohit.gallery.core.ui.components.LocalChromeHaze
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.EnterTransition
@@ -88,6 +93,8 @@ fun GalleryNavHost(
         with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() }
 
     val scope = rememberCoroutineScope()
+    // The bottom bar is frosted glass over the tabs, which scroll on underneath it.
+    val navHaze = rememberChromeHaze()
     val context = LocalContext.current
     val windowSize = LocalWindowInfo.current.containerSize
 
@@ -128,6 +135,7 @@ fun GalleryNavHost(
                         HomePager(
                             state = homePager,
                             userScrollEnabled = !selectionActive,
+                            modifier = Modifier.hazeSource(navHaze),
                         ) { page ->
                             when (page) {
                                 0 -> TimelineScreen(
@@ -221,7 +229,11 @@ fun GalleryNavHost(
                     enter = fadeIn(tween(GalleryMotion.FADE_MS)),
                     exit = fadeOut(tween(GalleryMotion.FADE_MS)),
                 ) {
-                    NavigationBar(Modifier.dragsPager(homePager, scope)) {
+                    NavigationBar(
+                        modifier = Modifier.dragsPager(homePager, scope).frostedChrome(navHaze),
+                        containerColor = Color.Transparent,
+                        tonalElevation = 0.dp,
+                    ) {
                         homeTabs.forEachIndexed { index, tab ->
                             NavigationBarItem(
                                 selected = homePager.targetPage == index,

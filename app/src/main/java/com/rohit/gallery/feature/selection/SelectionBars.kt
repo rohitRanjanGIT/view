@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.selection
 
+import com.rohit.gallery.core.ui.components.frostedChrome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,7 +49,7 @@ fun SelectionTopBar(
     onSelectAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
+    Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome(edgeAtTop = false)) {
         Row(
             Modifier
                 .statusBarsPadding()
@@ -78,7 +79,7 @@ fun SelectionActionBar(
     onCopy: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
+    Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome()) {
         Row(
             Modifier
                 .navigationBarsPadding()

@@ -1,5 +1,11 @@
 package com.rohit.gallery.feature.albums
 
+import androidx.compose.ui.graphics.Color
+import dev.chrisbanes.haze.hazeSource
+import com.rohit.gallery.core.ui.components.frostedChrome
+import com.rohit.gallery.core.ui.components.rememberChromeHaze
+import com.rohit.gallery.core.ui.components.LocalChromeHaze
+import androidx.compose.runtime.CompositionLocalProvider
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
@@ -120,9 +126,10 @@ fun AlbumsScreen(
         DisposableEffect(Unit) { onDispose { onSelectionModeChange(false) } }
         BackHandler(enabled = selection.isSelecting) { selection.clear() }
 
+        val haze = rememberChromeHaze()
         val list = current?.visible
         Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().hazeSource(haze)) {
                 if (selection.isSelecting) {
                     SelectionTopBar(
                         count = selection.ids.size,
@@ -154,7 +161,7 @@ fun AlbumsScreen(
                     }
                 }
             }
-            if (selection.isSelecting && list != null) {
+            if (selection.isSelecting && list != null) CompositionLocalProvider(LocalChromeHaze provides haze) {
                 AlbumSelectionBar(
                     entries = list.filter { it.album.bucketId in selection.ids },
                     onPin = { ids, pinned ->

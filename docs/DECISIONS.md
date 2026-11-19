@@ -380,3 +380,11 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   when MediaStore reports the change saved (not on the button press). Changed: pinch density switches use
   `SegmentTick` (a detent) and the fast-scroller's month change `SegmentFrequentTick`, instead of `TextHandleMove`.
   Not added: drag-select per item (too buzzy on fast drags), details panel open/close, trash.
+- **Frosted bars** (item 7): Haze 1.7.2 (`dev.chrisbanes.haze:haze`), the last release built with Kotlin 2.2 and
+  Compose 1.10 (1.7.3+ needs Kotlin 2.3+ metadata and Compose 1.12). It adds no permissions and leaves every
+  androidx / Kotlin version unchanged (only Compose Multiplatform's redirect stubs move 1.9.3 -> 1.10.0). One material
+  (`FrostedChrome.kt`): blur 28 dp, then `surfaceContainer` at 72 %, plus a hairline on the edge facing the content.
+  Used by the bottom tab bar (source: the home pager) and every selection bar (Pictures top + bottom, album /
+  Favourites / Videos / Trash bottom, Albums tab bottom); each screen marks its scrolling content `hazeSource` and
+  provides its state as `LocalChromeHaze` only around the bars, so no bar is inside its own source. Title bars that
+  sit above (not over) their content stay solid. Not done: the viewer's pills, the pinned day header.

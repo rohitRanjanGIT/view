@@ -1,5 +1,11 @@
 package com.rohit.gallery.feature.timeline
 
+import androidx.compose.ui.graphics.Color
+import dev.chrisbanes.haze.hazeSource
+import com.rohit.gallery.core.ui.components.frostedChrome
+import com.rohit.gallery.core.ui.components.rememberChromeHaze
+import com.rohit.gallery.core.ui.components.LocalChromeHaze
+import androidx.compose.runtime.CompositionLocalProvider
 import android.app.Activity
 import android.content.IntentSender
 import android.widget.Toast
@@ -135,6 +141,8 @@ private fun TimelineContent(
     LaunchedEffect(selecting) { onSelectionModeChange(selecting) }
     DisposableEffect(Unit) { onDispose { onSelectionModeChange(false) } }
     BackHandler(enabled = selecting) { selection.clear() }
+    // The selection bars float over the grid as frosted glass; the grid keeps scrolling underneath.
+    val haze = rememberChromeHaze()
 
     Box(Modifier.fillMaxSize()) {
         when (val s = state) {
@@ -143,9 +151,15 @@ private fun TimelineContent(
                 Text("No photos or videos yet", style = MaterialTheme.typography.titleMedium)
             }
             is TimelineUiState.Content -> {
-                TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
+                Box(Modifier.fillMaxSize().hazeSource(haze)) {
+                    TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
+                }
                 if (!selecting) SearchButton(onOpenSearch, Modifier.align(Alignment.TopEnd))
-                if (selecting) SelectionBars(viewModel, s, selection, Modifier.matchParentSize())
+                if (selecting) {
+                    CompositionLocalProvider(LocalChromeHaze provides haze) {
+                        SelectionBars(viewModel, s, selection, Modifier.matchParentSize())
+                    }
+                }
             }
         }
     }

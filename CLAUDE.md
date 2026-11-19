@@ -218,8 +218,8 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   `TimelineScreen.kt`, `MediaGrid.kt`, `Motion.kt` (close 380 ms). See DECISIONS "Viewer overlay".
 - **Apple-style pass (/apple-design), 2026-11-19, pushed.** Verified by me: 1-3 fluid viewer gestures (springs with
   velocity handoff into the close flight, momentum projection, 1:1 interruptible details panel, no tap lock while a
-  photo flies home), 4 rubber-banding. Verified: 5 press feedback on grid cells. Committed, not yet tried by me: 6 haptics. Remaining:
-  7 translucent chrome (blur library undecided), 8 type + reduced motion. See DECISIONS "Fluid viewer
+  photo flies home), 4 rubber-banding. Verified: 5 press feedback on grid cells. Verified: 6 haptics. Committed, not yet tried by me: 7 frosted bars (Haze 1.7.2). Remaining:
+  8 type + reduced motion. See DECISIONS "Fluid viewer
   gestures".
 - **Next (pick with me):**
   1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes

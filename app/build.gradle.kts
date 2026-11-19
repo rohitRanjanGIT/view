@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.coil.video)
     implementation(libs.coil.gif)
     implementation(libs.telephoto.zoomable.image.coil)
+    implementation(libs.haze)
     implementation(libs.androidx.exifinterface)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui.compose)
