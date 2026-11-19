@@ -77,6 +77,7 @@ fun SelectionActionBar(
     onTrash: () -> Unit,
     onMove: (() -> Unit)? = null,
     onCopy: (() -> Unit)? = null,
+    onLock: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome()) {
@@ -95,13 +96,14 @@ fun SelectionActionBar(
                 Modifier.weight(1f),
             )
             ActionItem(Icons.Filled.Delete, "Trash", enabled, onTrash, Modifier.weight(1f))
-            if (onMove != null && onCopy != null) {
+            if (onMove != null || onCopy != null || onLock != null) {
                 var menuOpen by remember { mutableStateOf(false) }
                 Box(Modifier.weight(1f)) {
                     ActionItem(Icons.Filled.MoreVert, "More", enabled, { menuOpen = true }, Modifier.fillMaxWidth())
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("Move to album") }, onClick = { menuOpen = false; onMove() })
-                        DropdownMenuItem(text = { Text("Copy to album") }, onClick = { menuOpen = false; onCopy() })
+                        if (onMove != null) DropdownMenuItem(text = { Text("Move to album") }, onClick = { menuOpen = false; onMove() })
+                        if (onCopy != null) DropdownMenuItem(text = { Text("Copy to album") }, onClick = { menuOpen = false; onCopy() })
+                        if (onLock != null) DropdownMenuItem(text = { Text("Lock") }, onClick = { menuOpen = false; onLock() })
                     }
                 }
             }

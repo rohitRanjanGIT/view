@@ -1,5 +1,7 @@
 package com.rohit.gallery.feature.albums
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import com.rohit.gallery.core.ui.components.frostedChrome
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +65,7 @@ fun AlbumSelectionBar(
     entries: List<AlbumEntry>,
     onPin: (ids: List<Long>, pinned: Boolean) -> Unit,
     onHide: (ids: List<Long>, hidden: Boolean) -> Unit,
+    onLock: ((ids: List<Long>) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val ids = entries.map { it.album.bucketId }
@@ -79,6 +82,7 @@ fun AlbumSelectionBar(
                 { onHide(ids, !allHidden) },
                 Modifier.weight(1f),
             )
+            if (onLock != null) ActionItem(Icons.Filled.Lock, "Lock", enabled, { onLock(ids) }, Modifier.weight(1f))
         }
     }
 }

@@ -33,6 +33,8 @@ val homeTabs: List<HomeTab> = listOf(
     val searchQuery: String? = null,
     val externalUri: String? = null,
     val externalMime: String? = null,
+    /** Page through Locked (the vault) instead; only reachable after unlocking it. */
+    val vault: Boolean = false,
 )
 
 /** The recycle bin, opened from the Menu tab. */
@@ -52,6 +54,9 @@ val homeTabs: List<HomeTab> = listOf(
 
 /** App settings, opened from the Menu tab. */
 @Serializable data object SettingsRoute
+
+/** Locked photos and videos (the vault), opened from the Menu tab. */
+@Serializable data object VaultRoute
 
 /** Pin, hide and reorder albums, opened from the Albums tab menu. */
 @Serializable data object EditAlbumsRoute

@@ -61,6 +61,15 @@ object GalleryIcons {
         }
     }
 
+    /** Unlock (line icon): a padlock with its shackle swung open. */
+    val LockOpen: ImageVector by lazy {
+        lineIcon("LockOpen") {
+            roundRect(4.5f, 10.5f, 19.5f, 20.5f, 2.5f)
+            moveTo(8f, 10.5f); verticalLineTo(7.5f); arcTo(4f, 4f, 0f, false, true, 16f, 7.5f)
+            moveTo(12f, 14.5f); verticalLineTo(16.5f)
+        }
+    }
+
     private fun icon(name: String, block: PathBuilder.() -> Unit): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
             .path(fill = SolidColor(Color.Black), pathBuilder = block)

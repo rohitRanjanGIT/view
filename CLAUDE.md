@@ -17,6 +17,8 @@ safety beat feature count. Every feature must feel instant on a library of
    through `MediaStore.createTrashRequest` (recoverable). Permanent deletion
    only from the Trash screen via `createDeleteRequest`, with user confirmation.
    Edits are always saved as new copies.
+   *Approved exception (2026-11-19):* locking into Locked deletes the original via `createDeleteRequest`,
+   but only after the vault copy is verified byte for byte (see DECISIONS "Locked").
 2. **Offline and private.** Do NOT declare the `INTERNET` permission. No
    analytics, no cloud, no third-party SDKs that phone home.
 3. **Original work only.** Take inspiration from One UI's layout and behavior,
@@ -221,6 +223,8 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   photo flies home), 4 rubber-banding. Verified: 5 press feedback on grid cells. Verified: 6 haptics. Verified: 7 frosted bars (Haze 1.7.2). Committed, not yet tried by me: 8 typography (size-specific tracking) and the
   "Remove animations" check. That completes the pass. See DECISIONS "Fluid viewer
   gestures".
+- **Committed, not yet tried by me (2026-11-19): Locked (vault).** Menu > Locked, lock from selection More menu,
+  viewer menu, Albums tab. Test with copies only (e.g. `Pictures/Gallery test`). See DECISIONS "Locked".
 - **Next (pick with me):**
   1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes
      after sharing). Proposed 2026-11-18; my answers on notification vs in-app card, delay (5 min suggested), and

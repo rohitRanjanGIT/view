@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.selection
 
+import com.rohit.gallery.feature.vault.rememberVaultLocker
 import android.app.Activity
 import android.content.Intent
 import android.content.IntentSender
@@ -183,6 +184,8 @@ fun SelectionActionsBar(
         }
     }
 
+    // Lock: copies into Locked, then Android confirms deleting the originals.
+    val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
     var picker by remember { mutableStateOf<TransferKind?>(null) }
     val albums by controller.albums.collectAsStateWithLifecycle()
     val busy by controller.busy.collectAsStateWithLifecycle()
@@ -206,6 +209,7 @@ fun SelectionActionsBar(
         onTrash = { launch(writeLauncher) { controller.trashRequest() } },
         onMove = if (allowTransfer) ({ picker = TransferKind.Move }) else null,
         onCopy = if (allowTransfer) ({ picker = TransferKind.Copy }) else null,
+        onLock = if (allowTransfer) ({ locker.lock(controller.selectedItems()) }) else null,
         modifier = modifier,
     )
 

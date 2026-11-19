@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.albums
 
+import com.rohit.gallery.feature.vault.rememberVaultLocker
 import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
 import com.rohit.gallery.core.ui.components.frostedChrome
@@ -127,6 +128,7 @@ fun AlbumsScreen(
         BackHandler(enabled = selection.isSelecting) { selection.clear() }
 
         val haze = rememberChromeHaze()
+        val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
         val list = current?.visible
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().hazeSource(haze)) {
@@ -175,6 +177,10 @@ fun AlbumsScreen(
                             val what = if (ids.size == 1) "Album hidden" else "${ids.size} albums hidden"
                             Toast.makeText(context, "$what. Show them again in Edit albums.", Toast.LENGTH_SHORT).show()
                         }
+                    },
+                    onLock = { ids ->
+                        // The whole album moves into Locked; it disappears from Albums once the originals are deleted.
+                        locker.lock(viewModel.itemsIn(ids))
                     },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
@@ -26,6 +27,7 @@ fun MenuScreen(
     onOpenFavorites: () -> Unit,
     onOpenVideos: () -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenLocked: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -33,6 +35,7 @@ fun MenuScreen(
         Text("Menu", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(24.dp))
         MenuRow(Icons.Filled.Favorite, "Favourites", onOpenFavorites)
         MenuRow(Icons.Filled.PlayArrow, "Videos", onOpenVideos)
+        MenuRow(Icons.Filled.Lock, "Locked", onOpenLocked)
         MenuRow(Icons.Filled.Delete, "Trash", onOpenTrash)
         MenuRow(Icons.Filled.Settings, "Settings", onOpenSettings)
     }

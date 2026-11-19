@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import com.rohit.gallery.core.data.db.AlbumPrefDao
 import com.rohit.gallery.core.data.db.GalleryDatabase
+import com.rohit.gallery.core.data.db.VaultDao
+import com.rohit.gallery.core.data.vault.VaultStorage
+import java.io.File
 import com.rohit.gallery.core.data.repository.HiddenAlbums
 import com.rohit.gallery.core.data.repository.RoomHiddenAlbums
 import dagger.Binds
@@ -24,6 +27,14 @@ object DatabaseModule {
 
     @Provides
     fun provideAlbumPrefDao(db: GalleryDatabase): AlbumPrefDao = db.albumPrefs()
+
+    @Provides
+    fun provideVaultDao(db: GalleryDatabase): VaultDao = db.vault()
+
+    /** The vault folder in app-private storage (no other app or file manager can read it). */
+    @Provides
+    @Singleton
+    fun provideVaultStorage(@ApplicationContext context: Context): VaultStorage = VaultStorage(File(context.filesDir, "vault"))
 }
 
 @Module

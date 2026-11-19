@@ -14,6 +14,7 @@ import com.rohit.gallery.core.data.mediastore.mediaStoreIdOf
 import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
 import com.rohit.gallery.core.domain.MediaActions
+import com.rohit.gallery.core.data.vault.VaultRepository
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.data.prefs.AppPreferences
 import com.rohit.gallery.core.data.prefs.AppSettings
@@ -71,6 +72,7 @@ class ViewerViewModel @AssistedInject constructor(
     private val actions: MediaActions,
     private val infoLoader: MediaInfoLoader,
     private val externalResolver: ExternalMediaResolver,
+    private val vault: VaultRepository,
     val playbackPositions: PlaybackPositionStore,
 ) : ViewModel() {
 
@@ -86,6 +88,9 @@ class ViewerViewModel @AssistedInject constructor(
     /** True when paging through the recycle bin: the viewer then offers Restore and Delete. */
     val isTrash: Boolean = route.trashed
 
+    /** True when paging through Locked: the viewer then offers Unlock and Delete, and nothing that hands the file out. */
+    val isVault: Boolean = route.vault
+
     /** Hands [item] to Google Photos' editor (or another editor); false if none could be opened. */
     fun openInEditor(item: MediaItem): Boolean = actions.openInEditor(item)
 
@@ -95,6 +100,7 @@ class ViewerViewModel @AssistedInject constructor(
     /** Items the pager swipes through, newest first; null until the index is ready. */
     val items: StateFlow<List<MediaItem>?> = when {
         route.trashed -> trashItems
+        route.vault -> vault.items
         route.externalUri != null -> externalTarget
             .flatMapLatest { target ->
                 when (target) {
@@ -184,6 +190,12 @@ class ViewerViewModel @AssistedInject constructor(
 
     suspend fun deleteRequest(item: MediaItem): IntentSender? =
         runCatching { actions.deleteRequest(listOf(item)) }.getOrNull()
+
+    /** Puts a locked photo back into the album it came from; true if it worked. */
+    suspend fun unlock(item: MediaItem): Boolean = vault.unlock(listOf(item)).done == 1
+
+    /** Deletes a locked photo for good (the screen confirms first: it is the only copy). */
+    suspend fun deleteFromVault(item: MediaItem): Boolean = vault.deleteForever(listOf(item)) == 1
 
     suspend fun loadDetails(item: MediaItem): MediaDetails = infoLoader.load(item)
 

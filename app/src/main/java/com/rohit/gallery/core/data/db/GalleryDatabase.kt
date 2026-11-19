@@ -1,5 +1,6 @@
 package com.rohit.gallery.core.data.db
 
+import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -36,7 +37,15 @@ interface AlbumPrefDao {
     suspend fun upsertAll(prefs: List<AlbumPrefEntity>)
 }
 
-@Database(entities = [AlbumPrefEntity::class], version = 1, exportSchema = true)
+// Version 2 added the vault table (a new table only, so Room migrates it from the exported schemas).
+@Database(
+    entities = [AlbumPrefEntity::class, VaultItemEntity::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
+)
 abstract class GalleryDatabase : RoomDatabase() {
     abstract fun albumPrefs(): AlbumPrefDao
+
+    abstract fun vault(): VaultDao
 }

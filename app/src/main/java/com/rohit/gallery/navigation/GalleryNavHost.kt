@@ -56,6 +56,7 @@ import com.rohit.gallery.feature.settings.MenuScreen
 import com.rohit.gallery.feature.settings.SettingsScreen
 import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.timeline.TimelineScreen
+import com.rohit.gallery.feature.vault.VaultScreen
 import com.rohit.gallery.feature.viewer.ViewerScreen
 import com.rohit.gallery.feature.viewer.prefetchViewerImage
 import com.rohit.gallery.feature.viewer.rememberViewerViewModelFactory
@@ -152,6 +153,7 @@ fun GalleryNavHost(
                                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
                                     onOpenVideos = { navController.navigate(VideosRoute) },
                                     onOpenTrash = { navController.navigate(TrashRoute) },
+                                    onOpenLocked = { navController.navigate(VaultRoute) },
                                     onOpenSettings = { navController.navigate(SettingsRoute) },
                                     modifier = Modifier.padding(bottom = contentBottomPadding),
                                 )
@@ -192,6 +194,14 @@ fun GalleryNavHost(
                         VideosScreen(
                             onBack = { navController.popBackStack() },
                             onOpenMedia = { item -> openViewer(host, item, ViewerRoute(item.id, videosOnly = true)) },
+                        )
+                    }
+                    topLevel<VaultRoute>(navController) { host ->
+                        VaultScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenMedia = { item -> openViewer(host, item, ViewerRoute(item.id, vault = true)) },
+                            // Locking again closes a locked photo that is still open.
+                            onRelock = { host.close() },
                         )
                     }
                     topLevel<TrashRoute>(navController) { host ->

@@ -3,7 +3,9 @@ package com.rohit.gallery.feature.albums
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rohit.gallery.core.data.repository.AlbumRepository
+import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
+import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.data.prefs.AppPreferences
 import com.rohit.gallery.core.model.AlbumSort
 import com.rohit.gallery.core.model.OrganizedAlbums
@@ -39,6 +41,12 @@ class AlbumsViewModel @Inject constructor(
     fun setPinned(bucketIds: List<Long>, pinned: Boolean) = launch { albums.setPinned(bucketIds, pinned) }
 
     fun setHidden(bucketIds: List<Long>, hidden: Boolean) = launch { albums.setHidden(bucketIds, hidden) }
+
+    /** Every photo and video in [bucketIds] (hidden albums too), to lock whole albums. */
+    fun itemsIn(bucketIds: List<Long>): List<MediaItem> {
+        val ids = bucketIds.toSet()
+        return (repository.allState.value as? MediaIndexState.Ready)?.items.orEmpty().filter { it.bucketId in ids }
+    }
 
     fun saveCustomOrder(bucketIds: List<Long>) = launch { albums.saveCustomOrder(bucketIds) }
 

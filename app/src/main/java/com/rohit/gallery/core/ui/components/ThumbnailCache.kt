@@ -2,10 +2,12 @@ package com.rohit.gallery.core.ui.components
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.media.ThumbnailUtils
 import android.os.CancellationSignal
 import android.util.LruCache
 import android.util.Size
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.rohit.gallery.core.data.vault.VaultFiles
 import com.rohit.gallery.core.model.MediaItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -34,6 +36,7 @@ val MediaItem.thumbKey: ThumbKey get() = ThumbKey(id, dateModifiedMs)
 @Singleton
 class ThumbnailCache @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val vaultFiles: VaultFiles,
 ) {
     /** A cached bitmap and the cell size it was decoded for (the grid density can change). */
     private class Entry(val bitmap: Bitmap, val cellSizePx: Int)
@@ -81,7 +84,14 @@ class ThumbnailCache @Inject constructor(
             val signal = CancellationSignal()
             cont.invokeOnCancellation { signal.cancel() }
             try {
-                cont.resume(context.contentResolver.loadThumbnail(uri, Size(box, box), signal))
+                // Vault files are not in MediaStore: decode them from the private file (sampled to the box).
+                val vaultFile = vaultFiles.fileFor(uri)
+                val bitmap = when {
+                    vaultFile == null -> context.contentResolver.loadThumbnail(uri, Size(box, box), signal)
+                    item.isVideo -> ThumbnailUtils.createVideoThumbnail(vaultFile, Size(box, box), signal)
+                    else -> ThumbnailUtils.createImageThumbnail(vaultFile, Size(box, box), signal)
+                }
+                cont.resume(bitmap)
             } catch (e: Exception) {
                 cont.resumeWithException(e)
             }

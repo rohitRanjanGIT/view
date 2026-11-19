@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the vault folder in app-private storage is served, and only to this app or an app it grants one file to (share). -->
+<paths>
+    <files-path name="vault" path="vault/" />
+</paths>

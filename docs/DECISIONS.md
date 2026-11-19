@@ -411,3 +411,30 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   blur 48 dp, surfaceContainerHigh at 86 %), outlined 1.8-stroke line icons (`GalleryIcons.lineIcon`), and one
   neutral pill (onSurface at 12 %) that slides with the pager's live position via `graphicsLayer` (no recomposition
   while swiping). No ripple on tabs: the sliding pill is the feedback. Content padding above it 92 dp.
+
+## Locked (vault), 2026-11-19
+- **Real vault, by the user's choice:** locked photos must be invisible to every other app, so locking *moves* files
+  into app-private storage (`filesDir/vault`), which other apps and file managers can't read. Not encrypted for now
+  (user's call: app-private storage plus the phone's own encryption; our own key would add a "lost key = lost photos"
+  risk and slow every open).
+- **Hard-rule exception, approved by the user:** locking deletes the original from shared storage, not via Trash
+  (Trash would leave it visible to other apps for 30 days). Only after the vault copy is verified byte for byte, and
+  through Android's own `createDeleteRequest` confirmation. Deleting from Locked is the only copy, so it is confirmed.
+- **Safe move:** `VaultStorage.store` writes a `.part` file, fsyncs, re-hashes it against the SHA-256 of the bytes
+  read, then renames; a failed copy leaves nothing. Rows (`vault_items`, Room v2 via AutoMigration) start `pending`;
+  after the delete confirmation each row is settled by whether its original still exists (gone: keep; still there:
+  remove the duplicate; can't tell: wait). The same check runs on start for locks interrupted by process death.
+  Unlock inserts into the original `RELATIVE_PATH` (fallback `Pictures/Restored/`, `Movies/Restored/`), re-hashes the
+  written copy, and only then deletes the vault file.
+- **Viewing:** vault files are served by a non-exported `FileProvider` (`${applicationId}.vault`), so Coil,
+  Telephoto, Media3 and the info panel work unchanged; ids are negative (`VaultIds`, base 2^40) so they never clash.
+  Grid thumbnails come from `ThumbnailUtils` on the private file (MediaStore has none for them).
+- **Unlock to view:** the framework `BiometricPrompt` (BIOMETRIC_STRONG or DEVICE_CREDENTIAL), so no new library and
+  no app PIN. `VaultSession` relocks on the screen's ON_STOP (leaving it, hiding the app, screen off), which also
+  closes an open locked photo. `FLAG_SECURE` while Locked is shown (no screenshots, blank recents preview).
+- **Where:** Menu > Locked (grid, Share / Unlock / Delete, Unlock everything); "Lock" in the selection bar's More menu
+  (Pictures, albums, Favourites, Videos), in the viewer's menu, and on the Albums tab selection bar (whole albums).
+  Locked photos offer no edit / favourite / "open with" (those would hand the file out); Share stays.
+- **Uninstall / backup:** `android:hasFragileUserData="true"` makes Android ask "keep app data?" on uninstall;
+  clearing data still wipes the vault, so "Unlock everything" is the escape hatch. `allowBackup` is now false (Google's
+  cloud backup would have uploaded the vault; the offline rule forbids it).

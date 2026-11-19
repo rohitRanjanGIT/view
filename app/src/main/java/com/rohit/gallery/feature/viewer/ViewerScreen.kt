@@ -1,5 +1,8 @@
 package com.rohit.gallery.feature.viewer
 
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import android.app.Activity
 import android.content.Intent
 import android.content.IntentSender
@@ -113,6 +116,8 @@ import com.rohit.gallery.core.ui.components.FavoriteHeartRed
 import com.rohit.gallery.core.ui.components.LocalThumbnailCache
 import com.rohit.gallery.core.ui.components.rememberSharedTransitionActive
 import com.rohit.gallery.core.ui.components.thumbKey
+import com.rohit.gallery.core.ui.icons.GalleryIcons
+import com.rohit.gallery.feature.vault.rememberVaultLocker
 import kotlin.math.abs
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.filterNotNull
@@ -161,6 +166,10 @@ fun ViewerScreen(
     val list = items
     if (list == null) {
         Box(modifier.fillMaxSize().background(Color.Black))
+    } else if (list.isEmpty() && viewModel.isVault) {
+        // The last locked photo was unlocked or deleted.
+        Box(modifier.fillMaxSize().background(Color.Black))
+        LaunchedEffect(Unit) { onBack() }
     } else if (list.isEmpty() && viewModel.isExternal) {
         val context = LocalContext.current
         Box(modifier.fillMaxSize().background(Color.Black))
@@ -243,6 +252,25 @@ private fun ViewerContent(
     val playback = rememberPlayback(currentItem, muted, viewModel.playbackPositions)
     val trashActions = rememberTrashViewerActions(viewModel)
     TrashViewerDialog(trashActions, currentItem)
+    // Locking from the viewer (normal photos) and deleting from Locked (vault photos: the only copy, so confirmed).
+    val locker = rememberVaultLocker()
+    val vaultScope = rememberCoroutineScope()
+    var confirmVaultDelete by remember { mutableStateOf(false) }
+    if (confirmVaultDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmVaultDelete = false },
+            title = { Text("Delete permanently?") },
+            text = { Text("This is only in Locked, so this deletes the only copy. This can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmVaultDelete = false
+                    val item = currentItem
+                    vaultScope.launch { viewModel.deleteFromVault(item) }
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmVaultDelete = false }) { Text("Cancel") } },
+        )
+    }
 
     // Drag down (any diagonal) to dismiss, drag up to open the info sheet. The image follows the
     // finger in both axes; the transform is applied inside the shared element (see ViewerPage) so
@@ -397,6 +425,21 @@ private fun ViewerContent(
                 ViewerAction(Icons.Outlined.Delete, "Delete forever", trashActions::askDelete),
             ),
         )
+    } else if (viewModel.isVault) {
+        // Locked: no favourite, edit or "open with" (they would hand the file to other apps or MediaStore).
+        BottomActions(
+            start = ViewerAction(Icons.Outlined.Share, "Share", { startOrToast(viewModel.shareIntent(currentItem)) }),
+            middle = listOf(
+                ViewerAction(GalleryIcons.LockOpen, "Unlock", {
+                    val item = currentItem
+                    scope.launch {
+                        val ok = viewModel.unlock(item)
+                        Toast.makeText(context, if (ok) "Moved back to its album" else "Couldn't unlock that; it's still in Locked", Toast.LENGTH_SHORT).show()
+                    }
+                }),
+                ViewerAction(Icons.Outlined.Delete, "Delete forever", { confirmVaultDelete = true }),
+            ),
+        )
     } else {
         BottomActions(
             start = ViewerAction(Icons.Outlined.Share, "Share", { startOrToast(viewModel.shareIntent(currentItem)) }),
@@ -426,7 +469,9 @@ private fun ViewerContent(
             },
         )
     }
-    fun viewerMenu(item: MediaItem): List<ViewerMenuEntry> = if (viewModel.isTrash) emptyList() else buildList {
+    fun viewerMenu(item: MediaItem): List<ViewerMenuEntry> = if (viewModel.isTrash || viewModel.isVault) emptyList() else buildList {
+        // Moves the photo into Locked (copied and checked first, then the original is deleted with Android's confirmation).
+        if (viewModel.canWrite(item)) add(ViewerMenuEntry("Lock") { locker.lock(listOf(item)) })
         fun intent(action: String) = Intent(action)
             .setDataAndType(item.uri, item.mimeType.ifBlank { if (item.isVideo) "video/*" else "image/*" })
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
