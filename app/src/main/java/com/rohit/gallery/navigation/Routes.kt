@@ -63,5 +63,8 @@ val homeTabs: List<HomeTab> = listOf(
 /** Pin, hide and reorder albums, opened from the Albums tab menu. */
 @Serializable data object EditAlbumsRoute
 
-/** Picking the photos for a new album named [name] (Albums tab, +). */
-@Serializable data class NewAlbumRoute(val name: String)
+/**
+ * Picking photos to put in an album: a new one named [name] (Albums tab, +), or the existing album [bucketId] (the +
+ * inside an album).
+ */
+@Serializable data class NewAlbumRoute(val name: String, val bucketId: Long? = null)

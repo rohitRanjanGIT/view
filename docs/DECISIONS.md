@@ -519,3 +519,7 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   whole library like Pictures, where a tap picks a photo (never opens the viewer), and a pill with Copy here / Move
   here (the existing `SelectionActions` copy / move into `MediaTransfer.newAlbum`; Move asks Android first). It
   closes once the photos are in (`SelectionActions.finished`).
+- **Add photos to an existing album** (2026-11-19): a + in every album's top bar opens the same picker
+  (`NewAlbumRoute(name, bucketId)`): the library minus what is already in that album, Copy here / Move here into the
+  album's own folder (`MediaTransfer.destinationOf` its cover). Verified on the phone: + on Albums → "Test album" →
+  one photo → Copy here made the album with the copy.

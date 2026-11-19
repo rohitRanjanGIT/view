@@ -42,6 +42,7 @@ import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
 import com.rohit.gallery.core.domain.MediaActions
 import com.rohit.gallery.core.domain.MediaTransfer
+import com.rohit.gallery.core.model.Album
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.FloatingActionPill
 import com.rohit.gallery.core.ui.components.pillSlot
@@ -67,17 +68,22 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class NewAlbumViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    repository: MediaRepository,
+    private val repo: MediaRepository,
     actions: MediaActions,
     transfer: MediaTransfer,
     albumRepository: AlbumRepository,
 ) : ViewModel() {
-    val name: String = savedStateHandle.toRoute<NewAlbumRoute>().name
+    private val route = savedStateHandle.toRoute<NewAlbumRoute>()
+    val name: String = route.name
+
+    /** Adding to an album that already exists (its own folder), rather than making a new one. */
+    val existingBucket: Long? = route.bucketId
 
     val selection = SelectionState()
 
-    val items: StateFlow<List<MediaItem>?> = repository.state
-        .map { (it as? MediaIndexState.Ready)?.items }
+    /** Everything, except what is already in the album being added to. */
+    val items: StateFlow<List<MediaItem>?> = repo.state
+        .map { state -> (state as? MediaIndexState.Ready)?.items?.let { all -> if (existingBucket == null) all else all.filter { it.bucketId != existingBucket } } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val transferActions = SelectionActions(
@@ -86,9 +92,20 @@ class NewAlbumViewModel @Inject constructor(
         allItems = { items.value.orEmpty() },
         actions = actions,
         transfer = transfer,
-        repository = repository,
+        repository = repo,
         albumRepository = albumRepository,
     )
+
+    /** The existing album to add to (its folder is read from one of its items); null for a new album. */
+    private fun target(): Album? {
+        val id = existingBucket ?: return null
+        val cover = (repo.state.value as? MediaIndexState.Ready)?.items?.firstOrNull { it.bucketId == id } ?: return null
+        return Album(id, name, 0, cover)
+    }
+
+    fun copySelected() = transferActions.copyTo(target(), if (existingBucket == null) name else null)
+
+    suspend fun moveRequest() = transferActions.moveRequest(target(), if (existingBucket == null) name else null)
 }
 
 @Composable
@@ -119,7 +136,7 @@ fun NewAlbumScreen(onClose: () -> Unit, viewModel: NewAlbumViewModel = hiltViewM
                     IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Cancel") }
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "New album: ${viewModel.name}",
+                            if (viewModel.existingBucket == null) "New album: ${viewModel.name}" else "Add to ${viewModel.name}",
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -141,10 +158,10 @@ fun NewAlbumScreen(onClose: () -> Unit, viewModel: NewAlbumViewModel = hiltViewM
         }
 
         FloatingActionPill(Modifier.align(Alignment.BottomCenter)) {
-            ActionItem(GalleryIcons.Copy, "Copy here", count > 0, { controller.copyTo(null, viewModel.name) }, Modifier.pillSlot())
+            ActionItem(GalleryIcons.Copy, "Copy here", count > 0, { viewModel.copySelected() }, Modifier.pillSlot())
             ActionItem(GalleryIcons.Folder, "Move here", count > 0, {
                 scope.launch {
-                    val sender = controller.moveRequest(null, viewModel.name)
+                    val sender = viewModel.moveRequest()
                     if (sender != null) moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
                 }
             }, Modifier.pillSlot())

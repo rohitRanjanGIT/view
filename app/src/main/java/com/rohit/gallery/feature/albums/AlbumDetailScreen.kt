@@ -3,6 +3,7 @@ package com.rohit.gallery.feature.albums
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
@@ -30,6 +31,7 @@ import com.rohit.gallery.feature.selection.MediaListScreen
 fun AlbumDetailScreen(
     onBack: () -> Unit,
     onOpenMedia: (MediaItem, bucketId: Long, oldestFirst: Boolean) -> Unit,
+    onAddPhotos: (bucketId: Long, name: String) -> Unit,
     viewModel: AlbumDetailViewModel = hiltViewModel(),
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
@@ -38,8 +40,9 @@ fun AlbumDetailScreen(
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     // Delete album: everything in it goes to Trash, then back to Albums (the album is gone).
     val deleter = rememberAlbumDeleter(onDeleted = onBack)
+    val title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album"
     MediaListScreen(
-        title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album",
+        title = title,
         emptyText = "This album is empty",
         items = items,
         selection = viewModel.selection,
@@ -47,6 +50,10 @@ fun AlbumDetailScreen(
         onBack = onBack,
         onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
         titleActions = {
+            // Add photos from anywhere in the library into this album.
+            IconButton(onClick = { onAddPhotos(bucketId, title) }) {
+                Icon(Icons.Filled.Add, contentDescription = "Add photos")
+            }
             OrderMenu(
                 oldestFirst = oldestFirst,
                 onChange = viewModel::setOldestFirst,

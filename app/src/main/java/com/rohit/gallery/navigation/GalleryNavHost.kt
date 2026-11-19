@@ -195,6 +195,7 @@ fun GalleryNavHost(
                             onOpenMedia = { item, bucketId, oldestFirst ->
                                 openViewer(host, item, ViewerRoute(item.id, bucketId = bucketId, oldestFirst = oldestFirst))
                             },
+                            onAddPhotos = { bucketId, name -> navController.navigate(NewAlbumRoute(name, bucketId)) },
                         )
                     }
                     topLevel<FavoritesRoute>(navController) { host ->
