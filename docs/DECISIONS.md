@@ -470,3 +470,8 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   works from the middle; the screen edges stay the system back gesture). Off while selecting. Picking an album
   switches in place (`AlbumDetailViewModel.switchTo`, saved in `SavedStateHandle`): no new screen, so Back still
   returns to the Albums tab. The grid is keyed by album so a new album starts at the top.
+- **Selection actions as a floating capsule** (2026-11-19, user's call, for consistency with the tab bar): every
+  selection action bar (photos, albums, Trash, Locked) is a `FloatingActionPill`: frosted capsule, 64 dp tall,
+  centred 12 dp above the bottom inset, equal 76 dp slots, pill-shaped press ripple.
+- Pull-down title and icon row draw *over* the grid: on Pictures the grid's opaque background reaches up under the
+  icon row (status-bar inset), which hid the search icon.

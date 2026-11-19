@@ -1,35 +1,27 @@
 package com.rohit.gallery.feature.trash
 
-import com.rohit.gallery.core.ui.components.frostedChrome
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import com.rohit.gallery.core.ui.components.FloatingActionPill
+import com.rohit.gallery.core.ui.components.pillSlot
 import android.app.Activity
 import android.content.IntentSender
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -79,14 +71,9 @@ fun TrashScreen(
         onOpenMedia = onOpenMedia,
         gridHeader = "Items here are deleted automatically after 30 days.",
     ) { modifier ->
-        Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome()) {
-            Row(
-                Modifier.navigationBarsPadding().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                ActionItem(Icons.Filled.Refresh, "Restore", count > 0, { launch { viewModel.restoreRequest() } }, Modifier.weight(1f))
-                ActionItem(Icons.Filled.Delete, "Delete", count > 0, { confirmDelete = true }, Modifier.weight(1f))
-            }
+        FloatingActionPill(modifier) {
+            ActionItem(Icons.Filled.Refresh, "Restore", count > 0, { launch { viewModel.restoreRequest() } }, Modifier.pillSlot())
+            ActionItem(Icons.Filled.Delete, "Delete", count > 0, { confirmDelete = true }, Modifier.pillSlot())
         }
     }
 

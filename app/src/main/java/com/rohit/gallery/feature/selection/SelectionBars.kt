@@ -1,15 +1,19 @@
 package com.rohit.gallery.feature.selection
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.rohit.gallery.core.ui.components.FloatingActionPill
+import com.rohit.gallery.core.ui.components.pillSlot
 import com.rohit.gallery.core.ui.components.frostedChrome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -31,10 +35,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -80,31 +82,24 @@ fun SelectionActionBar(
     onLock: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome()) {
-        Row(
-            Modifier
-                .navigationBarsPadding()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            ActionItem(Icons.Filled.Share, "Share", enabled, onShare, Modifier.weight(1f))
-            ActionItem(
-                if (allFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                if (allFavorite) "Unfavourite" else "Favourite",
-                enabled,
-                onFavorite,
-                Modifier.weight(1f),
-            )
-            ActionItem(Icons.Filled.Delete, "Trash", enabled, onTrash, Modifier.weight(1f))
-            if (onMove != null || onCopy != null || onLock != null) {
-                var menuOpen by remember { mutableStateOf(false) }
-                Box(Modifier.weight(1f)) {
-                    ActionItem(Icons.Filled.MoreVert, "More", enabled, { menuOpen = true }, Modifier.fillMaxWidth())
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        if (onMove != null) DropdownMenuItem(text = { Text("Move to album") }, onClick = { menuOpen = false; onMove() })
-                        if (onCopy != null) DropdownMenuItem(text = { Text("Copy to album") }, onClick = { menuOpen = false; onCopy() })
-                        if (onLock != null) DropdownMenuItem(text = { Text("Lock") }, onClick = { menuOpen = false; onLock() })
-                    }
+    FloatingActionPill(modifier) {
+        ActionItem(Icons.Filled.Share, "Share", enabled, onShare, Modifier.pillSlot())
+        ActionItem(
+            if (allFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+            if (allFavorite) "Unfavourite" else "Favourite",
+            enabled,
+            onFavorite,
+            Modifier.pillSlot(),
+        )
+        ActionItem(Icons.Filled.Delete, "Trash", enabled, onTrash, Modifier.pillSlot())
+        if (onMove != null || onCopy != null || onLock != null) {
+            var menuOpen by remember { mutableStateOf(false) }
+            Box(Modifier.pillSlot()) {
+                ActionItem(Icons.Filled.MoreVert, "More", enabled, { menuOpen = true }, Modifier.fillMaxWidth())
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (onMove != null) DropdownMenuItem(text = { Text("Move to album") }, onClick = { menuOpen = false; onMove() })
+                    if (onCopy != null) DropdownMenuItem(text = { Text("Copy to album") }, onClick = { menuOpen = false; onCopy() })
+                    if (onLock != null) DropdownMenuItem(text = { Text("Lock") }, onClick = { menuOpen = false; onLock() })
                 }
             }
         }
@@ -122,6 +117,8 @@ internal fun ActionItem(
     val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f)
     Column(
         modifier
+            // In the capsule, the press ripple is a pill too.
+            .clip(RoundedCornerShape(percent = 50))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

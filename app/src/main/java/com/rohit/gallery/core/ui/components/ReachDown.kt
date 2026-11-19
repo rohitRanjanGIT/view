@@ -232,9 +232,10 @@ fun ReachDown(
             }
             .nestedScroll(connection),
     ) {
+        Box(Modifier.fillMaxSize().offset { IntOffset(0, state.offset.roundToInt()) }) { content() }
+        // Drawn over the grid: on Pictures the grid's own background reaches up under the icon row.
         ReachTitle(title, subtitle, state, topInset)
         if (actions != null) ReachActions(state, topInset, actions)
-        Box(Modifier.fillMaxSize().offset { IntOffset(0, state.offset.roundToInt()) }) { content() }
     }
 }
 

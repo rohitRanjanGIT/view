@@ -1,5 +1,9 @@
 package com.rohit.gallery.feature.vault
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import com.rohit.gallery.core.ui.components.FloatingActionPill
+import com.rohit.gallery.core.ui.components.pillSlot
 import com.rohit.gallery.core.model.albumCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
@@ -16,7 +20,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -42,17 +45,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -65,7 +65,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.FloatingTab
 import com.rohit.gallery.core.ui.components.FloatingTabBar
-import com.rohit.gallery.core.ui.components.frostedChrome
 import com.rohit.gallery.core.ui.components.rememberChromeHaze
 import com.rohit.gallery.core.ui.icons.GalleryIcons
 import com.rohit.gallery.feature.albums.AlbumGrid
@@ -404,12 +403,10 @@ private fun VaultMenu(enabled: Boolean, onUnlockAll: () -> Unit) {
 /** Share / Unlock / Delete, for selected photos or for every photo in the selected albums. */
 @Composable
 private fun VaultItemsBar(count: Int, onShare: () -> Unit, onUnlock: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome()) {
-        Row(Modifier.navigationBarsPadding().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            ActionItem(Icons.Filled.Share, "Share", count > 0, onShare, Modifier.weight(1f))
-            ActionItem(GalleryIcons.LockOpen, "Unlock", count > 0, onUnlock, Modifier.weight(1f))
-            ActionItem(Icons.Filled.Delete, "Delete", count > 0, onDelete, Modifier.weight(1f))
-        }
+    FloatingActionPill(modifier) {
+        ActionItem(Icons.Filled.Share, "Share", count > 0, onShare, Modifier.pillSlot())
+        ActionItem(GalleryIcons.LockOpen, "Unlock", count > 0, onUnlock, Modifier.pillSlot())
+        ActionItem(Icons.Filled.Delete, "Delete", count > 0, onDelete, Modifier.pillSlot())
     }
 }
 
