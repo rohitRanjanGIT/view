@@ -2,6 +2,8 @@ package com.rohit.gallery.feature.vault
 
 import com.rohit.gallery.core.model.albumCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
+import com.rohit.gallery.core.ui.components.rememberReachState
+import androidx.compose.ui.graphics.graphicsLayer
 import com.rohit.gallery.core.ui.components.AlbumSwitcherDrawer
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -315,7 +317,8 @@ private fun VaultPages(
                 )
                 else -> Box(Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxSize()) {
-                        VaultTitleBar("Locked albums", onBack)
+                        val reach = rememberReachState()
+                        VaultTitleBar("Locked albums", onBack, titleAlpha = { 1f - reach.progress })
                         val list = albums
                         when {
                             list == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
@@ -326,7 +329,7 @@ private fun VaultPages(
                                     textAlign = TextAlign.Center,
                                 )
                             }
-                            else -> ReachDown(title = "Locked albums", subtitle = albumCountLabel(list.size)) {
+                            else -> ReachDown(title = "Locked albums", subtitle = albumCountLabel(list.size), state = reach) {
                                 AlbumGrid(
                                     list = list,
                                     columns = albumColumns,
@@ -378,11 +381,11 @@ private fun VaultPages(
 private val VaultBarRoom = 92.dp
 
 @Composable
-private fun VaultTitleBar(title: String, onBack: () -> Unit) {
+private fun VaultTitleBar(title: String, onBack: () -> Unit, titleAlpha: () -> Float = { 1f }) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.statusBarsPadding().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.graphicsLayer { alpha = titleAlpha() })
         }
     }
 }

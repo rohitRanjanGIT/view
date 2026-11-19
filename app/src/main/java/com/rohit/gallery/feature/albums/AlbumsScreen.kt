@@ -2,6 +2,7 @@ package com.rohit.gallery.feature.albums
 
 import com.rohit.gallery.core.model.albumCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
+import com.rohit.gallery.core.ui.components.rememberReachState
 import com.rohit.gallery.feature.vault.rememberVaultLocker
 import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
@@ -132,6 +133,8 @@ fun AlbumsScreen(
         val haze = rememberChromeHaze()
         val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
         val list = current?.visible
+        // Held here so the header's small title can fade out while the big one shows (grid pulled down).
+        val reach = rememberReachState()
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().hazeSource(haze)) {
                 if (selection.isSelecting) {
@@ -145,6 +148,7 @@ fun AlbumsScreen(
                         sort = current?.sort ?: AlbumSort.Newest,
                         onSort = viewModel::setSort,
                         onEditAlbums = onEditAlbums,
+                        titleAlpha = { 1f - reach.progress },
                         modifier = Modifier.statusBarsPadding(),
                     )
                 }
@@ -155,7 +159,7 @@ fun AlbumsScreen(
                     }
                     else -> columns?.let { cols ->
                         // Pull down at the top to bring the albums into thumb reach.
-                        ReachDown(title = "Albums", subtitle = albumCountLabel(list.size)) {
+                        ReachDown(title = "Albums", subtitle = albumCountLabel(list.size), state = reach) {
                             AlbumGrid(
                                 list = list,
                                 columns = cols,
@@ -325,13 +329,23 @@ internal fun AlbumGrid(
 
 /** "Albums" title with a menu: sort options and Edit albums. */
 @Composable
-private fun AlbumsHeader(sort: AlbumSort, onSort: (AlbumSort) -> Unit, onEditAlbums: () -> Unit, modifier: Modifier = Modifier) {
+private fun AlbumsHeader(
+    sort: AlbumSort,
+    onSort: (AlbumSort) -> Unit,
+    onEditAlbums: () -> Unit,
+    titleAlpha: () -> Float,
+    modifier: Modifier = Modifier,
+) {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Albums", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+        Text(
+            "Albums",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.weight(1f).graphicsLayer { alpha = titleAlpha() },
+        )
         Box {
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "Album options")

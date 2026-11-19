@@ -130,6 +130,10 @@ class ReachState internal constructor(expanded: Boolean) {
     }
 }
 
+/** A [ReachDown] state the screen holds itself, e.g. to fade out its own small title while the big one shows. */
+@Composable
+fun rememberReachState(): ReachState = rememberSaveable(saver = ReachState.Saver) { ReachState(false) }
+
 /**
  * Wraps a scrolling grid ([content]) with pull-down-to-reach. The grid's own scrolling is untouched: only a drag
  * that the grid can't use (pulling down at its top) moves it down, and a push up first brings it back up.
@@ -141,9 +145,9 @@ fun ReachDown(
     subtitle: String?,
     modifier: Modifier = Modifier,
     topInset: Dp = 0.dp,
+    state: ReachState = rememberReachState(),
     content: @Composable () -> Unit,
 ) {
-    val state = rememberSaveable(saver = ReachState.Saver) { ReachState(false) }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val connection = remember(state) {
