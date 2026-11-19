@@ -50,7 +50,6 @@ import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
 import com.rohit.gallery.core.ui.components.ReachState
 import com.rohit.gallery.core.ui.components.ReachTopIcons
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.key
 
 /**
@@ -115,7 +114,7 @@ fun MediaListScreen(
 
     val context = LocalContext.current
     val haze = rememberChromeHaze()
-    // The title bar's name fades out while the grid is pulled down and the big title shows.
+    // Pull-down-to-reach; the title bar's icons (not Back, not the name, which always stays) ride down with the grid.
     val reach = rememberReachState()
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().hazeSource(haze)) {
@@ -213,7 +212,7 @@ private fun TitleBar(
             }
             Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).graphicsLayer { alpha = 1f - reach.progress },
+                modifier = Modifier.weight(1f),
             )
             // Back stays up here; the other icons ride down with the grid while it is pulled down.
             ReachTopIcons(reach, content = actions)
