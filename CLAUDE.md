@@ -232,7 +232,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   - **New album:** Albums tab + asks a name, then a picker (tap to pick, Copy here / Move here). Verified by Claude on
     the phone (made "Test album" with one copied screenshot; still there, delete it with ⋮ > Delete album).
     **+ inside an album** (add photos to an existing album): committed, not yet tried by anyone.
-- **Git:** pushed up to `0ec32f3` (Delete album). Committed after that, not pushed: moving-title fix, Albums + / search,
+- **Git:** pushed up to `0ec32f3` (Delete album). Committed after that, not pushed: Albums + / search,
   New album, + inside an album, this handoff. Push when I say so.
 - **Next (pick with me):**
   1. **Swipe-left menu sidebar** (agreed, not started): on the Albums tab, finger-left swipe slides in a sidebar from
