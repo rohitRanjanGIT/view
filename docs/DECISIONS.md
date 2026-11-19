@@ -388,3 +388,12 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   Favourites / Videos / Trash bottom, Albums tab bottom); each screen marks its scrolling content `hazeSource` and
   provides its state as `LocalChromeHaze` only around the bars, so no bar is inside its own source. Title bars that
   sit above (not over) their content stay solid. Not done: the viewer's pills, the pinned day header.
+- **Typography** (item 8): `GalleryTypography` keeps Material's sizes but sets tracking and leading per size, in em so
+  they hold at any font scale: display -0.025..-0.02 em, headline -0.018..-0.012 em, titleLarge -0.008 em, with
+  leading tightening as size grows (1.08x..1.25x); titleMedium 0, titleSmall 0.05 sp; body 0.15-0.3 sp (Material
+  used 0.25-0.5); labels unchanged. Weights unchanged.
+- **Reduced motion** (item 8): Android's form is the system "Remove animations" switch (animation scale 0), which
+  Compose already applies to every animation, ours included (springs, flights, fades jump to their end). The only
+  code that waits on an animation (the viewer layer waiting for its open / close flight) handles a flight that ends
+  at once. No in-app "reduce motion" setting: Android has no separate reduce-motion signal, and overriding the
+  system scale to keep cross-fades would go against what the user chose.
