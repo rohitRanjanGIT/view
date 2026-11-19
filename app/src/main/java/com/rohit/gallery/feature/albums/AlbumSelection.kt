@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.rohit.gallery.core.ui.components.FloatingActionPill
 import com.rohit.gallery.core.ui.components.pillSlot
+import com.rohit.gallery.core.ui.icons.GalleryIcons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
@@ -58,6 +59,8 @@ fun AlbumSelectionBar(
     entries: List<AlbumEntry>,
     onPin: (ids: List<Long>, pinned: Boolean) -> Unit,
     onLock: ((ids: List<Long>) -> Unit)? = null,
+    /** Remove the albums but keep their photos (they move back where they came from). */
+    onRemove: ((ids: List<Long>) -> Unit)? = null,
     onDelete: ((ids: List<Long>) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -67,6 +70,7 @@ fun AlbumSelectionBar(
     FloatingActionPill(modifier) {
         ActionItem(OrganizeIcons.Pin, if (allPinned) "Unpin" else "Pin", enabled, { onPin(ids, !allPinned) }, Modifier.pillSlot())
         if (onLock != null) ActionItem(Icons.Filled.Lock, "Lock", enabled, { onLock(ids) }, Modifier.pillSlot())
+        if (onRemove != null) ActionItem(GalleryIcons.Folder, "Remove", enabled, { onRemove(ids) }, Modifier.pillSlot())
         if (onDelete != null) ActionItem(Icons.Filled.Delete, "Delete", enabled, { onDelete(ids) }, Modifier.pillSlot())
     }
 }

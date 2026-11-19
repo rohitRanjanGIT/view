@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rohit.gallery.core.model.Album
 import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.AlbumSwitcherDrawer
 import com.rohit.gallery.feature.selection.MediaListScreen
@@ -40,6 +41,8 @@ fun AlbumDetailScreen(
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     // Delete album: everything in it goes to Trash, then back to Albums (the album is gone).
     val deleter = rememberAlbumDeleter(onDeleted = onBack)
+    // Remove album: the album goes, its photos stay (moved back where they came from); then back to Albums.
+    val remover = rememberAlbumRemover(onRemoved = onBack)
     val title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album"
     MediaListScreen(
         title = title,
@@ -59,6 +62,10 @@ fun AlbumDetailScreen(
                 oldestFirst = oldestFirst,
                 onChange = viewModel::setOldestFirst,
                 onDelete = { deleter.delete(items.orEmpty(), albums = 1) },
+                onRemove = {
+                    val list = items.orEmpty()
+                    list.firstOrNull()?.let { cover -> remover.remove(listOf(Album(bucketId, title, list.size, cover))) }
+                },
             )
         },
         contentKey = bucketId,
@@ -76,7 +83,7 @@ fun AlbumDetailScreen(
 }
 
 @Composable
-private fun OrderMenu(oldestFirst: Boolean, onChange: (Boolean) -> Unit, onDelete: () -> Unit) {
+private fun OrderMenu(oldestFirst: Boolean, onChange: (Boolean) -> Unit, onDelete: () -> Unit, onRemove: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
@@ -100,6 +107,13 @@ private fun OrderMenu(oldestFirst: Boolean, onChange: (Boolean) -> Unit, onDelet
                 )
             }
             HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Remove album (keep photos)") },
+                onClick = {
+                    open = false
+                    onRemove()
+                },
+            )
             DropdownMenuItem(
                 text = { Text("Delete album") },
                 onClick = {

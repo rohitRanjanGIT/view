@@ -40,15 +40,71 @@ interface AlbumPrefDao {
     suspend fun deleteAll(bucketIds: List<Long>)
 }
 
-// Version 2 added the vault table (a new table only, so Room migrates it from the exported schemas).
+/**
+ * What a photo looked like when it went to Trash. Android re-reads a file when it comes back out and can lose the
+ * date it had (WhatsApp photos carry no date inside the file), so restores put [shownDateMs] and [isFavorite] back.
+ */
+@Entity(tableName = "trash_snapshots")
+data class TrashSnapshotEntity(
+    @PrimaryKey val mediaId: Long,
+    val isVideo: Boolean,
+    /** The date the grid showed (date taken, else the file's date): a restore puts it back as the date taken. */
+    val shownDateMs: Long,
+    val isFavorite: Boolean,
+    val savedAt: Long,
+)
+
+@Dao
+interface TrashSnapshotDao {
+    @Query("SELECT * FROM trash_snapshots")
+    fun observeAll(): Flow<List<TrashSnapshotEntity>>
+
+    @Upsert
+    suspend fun upsertAll(snapshots: List<TrashSnapshotEntity>)
+
+    @Query("DELETE FROM trash_snapshots WHERE mediaId IN (:mediaIds)")
+    suspend fun deleteAll(mediaIds: List<Long>)
+
+    /** Trash empties itself after 30 days; older snapshots have nothing left to restore. */
+    @Query("DELETE FROM trash_snapshots WHERE savedAt < :before")
+    suspend fun deleteOlderThan(before: Long)
+}
+
+/** The folder a photo was in before the app last moved it into an album: "Remove album" sends it back there. */
+@Entity(tableName = "media_origins")
+data class MediaOriginEntity(
+    @PrimaryKey val mediaId: Long,
+    /** Like `DCIM/Camera/`. */
+    val relativePath: String,
+    val movedAt: Long,
+)
+
+@Dao
+interface MediaOriginDao {
+    @Query("SELECT * FROM media_origins WHERE mediaId IN (:mediaIds)")
+    suspend fun getAll(mediaIds: List<Long>): List<MediaOriginEntity>
+
+    @Upsert
+    suspend fun upsertAll(origins: List<MediaOriginEntity>)
+
+    @Query("DELETE FROM media_origins WHERE mediaId IN (:mediaIds)")
+    suspend fun deleteAll(mediaIds: List<Long>)
+}
+
+// Version 2 added the vault table, version 3 the trash snapshots and move origins (new tables only, so Room
+// migrates them from the exported schemas).
 @Database(
-    entities = [AlbumPrefEntity::class, VaultItemEntity::class],
-    version = 2,
+    entities = [AlbumPrefEntity::class, VaultItemEntity::class, TrashSnapshotEntity::class, MediaOriginEntity::class],
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class GalleryDatabase : RoomDatabase() {
     abstract fun albumPrefs(): AlbumPrefDao
 
     abstract fun vault(): VaultDao
+
+    abstract fun trashSnapshots(): TrashSnapshotDao
+
+    abstract fun mediaOrigins(): MediaOriginDao
 }

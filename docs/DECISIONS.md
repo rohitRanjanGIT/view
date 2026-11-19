@@ -539,3 +539,17 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   - **Delete album** drops the albums' pins / custom places (`AlbumRepository.forget`), so a later album with the
     same folder starts fresh; Undo puts them back.
   - Back in the photo picker clears the picks first; + in an album waits for the album to load.
+- **Dates kept through Trash** (2026-11-19, user saw restored photos jump to another day): Android re-reads a file
+  when it leaves Trash, and a photo with no date inside the file (WhatsApp) can come back with another date.
+  `MediaActions.trashRequest` saves each photo's shown date (date taken, else file date) and favourite mark in Room
+  (`trash_snapshots`, kept 35 days). One app-wide `RestoreRepairEffect` compares restored photos with their snapshot
+  (`findRepairs`) and writes the old date back as `DATE_TAKEN` (plus the favourite mark) after a write request:
+  silent with Skip confirmation on, one Android prompt otherwise. Covers every restore path (Undo bars, Trash
+  screen, viewer) without touching each one. Only MediaStore columns change, never the file. Snapshots of photos
+  that came back unchanged are dropped after 10 minutes (not sooner: the trash prompt may still be open).
+- **Remove album, keep the photos** (2026-11-19, user's call: "back to where they came from"): every Move now saves
+  the folder a photo left (Room `media_origins`, `MediaTransfer.moveEach`). Remove (Albums selection bar, album ⋮)
+  sends each photo back to its saved folder (`planRemoval`: not a folder being removed, and one Android accepts);
+  photos without one (copies, or moved before this) go where the user picks in the album sheet. Then the folder
+  is empty and the album is gone; nothing goes to Trash. If anything can't move, the album stays and says so.
+  Room schema 3 (two new tables, auto-migrated).

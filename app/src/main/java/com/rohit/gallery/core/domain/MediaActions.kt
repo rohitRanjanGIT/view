@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
 import android.provider.MediaStore
+import com.rohit.gallery.core.data.db.TrashSnapshotDao
+import com.rohit.gallery.core.data.db.TrashSnapshotEntity
 import com.rohit.gallery.core.model.MediaItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -19,6 +21,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class MediaActions @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val snapshots: TrashSnapshotDao,
 ) {
     /** Chooser for sharing [items] (read access is granted to the receiving app only). */
     fun shareIntent(items: List<MediaItem>): Intent {
@@ -47,8 +50,16 @@ class MediaActions @Inject constructor(
         return runCatching { context.startActivity(chooser) }.isSuccess
     }
 
-    /** System confirmation to move [items] to the trash (they can be restored from there). */
+    /**
+     * System confirmation to move [items] to the trash (they can be restored from there). Their date and favourite
+     * mark are saved first: a restore can lose them, and [RestoreRepair] puts them back.
+     */
     suspend fun trashRequest(items: List<MediaItem>): IntentSender = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        runCatching {
+            snapshots.deleteOlderThan(now - SNAPSHOT_KEEP_MS)
+            snapshots.upsertAll(items.map { TrashSnapshotEntity(it.id, it.isVideo, it.sortDateMs, it.isFavorite, now) })
+        }
         MediaStore.createTrashRequest(context.contentResolver, items.map { it.uri }, true).intentSender
     }
 
@@ -79,3 +90,6 @@ fun commonMimeType(items: List<MediaItem>): String = when {
 }
 
 private const val GOOGLE_PHOTOS = "com.google.android.apps.photos"
+
+/** Trash keeps items 30 days; a few more covers a restore on the last day. */
+private const val SNAPSHOT_KEEP_MS = 35L * 24 * 60 * 60 * 1000

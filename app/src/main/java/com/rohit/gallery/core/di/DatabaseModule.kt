@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import com.rohit.gallery.core.data.db.AlbumPrefDao
 import com.rohit.gallery.core.data.db.GalleryDatabase
+import com.rohit.gallery.core.data.db.MediaOriginDao
+import com.rohit.gallery.core.data.db.TrashSnapshotDao
 import com.rohit.gallery.core.data.db.VaultDao
 import com.rohit.gallery.core.data.vault.VaultStorage
 import java.io.File
@@ -28,6 +30,12 @@ object DatabaseModule {
 
     @Provides
     fun provideVaultDao(db: GalleryDatabase): VaultDao = db.vault()
+
+    @Provides
+    fun provideTrashSnapshotDao(db: GalleryDatabase): TrashSnapshotDao = db.trashSnapshots()
+
+    @Provides
+    fun provideMediaOriginDao(db: GalleryDatabase): MediaOriginDao = db.mediaOrigins()
 
     /** The vault folder in app-private storage (no other app or file manager can read it). */
     @Provides

@@ -4,6 +4,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.IntentSender
 import android.provider.MediaStore
+import com.rohit.gallery.core.data.db.MediaOriginDao
+import com.rohit.gallery.core.data.db.MediaOriginEntity
 import com.rohit.gallery.core.model.MediaItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -11,6 +13,7 @@ import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
@@ -66,16 +69,13 @@ fun folderLabel(relativePath: String): String = relativePath.trim('/').substring
 @Singleton
 class MediaTransfer @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val origins: MediaOriginDao,
 ) {
     private val resolver get() = context.contentResolver
 
     /** The folder an existing album lives in, read from one of its items. Null if it can't be read. */
     suspend fun destinationOf(sample: MediaItem): Destination? = withContext(Dispatchers.IO) {
-        runCatching {
-            resolver.query(sample.uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH), null, null, null)?.use {
-                if (it.moveToFirst()) it.getString(0)?.let(::normalizeRelativePath)?.takeIf { p -> p.isNotEmpty() } else null
-            }
-        }.getOrNull()?.let(::Destination)
+        currentFolder(sample)?.let(::Destination)
     }
 
     /** A new album [name] under Pictures. */
@@ -94,21 +94,65 @@ class MediaTransfer @Inject constructor(
         items: List<MediaItem>,
         destination: Destination,
         onProgress: (handled: Int, done: Int) -> Unit = { _, _ -> },
+    ): TransferResult = moveEach(items.map { it to destination }, rememberOrigins = true, onProgress)
+
+    /**
+     * Moves each item into its own destination (Remove album sends photos back where each came from). With
+     * [rememberOrigins] the folder each photo leaves is saved, so a later Remove album can send it back there;
+     * without, any saved origin of a moved photo is dropped (it has gone back).
+     */
+    suspend fun moveEach(
+        moves: List<Pair<MediaItem, Destination>>,
+        rememberOrigins: Boolean,
+        onProgress: (handled: Int, done: Int) -> Unit = { _, _ -> },
     ): TransferResult = withContext(Dispatchers.IO) {
         var done = 0
-        for ((i, item) in items.withIndex()) {
+        val newOrigins = ArrayList<MediaOriginEntity>()
+        val returned = ArrayList<Long>()
+        val now = System.currentTimeMillis()
+        for ((i, move) in moves.withIndex()) {
             ensureActive()
+            val (item, destination) = move
+            val from = if (rememberOrigins) currentFolder(item) else null
             val ok = candidatePaths(item, destination).any { path ->
                 runCatching {
                     val values = ContentValues().apply { put(MediaStore.MediaColumns.RELATIVE_PATH, path) }
                     resolver.update(item.uri, values, null, null) > 0
                 }.getOrDefault(false)
             }
-            if (ok) done++
+            if (ok) {
+                done++
+                when {
+                    !rememberOrigins -> returned += item.id
+                    from != null && from != normalizeRelativePath(destination.relativePath) ->
+                        newOrigins += MediaOriginEntity(item.id, from, now)
+                }
+            }
             onProgress(i + 1, done)
         }
-        TransferResult(done, items.size - done)
+        // Bookkeeping only: a failure here never undoes a move.
+        withContext(NonCancellable) {
+            runCatching {
+                if (newOrigins.isNotEmpty()) origins.upsertAll(newOrigins)
+                returned.chunked(500).forEach { origins.deleteAll(it) }
+            }
+        }
+        TransferResult(done, moves.size - done)
     }
+
+    /** Where each of [items] came from, by media id (only photos this app moved). */
+    suspend fun originsOf(items: List<MediaItem>): Map<Long, String> = withContext(Dispatchers.IO) {
+        runCatching {
+            items.map { it.id }.chunked(500).flatMap { origins.getAll(it) }.associate { it.mediaId to it.relativePath }
+        }.getOrDefault(emptyMap())
+    }
+
+    /** The folder [item] is in now, like `Pictures/Trip/`. */
+    private fun currentFolder(item: MediaItem): String? = runCatching {
+        resolver.query(item.uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0)?.let(::normalizeRelativePath)?.takeIf { p -> p.isNotEmpty() } else null
+        }
+    }.getOrNull()
 
     /**
      * Copies [items] into [destination] as new files; the originals stay where they are. Cancelling stops mid-file

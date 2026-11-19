@@ -60,6 +60,7 @@ import com.rohit.gallery.feature.search.SearchScreen
 import com.rohit.gallery.feature.settings.MenuScreen
 import com.rohit.gallery.feature.settings.SettingsScreen
 import com.rohit.gallery.feature.trash.TrashScreen
+import com.rohit.gallery.feature.trash.RestoreRepairEffect
 import com.rohit.gallery.feature.timeline.TimelineScreen
 import com.rohit.gallery.feature.vault.VaultScreen
 import com.rohit.gallery.feature.viewer.ViewerScreen
@@ -117,6 +118,9 @@ fun GalleryNavHost(
             host.open(route)
         }
     }
+
+    // Photos back from Trash get the date and favourite mark they had (Android can lose them on the way).
+    RestoreRepairEffect()
 
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this, LocalUndoBar provides undoBar) {

@@ -51,11 +51,21 @@ fun AlbumPickerSheet(
     onDismiss: () -> Unit,
     /** Every album's name, including any left out of [albums]: a new album can't take one of them. */
     existingNames: List<String> = albums.map { it.name },
+    /** A line under the title (what else happens). */
+    subtitle: String? = null,
 ) {
     var creating by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        if (subtitle != null) {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+            )
+        }
         LazyColumn(Modifier.navigationBarsPadding()) {
             item(key = "new") {
                 Row(

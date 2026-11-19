@@ -143,6 +143,8 @@ fun AlbumsScreen(
         val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
         // Delete: everything in the albums goes to Trash; the albums then disappear.
         val deleter = rememberAlbumDeleter(onDeleted = { selection.clear() })
+        // Remove: the albums go, their photos stay (moved back where they came from, or where you pick).
+        val remover = rememberAlbumRemover(onRemoved = { selection.clear() })
         val list = current?.visible
         // Held here so the header's small title can fade out while the big one shows (grid pulled down).
         val reach = rememberReachState()
@@ -214,6 +216,7 @@ fun AlbumsScreen(
                     },
                     // The whole album moves into Locked; it disappears from Albums once the originals are deleted.
                     onLock = if (locker.enabled) { ids -> locker.lock(viewModel.itemsIn(ids)) } else null,
+                    onRemove = { ids -> remover.remove(list.filter { it.album.bucketId in ids }.map { it.album }) },
                     onDelete = { ids -> deleter.delete(viewModel.itemsIn(ids), albums = ids.size) },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
