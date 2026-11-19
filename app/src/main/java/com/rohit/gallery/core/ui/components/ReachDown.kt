@@ -1,6 +1,9 @@
 package com.rohit.gallery.core.ui.components
 
 import androidx.compose.animation.core.animate
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -259,7 +262,17 @@ fun ReachDown(
                 state.windowTop = top
                 state.resize((targetY - top - insetPx).coerceAtLeast(minPx))
             }
-            .nestedScroll(connection),
+            .nestedScroll(connection)
+            // The space above the grid (big title) moves it too: a swipe up there brings the grid back. Drags on the
+            // grid itself never get here (the grid takes them and passes on only what it can't use, see above).
+            .draggable(
+                state = rememberDraggableState { delta ->
+                    state.beginDrag()
+                    state.dragBy(delta)
+                },
+                orientation = Orientation.Vertical,
+                onDragStopped = { velocity -> state.release(velocity, scope) },
+            ),
     ) {
         Box(Modifier.fillMaxSize().offset { IntOffset(0, state.offset.roundToInt()) }) { content() }
         // Drawn over the grid: on Pictures the grid's own background reaches up under the icon row.
