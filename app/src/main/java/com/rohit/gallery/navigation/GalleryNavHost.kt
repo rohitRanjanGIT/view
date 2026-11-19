@@ -1,6 +1,5 @@
 package com.rohit.gallery.navigation
 
-import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
 import com.rohit.gallery.core.ui.components.frostedChrome
 import com.rohit.gallery.core.ui.components.rememberChromeHaze
@@ -23,11 +22,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -48,6 +43,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.rohit.gallery.core.ui.components.FloatingTab
+import com.rohit.gallery.core.ui.components.FloatingTabBar
 import com.rohit.gallery.core.ui.components.LocalSharedPhoto
 import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
 import com.rohit.gallery.feature.albums.AlbumDetailScreen
@@ -69,7 +66,8 @@ import com.rohit.gallery.feature.videos.VideosScreen
 import kotlinx.coroutines.launch
 
 /** Height of the M3 navigation bar, without the system navigation-bar inset. */
-private val NavigationBarHeight = 80.dp
+// Room the content keeps above the bottom edge: the floating capsule (64 dp), its margin, and some air above it.
+private val NavigationBarHeight = 92.dp
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -229,20 +227,13 @@ fun GalleryNavHost(
                     enter = fadeIn(tween(GalleryMotion.FADE_MS)),
                     exit = fadeOut(tween(GalleryMotion.FADE_MS)),
                 ) {
-                    NavigationBar(
-                        modifier = Modifier.dragsPager(homePager, scope).frostedChrome(navHaze),
-                        containerColor = Color.Transparent,
-                        tonalElevation = 0.dp,
-                    ) {
-                        homeTabs.forEachIndexed { index, tab ->
-                            NavigationBarItem(
-                                selected = homePager.targetPage == index,
-                                onClick = { scope.launch { homePager.animateScrollToPage(index, animationSpec = TabTapSpec) } },
-                                icon = { Icon(tab.icon, contentDescription = null) },
-                                label = { Text(tab.label) },
-                            )
-                        }
-                    }
+                    FloatingTabBar(
+                        tabs = homeTabs.map { FloatingTab(it.label, it.icon) },
+                        selectedIndex = homePager.targetPage,
+                        onSelect = { index -> scope.launch { homePager.animateScrollToPage(index, animationSpec = TabTapSpec) } },
+                        haze = navHaze,
+                        modifier = Modifier.dragsPager(homePager, scope),
+                    )
                 }
             }
         }

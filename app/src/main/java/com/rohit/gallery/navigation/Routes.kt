@@ -1,10 +1,7 @@
 package com.rohit.gallery.navigation
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.rohit.gallery.core.ui.icons.GalleryIcons
 import kotlinx.serialization.Serializable
 
 /** The three tabs (Pictures, Albums, Menu), side by side in one pager. */
@@ -14,9 +11,9 @@ import kotlinx.serialization.Serializable
 data class HomeTab(val label: String, val icon: ImageVector)
 
 val homeTabs: List<HomeTab> = listOf(
-    HomeTab("Pictures", Icons.Filled.DateRange),
-    HomeTab("Albums", Icons.AutoMirrored.Filled.List),
-    HomeTab("Menu", Icons.Filled.Menu),
+    HomeTab("Pictures", GalleryIcons.PicturesTab),
+    HomeTab("Albums", GalleryIcons.AlbumsTab),
+    HomeTab("Menu", GalleryIcons.MenuTab),
 )
 
 /**

@@ -4,8 +4,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
@@ -40,19 +44,31 @@ fun chromeHazeStyle(): HazeStyle {
 }
 
 /**
- * Draws this bar as frosted glass over [state]'s content, with a faint hairline on the edge that meets the content
- * ([edgeAtTop]: a bottom bar's top edge; false for a top bar's bottom edge) so it reads as a layer, not a cut-out.
+ * Draws this bar as frosted glass over [state]'s content. Edge bars get a faint hairline on the edge that meets the
+ * content ([edgeAtTop]: a bottom bar's top edge; false for a top bar's bottom edge). A [capsule] (a floating pill)
+ * is clipped round and gets a hairline all round instead.
  */
 @Composable
-fun Modifier.frostedChrome(state: HazeState? = LocalChromeHaze.current, edgeAtTop: Boolean = true): Modifier {
+fun Modifier.frostedChrome(
+    state: HazeState? = LocalChromeHaze.current,
+    edgeAtTop: Boolean = true,
+    capsule: Boolean = false,
+): Modifier {
     val hairline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     val style = chromeHazeStyle()
-    val material = if (state != null) hazeEffect(state, style) else this
+    val clipped = if (capsule) clip(RoundedCornerShape(percent = 50)) else this
+    val material = if (state != null) clipped.hazeEffect(state, style) else clipped
     return material.drawWithContent {
-        if (state == null) drawRect(style.backgroundColor)
+        if (state == null) {
+            if (capsule) drawRoundRect(style.backgroundColor, cornerRadius = CornerRadius(size.height / 2)) else drawRect(style.backgroundColor)
+        }
         drawContent()
-        val y = if (edgeAtTop) 0f else size.height
-        drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+        if (capsule) {
+            drawRoundRect(hairline, cornerRadius = CornerRadius(size.height / 2), style = Stroke(width = 1f))
+        } else {
+            val y = if (edgeAtTop) 0f else size.height
+            drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+        }
     }
 }
 

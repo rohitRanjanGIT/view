@@ -397,3 +397,11 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   code that waits on an animation (the viewer layer waiting for its open / close flight) handles a flight that ends
   at once. No in-app "reduce motion" setting: Android has no separate reduce-motion signal, and overriding the
   system scale to keep cross-fades would go against what the user chose.
+- **Floating tab bar** (2026-11-19, picked by the user over a refined flat bar and icons-only): `FloatingTabBar` is a
+  full-round frosted capsule, 16 dp in from the sides and 12 dp above the bottom inset, 64 dp tall. The selected tab is
+  a 48 dp pill (secondaryContainer) that opens to show its label; the others show icons only. Width changes animate
+  with `animateContentSize` and the label with fade + expand. Frosting uses `frostedChrome(capsule = true)`: the
+  capsule is clipped round and gets a hairline all round (a `drawRoundRect` rather than a generic shape, because
+  `drawOutline` isn't available from our Compose imports). The content padding above the bar is now 92 dp (was 80).
+  Icons: `GalleryIcons.PicturesTab` (frame, mountain, sun), `AlbumsTab` (stacked cards), `MenuTab` (four tiles),
+  replacing the material-icons-core placeholders. Selection action bars are still full-width (not floating).

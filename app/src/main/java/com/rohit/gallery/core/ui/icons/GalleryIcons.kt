@@ -1,6 +1,7 @@
 package com.rohit.gallery.core.ui.icons
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
@@ -30,8 +31,40 @@ object GalleryIcons {
         }
     }
 
-    private fun icon(name: String, block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit): ImageVector =
+    /** Pictures tab: a frame with a mountain and a sun inside. */
+    val PicturesTab: ImageVector by lazy {
+        icon("PicturesTab", PathFillType.EvenOdd) {
+            moveTo(3f, 5f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(3f); close()
+            moveTo(5f, 7f); verticalLineTo(17f); horizontalLineTo(19f); verticalLineTo(7f); close()
+            moveTo(5f, 17f); lineTo(9.5f, 12f); lineTo(12.2f, 14.8f); lineTo(14.4f, 12.4f); lineTo(19f, 17f); close()
+            moveTo(17f, 9.8f); arcTo(1.2f, 1.2f, 0f, true, true, 14.6f, 9.8f); arcTo(1.2f, 1.2f, 0f, true, true, 17f, 9.8f); close()
+        }
+    }
+
+    /** Albums tab: a stack of two cards. */
+    val AlbumsTab: ImageVector by lazy {
+        icon("AlbumsTab") {
+            moveTo(6f, 3.5f); horizontalLineTo(18f); verticalLineTo(6f); horizontalLineTo(6f); close()
+            moveTo(3f, 7.5f); horizontalLineTo(21f); verticalLineTo(20f); horizontalLineTo(3f); close()
+        }
+    }
+
+    /** Menu tab: four tiles in a grid. */
+    val MenuTab: ImageVector by lazy {
+        icon("MenuTab") {
+            moveTo(4f, 4f); horizontalLineTo(10.5f); verticalLineTo(10.5f); horizontalLineTo(4f); close()
+            moveTo(13.5f, 4f); horizontalLineTo(20f); verticalLineTo(10.5f); horizontalLineTo(13.5f); close()
+            moveTo(4f, 13.5f); horizontalLineTo(10.5f); verticalLineTo(20f); horizontalLineTo(4f); close()
+            moveTo(13.5f, 13.5f); horizontalLineTo(20f); verticalLineTo(20f); horizontalLineTo(13.5f); close()
+        }
+    }
+
+    private fun icon(
+        name: String,
+        fillType: PathFillType = PathFillType.NonZero,
+        block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
+    ): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
-            .path(fill = SolidColor(Color.Black), pathBuilder = block)
+            .path(fill = SolidColor(Color.Black), pathFillType = fillType, pathBuilder = block)
             .build()
 }
