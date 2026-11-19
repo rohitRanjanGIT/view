@@ -5,6 +5,7 @@ import androidx.compose.runtime.setValue
 import com.rohit.gallery.core.ui.components.FloatingActionPill
 import com.rohit.gallery.core.ui.components.pillSlot
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -57,6 +58,7 @@ fun AlbumSelectionBar(
     entries: List<AlbumEntry>,
     onPin: (ids: List<Long>, pinned: Boolean) -> Unit,
     onLock: ((ids: List<Long>) -> Unit)? = null,
+    onDelete: ((ids: List<Long>) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val ids = entries.map { it.album.bucketId }
@@ -65,5 +67,6 @@ fun AlbumSelectionBar(
     FloatingActionPill(modifier) {
         ActionItem(OrganizeIcons.Pin, if (allPinned) "Unpin" else "Pin", enabled, { onPin(ids, !allPinned) }, Modifier.pillSlot())
         if (onLock != null) ActionItem(Icons.Filled.Lock, "Lock", enabled, { onLock(ids) }, Modifier.pillSlot())
+        if (onDelete != null) ActionItem(Icons.Filled.Delete, "Delete", enabled, { onDelete(ids) }, Modifier.pillSlot())
     }
 }

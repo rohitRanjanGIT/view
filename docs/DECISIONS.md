@@ -509,3 +509,8 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   Pictures and the selecting state have no bar title, so there it rises and fades. `ReachDown` no longer clips (the
   title leaves its area). While the album strip pushes the grid aside, the title centres and the icons sit within
   the visible part (`LocalPushedAside`; not the window position, which would re-centre during tab swipes).
+- **Delete album** (2026-11-19): Albums selection bar "Delete" and an album's ⋮ "Delete album" trash everything in the
+  album(s) (`rememberAlbumDeleter`, `createTrashRequest`: recoverable for 30 days, per hard rule 1); an empty bucket
+  is no album, so it disappears. Same confirmation rules as trashing photos (Skip confirmation on: at once + Undo
+  bar; off: Android asks). The folder itself may remain on storage, empty: MediaStore gives no way to remove
+  directories, and asking for all-files access for that is not worth it.

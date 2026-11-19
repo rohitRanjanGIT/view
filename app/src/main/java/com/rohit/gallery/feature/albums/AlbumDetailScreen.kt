@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +36,8 @@ fun AlbumDetailScreen(
     val oldestFirst by viewModel.oldestFirst.collectAsStateWithLifecycle()
     val bucketId by viewModel.currentBucket.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle()
+    // Delete album: everything in it goes to Trash, then back to Albums (the album is gone).
+    val deleter = rememberAlbumDeleter(onDeleted = onBack)
     MediaListScreen(
         title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album",
         emptyText = "This album is empty",
@@ -43,7 +46,13 @@ fun AlbumDetailScreen(
         selectionActions = viewModel.selectionActions,
         onBack = onBack,
         onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
-        titleActions = { OrderMenu(oldestFirst, viewModel::setOldestFirst) },
+        titleActions = {
+            OrderMenu(
+                oldestFirst = oldestFirst,
+                onChange = viewModel::setOldestFirst,
+                onDelete = { deleter.delete(items.orEmpty(), albums = 1) },
+            )
+        },
         contentKey = bucketId,
         // Swipe sideways on the grid: a strip of albums slides in beside it, below the title bar.
         gridWrapper = { grid ->
@@ -59,7 +68,7 @@ fun AlbumDetailScreen(
 }
 
 @Composable
-private fun OrderMenu(oldestFirst: Boolean, onChange: (Boolean) -> Unit) {
+private fun OrderMenu(oldestFirst: Boolean, onChange: (Boolean) -> Unit, onDelete: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
@@ -82,6 +91,14 @@ private fun OrderMenu(oldestFirst: Boolean, onChange: (Boolean) -> Unit) {
                     trailingIcon = { if (oldest == oldestFirst) Icon(Icons.Filled.Check, contentDescription = "Selected") },
                 )
             }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Delete album") },
+                onClick = {
+                    open = false
+                    onDelete()
+                },
+            )
         }
     }
 }

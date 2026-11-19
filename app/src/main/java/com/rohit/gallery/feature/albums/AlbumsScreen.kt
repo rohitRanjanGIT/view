@@ -134,6 +134,8 @@ fun AlbumsScreen(
         val haze = rememberChromeHaze()
         // Also says whether Locked is turned on (Settings): off, there is no Lock action and no hold to open it.
         val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
+        // Delete: everything in the albums goes to Trash; the albums then disappear.
+        val deleter = rememberAlbumDeleter(onDeleted = { selection.clear() })
         val list = current?.visible
         // Held here so the header's small title can fade out while the big one shows (grid pulled down).
         val reach = rememberReachState()
@@ -190,6 +192,7 @@ fun AlbumsScreen(
                     },
                     // The whole album moves into Locked; it disappears from Albums once the originals are deleted.
                     onLock = if (locker.enabled) { ids -> locker.lock(viewModel.itemsIn(ids)) } else null,
+                    onDelete = { ids -> deleter.delete(viewModel.itemsIn(ids), albums = ids.size) },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
