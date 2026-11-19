@@ -480,3 +480,10 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   would hand a private photo to other apps). The clip carries the content URI (`core/domain/Clipboard.kt`), built by
   hand with the known MIME type (`ClipData.newUri` would query the provider on the main thread); the pasting app gets
   read access to that one file, and Android 13+ shows its own "Copied" preview. Copying ends the selection.
+- **Album switcher, second pass** (user's reference screenshot): replaced the M3 modal drawer with a narrow strip
+  (26% of the width) of album covers stacked with name and count, below the title bar (`MediaListScreen`
+  `gridWrapper`). It *pushes* the grid right (layout `offset`, so photo flights stay correct) instead of covering it
+  with a scrim; the grid stays usable. Picking an album keeps the strip open (to flick through albums); swipe left
+  or Back closes it. Own `draggable` with 1:1 tracking, rubber band past open, projection on release. The grid's
+  columns are not squeezed: grids size cells from the window width, and re-laying them out during the drag would
+  cost frames.

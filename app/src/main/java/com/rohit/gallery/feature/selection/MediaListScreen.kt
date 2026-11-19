@@ -69,6 +69,7 @@ fun MediaListScreen(
     onOpenMedia: (MediaItem) -> Unit,
     titleActions: @Composable RowScope.() -> Unit = {},
     contentKey: Any? = null,
+    gridWrapper: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
     val allFavorite by remember(items) {
         derivedStateOf {
@@ -78,7 +79,7 @@ fun MediaListScreen(
     }
     MediaListScreen(
         title, emptyText, items, selection, onBack, onOpenMedia,
-        asTimeline = true, titleActions = titleActions, contentKey = contentKey,
+        asTimeline = true, titleActions = titleActions, contentKey = contentKey, gridWrapper = gridWrapper,
     ) { modifier ->
         SelectionActionsBar(selectionActions, selection, modifier, allFavorite = allFavorite)
     }
@@ -101,6 +102,7 @@ fun MediaListScreen(
     asTimeline: Boolean = false,
     titleActions: @Composable RowScope.() -> Unit = {},
     allowCopy: Boolean = true,
+    gridWrapper: @Composable (@Composable () -> Unit) -> Unit = { it() },
     contentKey: Any? = null,
     selectionBar: @Composable (Modifier) -> Unit,
 ) {
@@ -128,21 +130,24 @@ fun MediaListScreen(
                 )
             }
 
-            when {
-                items == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text(emptyText, style = MaterialTheme.typography.titleMedium)
-                }
-                // Pull down at the top to bring the photos into thumb reach. A new [contentKey] (another album)
-                // starts a fresh grid, scrolled to the top.
-                else -> ReachDown(title = title, subtitle = remember(items) { mediaCountLabel(items) }, state = reach, actions = titleActions) {
-                    key(contentKey) {
-                        // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
-                        if (asTimeline) {
-                            level?.let { MediaTimeline(items, selection, it, sizes::setLevel, onOpenMedia) }
-                        } else {
-                            columns?.let {
-                                SelectableMediaGrid(items, selection, it, sizes::setTrashColumns, onOpenMedia, header = gridHeader)
+            // [gridWrapper]: e.g. the album switcher strip, which slides in beside the grid below the title bar.
+            gridWrapper {
+                when {
+                    items == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                    items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        Text(emptyText, style = MaterialTheme.typography.titleMedium)
+                    }
+                    // Pull down at the top to bring the photos into thumb reach. A new [contentKey] (another album)
+                    // starts a fresh grid, scrolled to the top.
+                    else -> ReachDown(title = title, subtitle = remember(items) { mediaCountLabel(items) }, state = reach, actions = titleActions) {
+                        key(contentKey) {
+                            // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
+                            if (asTimeline) {
+                                level?.let { MediaTimeline(items, selection, it, sizes::setLevel, onOpenMedia) }
+                            } else {
+                                columns?.let {
+                                    SelectableMediaGrid(items, selection, it, sizes::setTrashColumns, onOpenMedia, header = gridHeader)
+                                }
                             }
                         }
                     }

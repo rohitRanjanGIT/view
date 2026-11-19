@@ -204,29 +204,31 @@ private fun VaultContent(viewModel: VaultViewModel, onBack: () -> Unit, onOpenMe
         LaunchedEffect(albumItems) { if (albumItems != null && albumItems.isEmpty()) openAlbum = null }
         val albums by viewModel.albums.collectAsStateWithLifecycle()
         val lockedAlbums = remember(albums) { albums.orEmpty().map { it.album } }
-        // Swipe sideways on the grid to jump to another locked album.
-        AlbumSwitcherDrawer(
-            albums = lockedAlbums,
-            currentId = lockedAlbums.firstOrNull { it.name == album }?.bucketId,
-            enabled = !selection.isSelecting,
-            onPick = {
-                selection.clear()
-                openAlbum = it.name
+        MediaListScreen(
+            title = album.ifBlank { "Unnamed" },
+            emptyText = "",
+            items = albumItems,
+            selection = selection,
+            onBack = { selection.clear(); openAlbum = null },
+            onOpenMedia = { onOpenMedia(it, album) },
+            asTimeline = true,
+            contentKey = album,
+            allowCopy = false,
+            // Swipe sideways on the grid: a strip of the locked albums slides in beside it.
+            gridWrapper = { grid ->
+                AlbumSwitcherDrawer(
+                    albums = lockedAlbums,
+                    currentId = lockedAlbums.firstOrNull { it.name == album }?.bucketId,
+                    enabled = !selection.isSelecting,
+                    onPick = {
+                        selection.clear()
+                        openAlbum = it.name
+                    },
+                    content = grid,
+                )
             },
-        ) {
-            MediaListScreen(
-                title = album.ifBlank { "Unnamed" },
-                emptyText = "",
-                items = albumItems,
-                selection = selection,
-                onBack = { selection.clear(); openAlbum = null },
-                onOpenMedia = { onOpenMedia(it, album) },
-                asTimeline = true,
-                contentKey = album,
-                allowCopy = false,
-                selectionBar = bar,
-            )
-        }
+            selectionBar = bar,
+        )
     } else {
         VaultPages(
             viewModel = viewModel,

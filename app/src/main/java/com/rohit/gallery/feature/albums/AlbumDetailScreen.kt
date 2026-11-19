@@ -35,25 +35,27 @@ fun AlbumDetailScreen(
     val oldestFirst by viewModel.oldestFirst.collectAsStateWithLifecycle()
     val bucketId by viewModel.currentBucket.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle()
-    // Swipe sideways on the grid to jump to another album.
-    AlbumSwitcherDrawer(
-        albums = albums,
-        currentId = bucketId,
-        enabled = !viewModel.selection.isSelecting,
-        onPick = { viewModel.switchTo(it.bucketId) },
-    ) {
-        MediaListScreen(
-            title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album",
-            emptyText = "This album is empty",
-            items = items,
-            selection = viewModel.selection,
-            selectionActions = viewModel.selectionActions,
-            onBack = onBack,
-            onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
-            titleActions = { OrderMenu(oldestFirst, viewModel::setOldestFirst) },
-            contentKey = bucketId,
-        )
-    }
+    MediaListScreen(
+        title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album",
+        emptyText = "This album is empty",
+        items = items,
+        selection = viewModel.selection,
+        selectionActions = viewModel.selectionActions,
+        onBack = onBack,
+        onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
+        titleActions = { OrderMenu(oldestFirst, viewModel::setOldestFirst) },
+        contentKey = bucketId,
+        // Swipe sideways on the grid: a strip of albums slides in beside it, below the title bar.
+        gridWrapper = { grid ->
+            AlbumSwitcherDrawer(
+                albums = albums,
+                currentId = bucketId,
+                enabled = !viewModel.selection.isSelecting,
+                onPick = { viewModel.switchTo(it.bucketId) },
+                content = grid,
+            )
+        },
+    )
 }
 
 @Composable
