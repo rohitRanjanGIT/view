@@ -96,6 +96,10 @@ class ReachState internal constructor(expanded: Boolean) {
     internal var dragging by mutableStateOf(false)
         private set
 
+    /** This drag has been pulled past halfway at some point (the hold count then runs until the finger lifts). */
+    internal var pulledFar by mutableStateOf(false)
+        private set
+
     /** Finger travel before rubber-banding, so a drag past the open position keeps tracking smoothly. */
     private var raw = 0f
     private var settleJob: Job? = null
@@ -125,6 +129,7 @@ class ReachState internal constructor(expanded: Boolean) {
         val before = raw
         raw = (raw + dy).coerceAtLeast(0f)
         offset = shownFor(raw)
+        if (offset > maxPx / 2) pulledFar = true
         return raw - before
     }
 
@@ -133,6 +138,7 @@ class ReachState internal constructor(expanded: Boolean) {
     /** Ends a drag with [velocity] px/s: goes to the rest position the momentum points at. */
     internal fun release(velocity: Float, scope: CoroutineScope) {
         dragging = false
+        pulledFar = false
         val target = if (offset + GalleryMotion.project(velocity) > maxPx / 2) maxPx else 0f
         expanded = target > 0f
         if (offset == target) return
@@ -224,10 +230,10 @@ fun ReachDown(
     }
 
 
-    // Pull down and keep holding: after [HOLD_MS] a buzz, then [onHold] (the Albums tab's hidden way into Locked).
+    // Pull down past halfway and keep the finger down (it may drift): after [HOLD_MS] a buzz, then [onHold] (the Albums tab's hidden way into Locked).
     if (onHold != null) {
         val latestHold by rememberUpdatedState(onHold)
-        val holding by remember(state) { derivedStateOf { state.dragging && state.offset > state.maxPx / 2 } }
+        val holding by remember(state) { derivedStateOf { state.dragging && state.pulledFar } }
         LaunchedEffect(holding) {
             if (holding) {
                 delay(HOLD_MS)
