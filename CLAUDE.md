@@ -206,32 +206,40 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 
 ### Where we are
 - **Phases 0-2 done and verified on my phone. Phase 3 nearly done** (only the own editor is left, deferred by me).
-  54 unit tests pass. Merged manifests contain no `INTERNET` (re-check each build).
+  66 unit tests pass. Merged manifests contain no `INTERNET` (re-check each build).
 - **Phase 3 done and verified on my phone:** pinch density, album timelines, album organisation, Albums tab pinch,
   oldest-first albums, search, own back-gesture animations, Edit hand-off to Google Photos, GIF / motion photo /
   Ultra HDR, Settings, the viewer redesign, favourite hearts, tabs that slide with the finger.
 - **Decisions:** no ML search for now. Trash stays a flat grid. Own editor later (Edit hands off to Google Photos).
-- **Committed and pushed, not yet tried by me (2026-11-19): viewer as an overlay over the grid.** Build clean,
-  unit tests pass, verified with a 10x recording (swipe-down glides from the release point into the cell). Still to
-  check with me on the phone: swipe-down from Pictures (also after paging to
-  another photo); open/close from an album, Favourites, Search; close with back gesture and the ← button; details
-  panel → album row → back (viewer should still be open). Files: `navigation/ViewerOverlay.kt` (new),
-  `GalleryNavHost.kt`, `SharedTransition.kt`, `ViewerViewModel.kt`, `ViewerScreen.kt`, `SharedFlight.kt`,
-  `TimelineScreen.kt`, `MediaGrid.kt`, `Motion.kt` (close 380 ms). See DECISIONS "Viewer overlay".
-- **Apple-style pass (/apple-design), 2026-11-19, pushed.** Verified by me: 1-3 fluid viewer gestures (springs with
-  velocity handoff into the close flight, momentum projection, 1:1 interruptible details panel, no tap lock while a
-  photo flies home), 4 rubber-banding. Verified: 5 press feedback on grid cells. Verified: 6 haptics. Verified: 7 frosted bars (Haze 1.7.2). Committed, not yet tried by me: 8 typography (size-specific tracking) and the
-  "Remove animations" check. That completes the pass. See DECISIONS "Fluid viewer
+  Hidden albums are gone (merged into Locked, my call).
+- **Viewer as an overlay over the grid** and the **Apple-style pass** (springs, projection, rubber-banding, press
+  feedback, haptics, frosted bars, typography): done and verified. See DECISIONS "Viewer overlay", "Fluid viewer
   gestures".
-- **Committed, not yet tried by me (2026-11-19): Locked (vault).** Opened only by pulling down on Albums and holding 2 s (no Menu row), lock from selection More menu,
-  viewer menu, Albums tab. Test with copies only (e.g. `Pictures/Gallery test`). See DECISIONS "Locked".
-  Second round: Photos / Albums pages in Locked, one-tap locking and trash Undo with Skip confirmation on.
+- **Polish pass, 2026-11-19 (all verified by me unless marked):**
+  - Floating capsule tab bar; selection action bars are the same floating capsule (`FloatingActionPill`).
+  - **Pull down to reach** (`core/ui/components/ReachDown.kt`) on every grid: pull down at the top and the grid comes
+    down to status bar + 30% of the screen and stays until pushed up (also from the empty space above it). One title
+    glides between the centre and the top bar (`ReachBarTitle`); the bar's icons (search, +, ⋮; not Back) ride down
+    above the grid (`ReachTopIcons`). Pictures: search sits on the "Today" line.
+  - **Album switcher strip** (`AlbumSwitcher.kt`): in an album (and a locked album), swipe right on the grid: a
+    narrow strip of covers pushes the grid aside; tap switches album in place, strip stays open.
+  - **Locked (vault):** only way in is pulling down on Albums and holding 2 s (buzz), or Settings > Open Locked.
+    Settings > Locked folder switch: off asks for the screen lock, moves everything back, then hides all Lock actions.
+    Fixed 2026-11-19, not yet re-checked by me: a stray "Locked albums" title in the status bar (moving title now
+    measured live).
+  - Copy to clipboard (viewer top bar; selection bar with one item; not Trash / Locked). Three-finger screenshot no
+    longer zooms grids. Selection mode ends when the last item is deselected. Delete album (to Trash).
+  - **New album:** Albums tab + asks a name, then a picker (tap to pick, Copy here / Move here). Verified by Claude on
+    the phone (made "Test album" with one copied screenshot; still there, delete it with ⋮ > Delete album).
+    **+ inside an album** (add photos to an existing album): committed, not yet tried by anyone.
+- **Git:** pushed up to `0ec32f3` (Delete album). Committed after that, not pushed: moving-title fix, Albums + / search,
+  New album, + inside an album, this handoff. Push when I say so.
 - **Next (pick with me):**
-  1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes
-     after sharing). Proposed 2026-11-18; my answers on notification vs in-app card, delay (5 min suggested), and
-     default on/off are still pending.
-  2. More UI polish / features I bring (I am doing a polish pass now, one request at a time).
-  3. Then Phase 4 (see Known gaps).
+  1. **Swipe-left menu sidebar** (agreed, not started): on the Albums tab, finger-left swipe slides in a sidebar from
+     the right with Favourites, Videos, Trash, Settings, replacing the Menu tab (bottom bar becomes Pictures + Albums).
+     Open questions from me still: exact direction confirmed as finger-left; whether a small icon also opens it.
+  2. My screenshot idea: a notification offers Share / Share & delete after a screenshot (answers still pending).
+  3. App icon (deferred by me). Then Phase 4 (see Known gaps).
 
 ### What exists
 - **Setup:** `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin), Kotlin 2.2.10, Gradle 9.6.0, Compose BOM
@@ -264,19 +272,22 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     aperture / focal box (`ExposureValues`); album row (opens the album) and Favourites row (opens Favourites).
   - Video (Media3: scrubber, mute, keep-screen-on, resume saved across launches), Ultra HDR window mode.
 - **Selection** (`feature/selection/`): long-press + drag-select with edge auto-scroll; Share, Favourite, Trash,
-  Move/Copy to album. Secondary grids (album, Favourites, Videos, Trash) use `MediaListScreen` /
+  More (Move / Copy to album, Lock), Copy to clipboard with one item; ends at zero selected.
+  Secondary grids (album, Favourites, Videos, Trash) use `MediaListScreen` /
   `SelectableMediaGrid`.
 - **Albums, Favourites, Videos, Trash** (restore / delete forever with confirmation). UI text spells "Favourite"
   (British); code identifiers keep `favorite`.
 - **External intents:** `ACTION_VIEW` + camera `REVIEW` open straight into the viewer, works without media permission.
 - **Pinch density:** `GridZoom.kt` / `PinchToZoom.kt` / `GridZoomAnchor.kt`. Pictures 2/4/6 + month; album lists
   share one size; Trash a flat 2/4/6 grid. All remembered across launches (`GridSizeKey` in `AppPreferences`).
+- **Albums tab:** + New album (`NewAlbumScreen`, `NewAlbumRoute(name, bucketId?)` also used by the + inside an album),
+  Search, ⋮ (sort, Edit albums); selection: Pin, Lock, Delete (`AlbumDelete.kt`, to Trash). Hold-pull opens Locked.
 - **Album organisation:** Room `gallery.db` (`AlbumPrefEntity`: hidden, pinnedAt, position; schema in `app/schemas/`),
   DataStore `AppPreferences` (album sort, albums per row, oldest-first). Edit albums screen (pin, reorder).
   Hidden albums were removed (the `hidden` column stays in Room, unused).
 - **Search:** `feature/search/` (`parseSearch` / `SearchIndex` / suggestions, recent searches in DataStore).
 - **Settings** (`feature/settings/`): theme, wallpaper colours, start muted, motion autoplay, Ultra HDR, skip
-  confirmation pop-ups (`MANAGE_MEDIA` special access), About. `AppSettings` read before the first frame.
+  confirmation pop-ups (`MANAGE_MEDIA` special access), Locked on / off + Open Locked, About. `AppSettings` read before the first frame.
 
 ### Known gaps / deferred
 - Camera thumbnail opens Google Photos, not Gallery (parked by me; likely the system default app setting).
@@ -361,3 +372,9 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   In perl `s{}{}` replacements with Kotlin braces break: use the Edit tool or `s///` instead.
 - Coil memory-cache keys ignore the decoder: give a request with a custom `decoderFactory` its own `memoryCacheKey`.
 
+- `draggable(startDragImmediately = ...)` is read at composition: pass *state*, never a value computed from a Job
+  (a stale `true` made every tap inside the album strip start a drag).
+- Inside pagers, don't combine two `boundsInWindow` / `positionInWindow` readings taken in different callbacks: they
+  go stale relative to each other while pages slide. Measure live with `LayoutCoordinates.localPositionOf`.
+- Pinch detectors must ignore 3+ fingers and wait ~100 ms with two before starting (three-finger screenshot swipe).
+- adb `input text` needs `%s` for spaces.
