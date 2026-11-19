@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -36,9 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.layout.widthIn
@@ -121,7 +121,10 @@ class ReachState internal constructor(expanded: Boolean) {
      * Where the screen's top bar shows the title ([ReachBarTitle]), on screen, and its font size in px; null when the
      * bar shows no title (Pictures, or while selecting). The big title glides into this spot as the grid goes up.
      */
-    internal var barTitle by mutableStateOf<Pair<Rect, Float>?>(null)
+    internal var barTitle by mutableStateOf<Pair<LayoutCoordinates, Float>?>(null, neverEqualPolicy())
+
+    /** This area's own layout, to measure the bar title against it directly (see [ReachTitle]). */
+    internal var area by mutableStateOf<LayoutCoordinates?>(null, neverEqualPolicy())
 
     /** A [ReachDown] with a title is on screen, drawing the title itself: the bar's own copy then stays invisible. */
     internal var drawsTitle by mutableStateOf(false)
@@ -293,6 +296,7 @@ fun ReachDown(
                 val top = position.y
                 state.windowTop = top
                 state.windowLeft = position.x
+                state.area = coords
                 state.resize((targetY - top - insetPx).coerceAtLeast(minPx))
             }
             .nestedScroll(connection)
@@ -370,16 +374,25 @@ private fun ReachTitle(title: String?, subtitle: String?, state: ReachState, top
                         val expandedX = (state.visibleWidth(widthPx) - titleSize.width) / 2
                         val expandedY = groupTop(state.offset)
                         val bar = state.barTitle
-                        if (bar == null) {
+                        val area = state.area
+                        // Measured live between the two layouts (not two screen readings taken at different moments,
+                        // which went stale while Locked's pages slid and drew the title on the wrong page).
+                        val landing = if (bar != null && area != null && bar.first.isAttached && area.isAttached) {
+                            area.localPositionOf(bar.first, Offset.Zero) to bar.first.size.height
+                        } else {
+                            null
+                        }
+                        if (bar == null || landing == null) {
                             // Nowhere to land: rise with the grid and fade out.
                             alpha = ((p - 0.25f) / 0.75f).coerceIn(0f, 1f)
                             translationX = expandedX
                             translationY = expandedY
                         } else {
-                            val (rect, fontPx) = bar
+                            val fontPx = bar.second
+                            val (spot, barHeight) = landing
                             val collapsedScale = (fontPx / bigFontPx).coerceIn(0.2f, 1f)
-                            val collapsedX = rect.left - state.windowLeft
-                            val collapsedY = rect.center.y - state.windowTop - titleSize.height * collapsedScale / 2
+                            val collapsedX = spot.x
+                            val collapsedY = spot.y + barHeight / 2f - titleSize.height * collapsedScale / 2
                             val scale = lerp(collapsedScale, 1f, p)
                             alpha = 1f
                             scaleX = scale
@@ -425,7 +438,7 @@ fun ReachBarTitle(state: ReachState, text: String, style: TextStyle, modifier: M
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
-            .onGloballyPositioned { state.barTitle = it.boundsInWindow() to fontPx }
+            .onGloballyPositioned { state.barTitle = it to fontPx }
             .graphicsLayer { alpha = if (state.drawsTitle) 0f else 1f },
     )
 }
