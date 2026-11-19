@@ -454,3 +454,17 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
     "Moved to trash · Undo" bar (`UndoBarHost` at the app root, `LocalUndoBar`) shows for 5 s; Undo is a silent
     `createTrashRequest(..., false)` on the trashed URIs. With it off, Android's own trash dialog stays and no Undo is
     shown (it would pop a second system dialog). Delete forever keeps its in-app confirmation everywhere.
+
+## Pull down to reach, album switcher (2026-11-19)
+- **Pull down to reach** (`core/ui/components/ReachDown.kt`): on Pictures, the Albums tab, album / Favourites /
+  Videos / Trash grids and both Locked pages, pulling down at the top of the grid brings the whole grid down by 40%
+  of its height, with a big title and item count in the space above. It stays down (saved per screen) until pushed
+  back up. Built as a `NestedScrollConnection` around the grid, so the grid's own scrolling is untouched: only the
+  drag the grid can't use (pulling past its top) moves it, and a push up first brings it back. 1:1 tracking,
+  rubber-band past the open position, momentum projection on release, haptic tick at the halfway point. The grid
+  moves by layout `offset` (not a graphics layer) so shared-element flights and hit tests stay correct.
+- **Album switcher** (`AlbumSwitcher.kt`): inside an album (and inside a locked album), a sideways swipe on the grid
+  pulls in a list of albums from the left (M3 `ModalNavigationDrawer`, whose drag covers the whole content, so it
+  works from the middle; the screen edges stay the system back gesture). Off while selecting. Picking an album
+  switches in place (`AlbumDetailViewModel.switchTo`, saved in `SavedStateHandle`): no new screen, so Back still
+  returns to the Albums tab. The grid is keyed by album so a new album starts at the top.

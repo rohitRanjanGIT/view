@@ -44,6 +44,9 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.model.mediaCountLabel
+import com.rohit.gallery.core.ui.components.ReachDown
+import androidx.compose.runtime.key
 
 /**
  * A secondary screen showing [items] as a selectable grid under a back/title bar, with the shared
@@ -60,6 +63,7 @@ fun MediaListScreen(
     onBack: () -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
     titleActions: @Composable RowScope.() -> Unit = {},
+    contentKey: Any? = null,
 ) {
     val allFavorite by remember(items) {
         derivedStateOf {
@@ -67,7 +71,10 @@ fun MediaListScreen(
             ids.isNotEmpty() && items.orEmpty().filter { it.id in ids }.let { sel -> sel.isNotEmpty() && sel.all { it.isFavorite } }
         }
     }
-    MediaListScreen(title, emptyText, items, selection, onBack, onOpenMedia, asTimeline = true, titleActions = titleActions) { modifier ->
+    MediaListScreen(
+        title, emptyText, items, selection, onBack, onOpenMedia,
+        asTimeline = true, titleActions = titleActions, contentKey = contentKey,
+    ) { modifier ->
         SelectionActionsBar(selectionActions, selection, modifier, allFavorite = allFavorite)
     }
 }
@@ -88,6 +95,7 @@ fun MediaListScreen(
     gridHeader: String? = null,
     asTimeline: Boolean = false,
     titleActions: @Composable RowScope.() -> Unit = {},
+    contentKey: Any? = null,
     selectionBar: @Composable (Modifier) -> Unit,
 ) {
     BackHandler(enabled = selection.isSelecting) { selection.clear() }
@@ -115,10 +123,19 @@ fun MediaListScreen(
                 items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text(emptyText, style = MaterialTheme.typography.titleMedium)
                 }
-                // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
-                asTimeline -> level?.let { MediaTimeline(items, selection, it, sizes::setLevel, onOpenMedia) }
-                else -> columns?.let {
-                    SelectableMediaGrid(items, selection, it, sizes::setTrashColumns, onOpenMedia, header = gridHeader)
+                // Pull down at the top to bring the photos into thumb reach. A new [contentKey] (another album)
+                // starts a fresh grid, scrolled to the top.
+                else -> ReachDown(title = title, subtitle = remember(items) { mediaCountLabel(items) }) {
+                    key(contentKey) {
+                        // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
+                        if (asTimeline) {
+                            level?.let { MediaTimeline(items, selection, it, sizes::setLevel, onOpenMedia) }
+                        } else {
+                            columns?.let {
+                                SelectableMediaGrid(items, selection, it, sizes::setTrashColumns, onOpenMedia, header = gridHeader)
+                            }
+                        }
+                    }
                 }
             }
         }

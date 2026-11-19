@@ -1,5 +1,7 @@
 package com.rohit.gallery.feature.albums
 
+import com.rohit.gallery.core.model.albumCountLabel
+import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.feature.vault.rememberVaultLocker
 import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
@@ -152,14 +154,17 @@ fun AlbumsScreen(
                         Text("No albums yet", style = MaterialTheme.typography.titleMedium)
                     }
                     else -> columns?.let { cols ->
-                        AlbumGrid(
-                            list = list,
-                            columns = cols,
-                            selection = selection,
-                            contentBottomPadding = contentBottomPadding,
-                            onOpenAlbum = onOpenAlbum,
-                            onColumnsChange = viewModel::setColumns,
-                        )
+                        // Pull down at the top to bring the albums into thumb reach.
+                        ReachDown(title = "Albums", subtitle = albumCountLabel(list.size)) {
+                            AlbumGrid(
+                                list = list,
+                                columns = cols,
+                                selection = selection,
+                                contentBottomPadding = contentBottomPadding,
+                                onOpenAlbum = onOpenAlbum,
+                                onColumnsChange = viewModel::setColumns,
+                            )
+                        }
                     }
                 }
             }

@@ -1,5 +1,8 @@
 package com.rohit.gallery.feature.vault
 
+import com.rohit.gallery.core.model.albumCountLabel
+import com.rohit.gallery.core.ui.components.ReachDown
+import com.rohit.gallery.core.ui.components.AlbumSwitcherDrawer
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -198,16 +201,30 @@ private fun VaultContent(viewModel: VaultViewModel, onBack: () -> Unit, onOpenMe
         val albumItems = remember(items, album) { items?.filter { it.bucketName == album } }
         // The album emptied (all unlocked or deleted): back to the albums.
         LaunchedEffect(albumItems) { if (albumItems != null && albumItems.isEmpty()) openAlbum = null }
-        MediaListScreen(
-            title = album.ifBlank { "Unnamed" },
-            emptyText = "",
-            items = albumItems,
-            selection = selection,
-            onBack = { selection.clear(); openAlbum = null },
-            onOpenMedia = { onOpenMedia(it, album) },
-            asTimeline = true,
-            selectionBar = bar,
-        )
+        val albums by viewModel.albums.collectAsStateWithLifecycle()
+        val lockedAlbums = remember(albums) { albums.orEmpty().map { it.album } }
+        // Swipe sideways on the grid to jump to another locked album.
+        AlbumSwitcherDrawer(
+            albums = lockedAlbums,
+            currentId = lockedAlbums.firstOrNull { it.name == album }?.bucketId,
+            enabled = !selection.isSelecting,
+            onPick = {
+                selection.clear()
+                openAlbum = it.name
+            },
+        ) {
+            MediaListScreen(
+                title = album.ifBlank { "Unnamed" },
+                emptyText = "",
+                items = albumItems,
+                selection = selection,
+                onBack = { selection.clear(); openAlbum = null },
+                onOpenMedia = { onOpenMedia(it, album) },
+                asTimeline = true,
+                contentKey = album,
+                selectionBar = bar,
+            )
+        }
     } else {
         VaultPages(
             viewModel = viewModel,
@@ -309,14 +326,16 @@ private fun VaultPages(
                                     textAlign = TextAlign.Center,
                                 )
                             }
-                            else -> AlbumGrid(
-                                list = list,
-                                columns = albumColumns,
-                                selection = albumSelection,
-                                contentBottomPadding = VaultBarRoom + bottomInset,
-                                onOpenAlbum = { onOpenAlbum(it.name) },
-                                onColumnsChange = { albumColumns = it },
-                            )
+                            else -> ReachDown(title = "Locked albums", subtitle = albumCountLabel(list.size)) {
+                                AlbumGrid(
+                                    list = list,
+                                    columns = albumColumns,
+                                    selection = albumSelection,
+                                    contentBottomPadding = VaultBarRoom + bottomInset,
+                                    onOpenAlbum = { onOpenAlbum(it.name) },
+                                    onColumnsChange = { albumColumns = it },
+                                )
+                            }
                         }
                     }
                     if (albumSelection.isSelecting) {

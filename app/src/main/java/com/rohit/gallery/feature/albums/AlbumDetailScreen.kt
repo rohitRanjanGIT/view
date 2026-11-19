@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.ui.components.AlbumSwitcherDrawer
 import com.rohit.gallery.feature.selection.MediaListScreen
 
 /** One album: its photos and videos in a grid, with the full selection actions and a newest/oldest order. */
@@ -32,16 +33,27 @@ fun AlbumDetailScreen(
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     val oldestFirst by viewModel.oldestFirst.collectAsStateWithLifecycle()
-    MediaListScreen(
-        title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album",
-        emptyText = "This album is empty",
-        items = items,
-        selection = viewModel.selection,
-        selectionActions = viewModel.selectionActions,
-        onBack = onBack,
-        onOpenMedia = { onOpenMedia(it, viewModel.bucketId, oldestFirst) },
-        titleActions = { OrderMenu(oldestFirst, viewModel::setOldestFirst) },
-    )
+    val bucketId by viewModel.currentBucket.collectAsStateWithLifecycle()
+    val albums by viewModel.albums.collectAsStateWithLifecycle()
+    // Swipe sideways on the grid to jump to another album.
+    AlbumSwitcherDrawer(
+        albums = albums,
+        currentId = bucketId,
+        enabled = !viewModel.selection.isSelecting,
+        onPick = { viewModel.switchTo(it.bucketId) },
+    ) {
+        MediaListScreen(
+            title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album",
+            emptyText = "This album is empty",
+            items = items,
+            selection = viewModel.selection,
+            selectionActions = viewModel.selectionActions,
+            onBack = onBack,
+            onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
+            titleActions = { OrderMenu(oldestFirst, viewModel::setOldestFirst) },
+            contentKey = bucketId,
+        )
+    }
 }
 
 @Composable

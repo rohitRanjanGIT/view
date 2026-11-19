@@ -87,6 +87,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.model.mediaCountLabel
+import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.FollowViewerPhoto
@@ -151,8 +153,16 @@ private fun TimelineContent(
                 Text("No photos or videos yet", style = MaterialTheme.typography.titleMedium)
             }
             is TimelineUiState.Content -> {
+                val counts = remember(s.items) { mediaCountLabel(s.items) }
                 Box(Modifier.fillMaxSize().hazeSource(haze)) {
-                    TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
+                    // Pull down at the top to bring the photos into thumb reach.
+                    ReachDown(
+                        title = "Pictures",
+                        subtitle = counts,
+                        topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                    ) {
+                        TimelineGrid(s, selection, contentBottomPadding, onOpenMedia, viewModel::setLevel)
+                    }
                 }
                 if (!selecting) SearchButton(onOpenSearch, Modifier.align(Alignment.TopEnd))
                 if (selecting) {
