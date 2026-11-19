@@ -45,7 +45,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** How far the grid comes down when pulled: this share of the area it fills. */
-private const val REACH_FRACTION = 0.4f
+private const val REACH_FRACTION = 0.3f
 
 /**
  * Pull down at the top of a grid and the whole grid comes down by [REACH_FRACTION] of the screen, so its top rows

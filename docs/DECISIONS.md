@@ -457,7 +457,7 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
 
 ## Pull down to reach, album switcher (2026-11-19)
 - **Pull down to reach** (`core/ui/components/ReachDown.kt`): on Pictures, the Albums tab, album / Favourites /
-  Videos / Trash grids and both Locked pages, pulling down at the top of the grid brings the whole grid down by 40%
+  Videos / Trash grids and both Locked pages, pulling down at the top of the grid brings the whole grid down by 30%
   of its height, with a big title and item count in the space above. It stays down (saved per screen) until pushed
   back up. Built as a `NestedScrollConnection` around the grid, so the grid's own scrolling is untouched: only the
   drag the grid can't use (pulling past its top) moves it, and a push up first brings it back. 1:1 tracking,
