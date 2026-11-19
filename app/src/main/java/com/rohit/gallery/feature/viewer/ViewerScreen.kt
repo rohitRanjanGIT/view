@@ -20,6 +20,11 @@ import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalWindowInfo
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.BackEventCompat
@@ -113,9 +118,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 
-private const val DISMISS_VELOCITY = 1800f
+/**
+ * Projection for swipe-down: shorter than a scroll's 0.998, so only a real flick closes the viewer on speed alone
+ * (about 1700 px/s with no distance, close to the old fixed 1800 px/s threshold).
+ */
+private const val DISMISS_DECELERATION = 0.995f
+
+/** Moving back up faster than this (per second) at release keeps the viewer open, however far it was pulled. */
+private val FlickBackVelocity = 150.dp
 private val DismissDistance = 120.dp
-private val UpSwipeOpenDistance = 48.dp
 
 /** How far the photo shrinks at the end of a back gesture, as drag-down progress (0.9: about 60 % size, the
  * background mostly faded, corners rounded like a card). */
@@ -138,6 +149,8 @@ fun ViewerScreen(
     onOpenFavorites: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ViewerViewModel,
+    // A swipe-down close, with the finger's release velocity (px/s); [onBack] when not given.
+    onSwipeClose: ((velocity: Offset) -> Unit)? = null,
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     val list = items
@@ -155,6 +168,7 @@ fun ViewerScreen(
             items = list,
             startId = viewModel.startId,
             onBack = onBack,
+            onSwipeClose = onSwipeClose,
             onCurrentItemChanged = onCurrentItemChanged,
             onOpenAlbum = onOpenAlbum,
             onOpenFavorites = onOpenFavorites,
@@ -169,6 +183,7 @@ private fun ViewerContent(
     items: List<MediaItem>,
     startId: Long,
     onBack: () -> Unit,
+    onSwipeClose: ((velocity: Offset) -> Unit)?,
     onCurrentItemChanged: (Long?) -> Unit,
     onOpenAlbum: (bucketId: Long) -> Unit,
     onOpenFavorites: () -> Unit,
@@ -238,18 +253,27 @@ private fun ViewerContent(
     // Videos do not zoom; make sure a previous photo's zoom state cannot block the dismiss gesture.
     LaunchedEffect(currentItem.isVideo) { if (currentItem.isVideo) zoomed = false }
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
-    val upSwipeOpenPx = with(LocalDensity.current) { UpSwipeOpenDistance.toPx() }
+    val flickBackPx = with(LocalDensity.current) { FlickBackVelocity.toPx() }
     // Plain holder (not state): per-gesture bookkeeping that must not trigger recomposition.
-    val swipe = remember { object { var mode = SwipeMode.None; var travel = 0f } }
+    val swipe = remember { object { var mode = SwipeMode.None; var infoStart = 0f; var infoTravel = 0f } }
+    val settleJobs = remember { mutableListOf<Job>() }
     val infoScroll = rememberScrollState()
     val progress = maxOf((dragY.coerceAtLeast(0f) / (dismissDistancePx * 3)).coerceIn(0f, 1f), backShrink * BACK_MAX_PROGRESS)
     val dismissAlpha by animateFloatAsState(if (dismissed) 0f else 1f, tween(160), label = "dismissAlpha")
     val exitProgress by animateFloatAsState(if (dismissed) 1f else 0f, tween(180), label = "exit")
     val chromeAlpha = dismissAlpha * (1f - maxOf((abs(dragY) / dismissDistancePx).coerceIn(0f, 1f), backShrink))
 
-    fun settle(spec: androidx.compose.animation.core.AnimationSpec<Float>) {
-        scope.launch { animate(dragX, 0f, animationSpec = spec) { v, _ -> dragX = v } }
-        scope.launch { animate(dragY, 0f, animationSpec = spec) { v, _ -> dragY = v } }
+    // Grabbing the photo while it springs back stops it where it is on screen; the drag carries on from there.
+    fun stopSettle() {
+        settleJobs.forEach { it.cancel() }
+        settleJobs.clear()
+    }
+    // Springs the photo back to rest, starting at the finger's release [velocity] (px/s), each axis on its own.
+    fun settle(velocity: Offset = Offset.Zero) {
+        stopSettle()
+        val spec = GalleryMotion.dragReturn<Float>()
+        settleJobs += scope.launch { animate(dragX, 0f, velocity.x, spec) { v, _ -> dragX = v } }
+        settleJobs += scope.launch { animate(dragY, 0f, velocity.y, spec) { v, _ -> dragY = v } }
     }
 
     // [contentAspect]: the photo's width / height (0 if unknown), so the rounding follows its real edges.
@@ -271,7 +295,38 @@ private fun ViewerContent(
     }
 
     // Details: the photo shrinks upward into the area above an inline panel (stacked, not overlapping).
-    val infoProgress by animateFloatAsState(if (showInfo) 1f else 0f, GalleryMotion.snappy(), label = "info")
+    // The panel follows the finger 1:1 while dragged ([infoDrag]); otherwise [info] springs it open or shut, from
+    // wherever it is, so it can be grabbed again mid-way.
+    val info = remember { Animatable(if (showInfo) 1f else 0f) }
+    var infoDrag by remember { mutableStateOf<Float?>(null) }
+    val infoProgress = infoDrag ?: info.value
+    val panelPx = LocalWindowInfo.current.containerSize.height * InfoPanelFraction
+    LaunchedEffect(showInfo) {
+        // Buttons, taps and Back; a released swipe has already started its own animation towards this target.
+        val target = if (showInfo) 1f else 0f
+        if (infoDrag == null && info.targetValue != target) info.animateTo(target, GalleryMotion.sheet())
+    }
+    // [dy]: finger movement in px, down closes.
+    fun dragInfo(dy: Float) {
+        if (infoDrag == null) {
+            swipe.infoStart = info.value
+            swipe.infoTravel = 0f
+            scope.launch { info.stop() }
+        }
+        swipe.infoTravel += dy
+        infoDrag = (swipe.infoStart - swipe.infoTravel / panelPx).coerceIn(0f, 1f)
+    }
+    // Opens or closes towards where the swipe was heading, starting at its speed ([velocityY] px/s, down closes).
+    fun releaseInfo(velocityY: Float) {
+        val from = infoDrag ?: return
+        val open = from - GalleryMotion.project(velocityY) / panelPx > 0.5f
+        showInfo = open
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            info.snapTo(from)
+            infoDrag = null
+            info.animateTo(if (open) 1f else 0f, GalleryMotion.sheet(), initialVelocity = -velocityY / panelPx)
+        }
+    }
     BackHandler(enabled = showInfo) { showInfo = false }
 
     // Closing while zoomed in: animate the zoom out first, then close, so the flight back to the grid
@@ -375,8 +430,8 @@ private fun ViewerContent(
             dismissed = true
             onBack()
         } catch (e: CancellationException) {
-            settle(GalleryMotion.standard())
-            scope.launch { animate(backShrink, 0f, animationSpec = GalleryMotion.standard()) { v, _ -> backShrink = v } }
+            settle()
+            scope.launch { animate(backShrink, 0f, animationSpec = GalleryMotion.dragReturn()) { v, _ -> backShrink = v } }
             throw e
         }
     }
@@ -401,17 +456,11 @@ private fun ViewerContent(
                                 showInfo -> SwipeMode.CloseInfo
                                 else -> SwipeMode.Dismiss
                             }
+                            if (swipe.mode == SwipeMode.Dismiss) stopSettle()
                         }
                         when (swipe.mode) {
-                            SwipeMode.OpenInfo -> {
-                                // No image movement; open as soon as it is clearly a swipe up.
-                                swipe.travel -= delta.y
-                                if (swipe.travel > upSwipeOpenPx) showInfo = true
-                            }
-                            SwipeMode.CloseInfo -> {
-                                swipe.travel += delta.y
-                                if (swipe.travel > upSwipeOpenPx) showInfo = false
-                            }
+                            // The photo stays put; the panel follows the finger.
+                            SwipeMode.OpenInfo, SwipeMode.CloseInfo -> dragInfo(delta.y)
                             SwipeMode.Dismiss -> {
                                 dragX += delta.x
                                 dragY = (dragY + delta.y).coerceAtLeast(0f)
@@ -419,28 +468,31 @@ private fun ViewerContent(
                             else -> Unit
                         }
                     },
-                    onEnd = { _, _, velocityY ->
+                    onEnd = { _, velocityX, velocityY ->
                         val mode = swipe.mode
                         swipe.mode = SwipeMode.None
-                        swipe.travel = 0f
+                        val velocity = Offset(velocityX, velocityY)
                         when (mode) {
-                            SwipeMode.OpenInfo -> if (velocityY < -DISMISS_VELOCITY) showInfo = true
-                            SwipeMode.CloseInfo -> if (velocityY > DISMISS_VELOCITY) showInfo = false
-                            SwipeMode.Dismiss ->
-                                if (dragY > dismissDistancePx || velocityY > DISMISS_VELOCITY) {
-                                    // The flight stays on: the photo glides from here into its grid cell.
+                            SwipeMode.OpenInfo, SwipeMode.CloseInfo -> releaseInfo(velocityY)
+                            SwipeMode.Dismiss -> {
+                                // Decide by where the swipe is heading, not where the finger stopped; flicking back
+                                // up always keeps the viewer.
+                                val heading = dragY + GalleryMotion.project(velocityY, DISMISS_DECELERATION)
+                                if (velocityY > -flickBackPx && heading > dismissDistancePx) {
+                                    // The flight stays on: the photo carries on at the finger's speed into its cell.
                                     dismissed = true
-                                    onBack()
+                                    onSwipeClose?.invoke(velocity) ?: onBack()
                                 } else {
-                                    settle(GalleryMotion.standard())
+                                    settle(velocity)
                                 }
+                            }
                             else -> Unit
                         }
                     },
                     onCancel = {
+                        val mode = swipe.mode
                         swipe.mode = SwipeMode.None
-                        swipe.travel = 0f
-                        settle(GalleryMotion.standard())
+                        if (mode == SwipeMode.OpenInfo || mode == SwipeMode.CloseInfo) releaseInfo(0f) else settle()
                     },
                 ),
         ) {
@@ -513,15 +565,9 @@ private fun ViewerContent(
                     .verticalDismissGestures(
                         enabled = { infoScroll.value == 0 },
                         downOnly = true,
-                        onDrag = { delta ->
-                            swipe.travel += delta.y
-                            if (swipe.travel > upSwipeOpenPx) showInfo = false
-                        },
-                        onEnd = { _, _, velocityY ->
-                            swipe.travel = 0f
-                            if (velocityY > DISMISS_VELOCITY) showInfo = false
-                        },
-                        onCancel = { swipe.travel = 0f },
+                        onDrag = { delta -> dragInfo(delta.y) },
+                        onEnd = { _, _, velocityY -> releaseInfo(velocityY) },
+                        onCancel = { releaseInfo(0f) },
                     ),
             )
         }

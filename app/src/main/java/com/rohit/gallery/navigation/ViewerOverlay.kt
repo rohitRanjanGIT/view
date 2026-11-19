@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.ViewModel
@@ -62,6 +63,9 @@ class ViewerHost(route: ViewerRoute?, session: Int) : SharedPhotoState {
     override var viewerSettled by mutableStateOf(false)
         internal set
 
+    override var closeVelocity = Offset.Zero
+        private set
+
     /** Step 1 of opening: tags the tapped cell as the shared element, a frame before the viewer appears. */
     fun prepare(mediaId: Long) {
         if (route == null) activeId = mediaId
@@ -72,12 +76,15 @@ class ViewerHost(route: ViewerRoute?, session: Int) : SharedPhotoState {
         session++
         closing = false
         viewerSettled = false
+        closeVelocity = Offset.Zero
         activeId = route.mediaId
         this.route = route
     }
 
-    fun close() {
-        if (route == null) return
+    /** [velocity]: the finger's speed (px/s) if a swipe closed the viewer, so the flight carries on at it. */
+    fun close(velocity: Offset = Offset.Zero) {
+        if (route == null || closing) return
+        closeVelocity = velocity
         closing = true
         viewerSettled = false
     }
@@ -173,7 +180,8 @@ fun ViewerOverlay(
                 .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
         ) {
             ViewerScreen(
-                onBack = host::close,
+                onBack = { host.close() },
+                onSwipeClose = { velocity -> host.close(velocity) },
                 onCurrentItemChanged = { id -> if (id != null && !host.closing) host.activeId = id },
                 onOpenAlbum = onOpenAlbum,
                 onOpenFavorites = onOpenFavorites,

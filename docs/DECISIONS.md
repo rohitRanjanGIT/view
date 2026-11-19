@@ -340,3 +340,18 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
 - Shared element: `sharedElementWithCallerManagedVisibility`, viewer side visible while showing, grid cell visible otherwise. The grid cell is unlinked once the open flight lands (`viewerSettled`) and re-linked at close, otherwise the close flight starts from the open flight's end bounds (full screen) instead of the release point.
 - The stored "backdrop" bitmap of the grid (and recording the whole screen into a layer every frame) is gone: the live grid shows behind a drag-down, and the photo's cell is hidden (alpha 0) while the viewer shows it. `ViewerReturnTarget` is replaced by `FollowViewerPhoto`: grids scroll the viewer's photo into view underneath, 350 ms after paging settles, at once on close.
 - Close flight: 380 ms, `CubicBezierEasing(0.2, 0, 0, 1)` (about 266 ms at my 0.7 animation scale).
+
+## Fluid viewer gestures (2026-11-19, Apple "Designing Fluid Interfaces")
+- **Springs in Apple's terms:** `GalleryMotion.fluid(response, dampingRatio)` with stiffness = (2π / response)².
+  Open flight: critically damped, response 0.28 s. Close flight: response 0.4 s. Details panel 0.3 s; a photo
+  springing back after a drag 0.35 s with damping 0.85 (a little give, since a gesture with momentum preceded it).
+- **Velocity handoff into the close flight:** the shared-element library starts its bounds animation from rest and
+  takes no initial velocity, so `VelocityHandoff` wraps the bounds spring and substitutes the finger's release velocity
+  (`ViewerHost.closeVelocity`, set by `onSwipeClose`) when the library passes zero. A non-zero velocity (flight
+  redirected mid-way) is kept. Capped at 6000 px/s.
+- **Projection:** swipe-down closes when `dragY + project(v, 0.995)` passes 120 dp (0.995 rather than a scroll's
+  0.998, so speed alone needs ~1700 px/s, close to the old 1800 threshold); flicking back up (> 150 dp/s) always keeps
+  the viewer. The details panel opens/closes towards `progress + project(v)` (0.998) instead of a fixed velocity.
+- **Interruptible:** the details panel follows the finger 1:1 (`infoDrag`) and is an `Animatable`, so it can be grabbed
+  mid-animation; a photo springing back (`settle`) is cancelled when a new drag starts, continuing from where it is.
+- Not done: grabbing the photo during the close flight itself (the viewer is already closing then).

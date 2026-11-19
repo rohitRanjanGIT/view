@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import kotlinx.coroutines.delay
@@ -38,6 +39,9 @@ interface SharedPhotoState {
      * the cell makes a fresh match that starts from where the finger let go.
      */
     val viewerSettled: Boolean
+
+    /** How fast (px/s) the finger was moving when a swipe-down closed the viewer; the close flight starts at it. */
+    val closeVelocity: Offset get() = Offset.Zero
 }
 
 /** The viewer state of the screen this grid is on; null where no viewer can open (or the viewer itself). */
@@ -65,7 +69,7 @@ fun Modifier.mediaSharedElement(mediaId: Long, viewerSide: Boolean = false): Mod
             visible = visible,
             // Shrinking (viewer -> grid) is the close; it glides a little longer than the open.
             boundsTransform = { initial, target ->
-                if (initial.width > target.width) GalleryMotion.sharedBoundsClosing() else GalleryMotion.sharedBounds()
+                if (initial.width > target.width) GalleryMotion.sharedBoundsClosing(photo.closeVelocity) else GalleryMotion.sharedBounds()
             },
         )
     }
