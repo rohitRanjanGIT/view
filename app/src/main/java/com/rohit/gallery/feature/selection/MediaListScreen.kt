@@ -50,6 +50,7 @@ import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
 import com.rohit.gallery.core.ui.components.ReachState
 import com.rohit.gallery.core.ui.components.ReachTopIcons
+import com.rohit.gallery.core.ui.components.ReachBarTitle
 import androidx.compose.runtime.key
 
 /**
@@ -114,7 +115,7 @@ fun MediaListScreen(
 
     val context = LocalContext.current
     val haze = rememberChromeHaze()
-    // Pull-down-to-reach; the title bar's icons (not Back, not the name, which always stays) ride down with the grid.
+    // Pull-down-to-reach: the name glides between the bar and the centre; the bar's icons (not Back) ride down too.
     val reach = rememberReachState()
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().hazeSource(haze)) {
@@ -138,7 +139,7 @@ fun MediaListScreen(
                     }
                     // Pull down at the top to bring the photos into thumb reach. A new [contentKey] (another album)
                     // starts a fresh grid, scrolled to the top.
-                    else -> ReachDown(title = null, subtitle = remember(items) { mediaCountLabel(items) }, state = reach, actions = titleActions) {
+                    else -> ReachDown(title = title, subtitle = remember(items) { mediaCountLabel(items) }, state = reach, actions = titleActions) {
                         key(contentKey) {
                             // Until the saved size is read (a few ms) nothing is shown, rather than the default size first.
                             if (asTimeline) {
@@ -210,10 +211,8 @@ private fun TitleBar(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            // Where the big title lands when the grid goes up (it is the big title that shows here then).
+            ReachBarTitle(reach, title, MaterialTheme.typography.titleMedium, Modifier.weight(1f))
             // Back stays up here; the other icons ride down with the grid while it is pulled down.
             ReachTopIcons(reach, content = actions)
         }

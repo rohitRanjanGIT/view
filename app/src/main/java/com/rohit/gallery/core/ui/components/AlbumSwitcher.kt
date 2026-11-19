@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -107,6 +108,8 @@ fun AlbumSwitcherDrawer(
     }
 
     BackHandler(enabled = open) { settleTo(0f) }
+    // One lambda for good (it reads the live offset), so providing it never recomposes the grid.
+    val pushedAside = remember { { offset } }
 
     val shown by remember { derivedStateOf { offset > 0.5f } }
     Box(
@@ -126,7 +129,10 @@ fun AlbumSwitcherDrawer(
                 },
             ),
     ) {
-        Box(Modifier.fillMaxSize().offset { IntOffset(offset.roundToInt(), 0) }) { content() }
+        Box(Modifier.fillMaxSize().offset { IntOffset(offset.roundToInt(), 0) }) {
+            // Tells pull-down-to-reach how much of the grid is pushed off screen (it centres its title in the rest).
+            CompositionLocalProvider(LocalPushedAside provides pushedAside) { content() }
+        }
         if (shown) {
             AlbumStrip(
                 albums = albums,

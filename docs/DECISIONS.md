@@ -502,3 +502,10 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   the private photos back into the gallery), then `unlockAll` moves everything back to its albums with a progress
   dialog (Back blocked); the switch only goes off when every item made it, otherwise Locked stays on and keeps the
   rest. The count is awaited, never assumed empty.
+- **One moving title** (2026-11-19, user's call, all screens): instead of a big title plus a fading bar title, the
+  title is one piece of text drawn by `ReachDown`: big and centred while the grid is down, gliding and shrinking (by
+  font-size ratio, graphics layer only) onto the bar's title spot as it goes up. The bar keeps an invisible
+  `ReachBarTitle` that reports where to land; with no `ReachDown` on screen (empty / loading) it draws normally.
+  Pictures and the selecting state have no bar title, so there it rises and fades. `ReachDown` no longer clips (the
+  title leaves its area). While the album strip pushes the grid aside, the title centres and the icons sit within
+  the visible part (`LocalPushedAside`; not the window position, which would re-centre during tab swipes).

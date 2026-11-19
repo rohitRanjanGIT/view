@@ -7,6 +7,8 @@ import com.rohit.gallery.core.ui.components.pillSlot
 import com.rohit.gallery.core.model.albumCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
+import com.rohit.gallery.core.ui.components.ReachBarTitle
+import com.rohit.gallery.core.ui.components.ReachState
 import androidx.compose.ui.graphics.graphicsLayer
 import com.rohit.gallery.core.ui.components.AlbumSwitcherDrawer
 import android.widget.Toast
@@ -321,7 +323,7 @@ private fun VaultPages(
                 else -> Box(Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxSize()) {
                         val reach = rememberReachState()
-                        VaultTitleBar("Locked albums", onBack, titleAlpha = { 1f - reach.progress })
+                        VaultTitleBar("Locked albums", onBack, reach)
                         val list = albums
                         when {
                             list == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
@@ -384,11 +386,11 @@ private fun VaultPages(
 private val VaultBarRoom = 92.dp
 
 @Composable
-private fun VaultTitleBar(title: String, onBack: () -> Unit, titleAlpha: () -> Float = { 1f }) {
+private fun VaultTitleBar(title: String, onBack: () -> Unit, reach: ReachState) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.statusBarsPadding().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.graphicsLayer { alpha = titleAlpha() })
+            ReachBarTitle(reach, title, MaterialTheme.typography.titleMedium)
         }
     }
 }

@@ -5,6 +5,7 @@ import com.rohit.gallery.core.ui.components.ReachDown
 import com.rohit.gallery.core.ui.components.rememberReachState
 import com.rohit.gallery.core.ui.components.ReachState
 import com.rohit.gallery.core.ui.components.ReachTopIcons
+import com.rohit.gallery.core.ui.components.ReachBarTitle
 import com.rohit.gallery.feature.vault.rememberVaultLocker
 import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
@@ -338,11 +339,7 @@ private fun AlbumsHeader(
         modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            "Albums",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.weight(1f).graphicsLayer { alpha = 1f - reach.progress },
-        )
+        ReachBarTitle(reach, "Albums", MaterialTheme.typography.headlineMedium, Modifier.weight(1f))
         ReachTopIcons(reach) { AlbumsMenu(sort, onSort, onEditAlbums) }
     }
 }
