@@ -1,5 +1,7 @@
 package com.rohit.gallery.feature.selection
 
+import com.rohit.gallery.core.ui.components.LocalUndoBar
+import android.provider.MediaStore
 import com.rohit.gallery.feature.vault.rememberVaultLocker
 import android.app.Activity
 import android.content.Intent
@@ -90,6 +92,12 @@ class SelectionActions(
         return actions.favoriteRequest(items, favorite = !items.all { it.isFavorite })
     }
 
+    /** Reverses a trash of [items] (silent with "Manage media" access). */
+    suspend fun untrashRequest(items: List<MediaItem>): IntentSender? =
+        items.takeIf { it.isNotEmpty() }?.let { actions.restoreRequest(it.map { item -> item.copy(isTrashed = true) }) }
+
+    fun refresh() = repository.refresh()
+
     /** After trash or favorite went through. */
     fun onWritten() {
         selection.clear()
@@ -168,6 +176,19 @@ fun SelectionActionsBar(
     val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) controller.onWritten()
     }
+    // Trash: with "Skip confirmation pop-ups" on, Android trashes at once, so offer Undo instead of a question.
+    val undoBar = LocalUndoBar.current
+    val trashed = remember { object { var items: List<MediaItem> = emptyList() } }
+    val trashLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        val items = trashed.items
+        trashed.items = emptyList()
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        controller.onWritten()
+        if (undoBar != null && runCatching { MediaStore.canManageMedia(context) }.getOrDefault(false)) {
+            val what = if (items.size == 1) "1 item" else "${items.size} items"
+            undoBar.show("Moved $what to trash", undo = { controller.untrashRequest(items) }, onUndone = controller::refresh)
+        }
+    }
     // Moving needs its own write confirmation; the move itself runs once it is accepted.
     val moveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) controller.finishMove()
@@ -206,7 +227,10 @@ fun SelectionActionsBar(
             }
         },
         onFavorite = { launch(writeLauncher) { controller.favoriteRequest() } },
-        onTrash = { launch(writeLauncher) { controller.trashRequest() } },
+        onTrash = {
+            trashed.items = controller.selectedItems()
+            launch(trashLauncher) { controller.trashRequest() }
+        },
         onMove = if (allowTransfer) ({ picker = TransferKind.Move }) else null,
         onCopy = if (allowTransfer) ({ picker = TransferKind.Copy }) else null,
         onLock = if (allowTransfer) ({ locker.lock(controller.selectedItems()) }) else null,

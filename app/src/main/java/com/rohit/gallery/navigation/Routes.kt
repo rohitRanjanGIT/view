@@ -35,6 +35,8 @@ val homeTabs: List<HomeTab> = listOf(
     val externalMime: String? = null,
     /** Page through Locked (the vault) instead; only reachable after unlocking it. */
     val vault: Boolean = false,
+    /** With [vault]: only the photos locked from this album. */
+    val vaultAlbum: String? = null,
 )
 
 /** The recycle bin, opened from the Menu tab. */

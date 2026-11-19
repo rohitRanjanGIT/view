@@ -5,16 +5,21 @@ import androidx.lifecycle.viewModelScope
 import com.rohit.gallery.core.data.vault.VaultRepository
 import com.rohit.gallery.core.domain.MediaActions
 import com.rohit.gallery.core.domain.TransferResult
+import com.rohit.gallery.core.model.AlbumEntry
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.model.buildAlbums
 import com.rohit.gallery.feature.selection.SelectionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -25,6 +30,13 @@ class VaultViewModel @Inject constructor(
 ) : ViewModel() {
     val unlocked: StateFlow<Boolean> = session.unlocked
     val items: StateFlow<List<MediaItem>?> = vault.items
+
+    /** Locked items grouped by the album they were locked from, newest album first. */
+    val albums: StateFlow<List<AlbumEntry>?> = vault.items
+        .map { list -> list?.let { buildAlbums(it).map { album -> AlbumEntry(album, hidden = false, pinned = false) } } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Photo selection (the Photos page and an album's page share it; it is cleared when switching). */
     val selection = SelectionState()
 
     private val _progress = MutableStateFlow<LockProgress?>(null)
@@ -44,21 +56,28 @@ class VaultViewModel @Inject constructor(
         return items.value.orEmpty().filter { it.id in ids }
     }
 
+    fun itemsInAlbums(albumIds: Set<Long>): List<MediaItem> = items.value.orEmpty().filter { it.bucketId in albumIds }
+
     fun shareIntent(items: List<MediaItem>) = actions.shareIntent(items)
 
-    /** Puts the selected items back where they were locked from. */
-    fun unlockSelected() = runUnlock(selectedItems()) { vault.unlock(it) { done, total -> _progress.value = LockProgress(done, total) } }
+    /** Puts [chosen] back where they were locked from. */
+    fun unlock(chosen: List<MediaItem>) = runUnlock(chosen) { vault.unlock(it, ::onProgress) }
 
     /** Everything back to shared storage (the escape hatch before uninstalling or clearing app data). */
-    fun unlockAll() = runUnlock(items.value.orEmpty()) { vault.unlockAll { done, total -> _progress.value = LockProgress(done, total) } }
+    fun unlockAll() = runUnlock(items.value.orEmpty()) { vault.unlockAll(::onProgress) }
 
-    fun deleteSelected() {
-        val chosen = selectedItems().takeIf { it.isNotEmpty() } ?: return
+    /** Deletes [chosen] for good: they are only in Locked, so the screen confirms first. */
+    fun deleteForever(chosen: List<MediaItem>) {
+        if (chosen.isEmpty()) return
         viewModelScope.launch {
             val deleted = vault.deleteForever(chosen)
             selection.clear()
             _messages.tryEmit("Deleted ${plural(deleted)} for good")
         }
+    }
+
+    private fun onProgress(done: Int, total: Int) {
+        _progress.value = LockProgress(done, total)
     }
 
     private fun runUnlock(chosen: List<MediaItem>, work: suspend (List<MediaItem>) -> TransferResult) {

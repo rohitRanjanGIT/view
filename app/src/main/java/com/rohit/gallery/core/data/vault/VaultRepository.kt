@@ -274,7 +274,7 @@ class VaultRepository @Inject constructor(
         width = row.width,
         height = row.height,
         durationMs = row.durationMs,
-        bucketId = 0,
+        bucketId = VaultIds.albumIdOf(row.albumName),
         bucketName = row.albumName,
         isFavorite = false,
         sizeBytes = row.sizeBytes,

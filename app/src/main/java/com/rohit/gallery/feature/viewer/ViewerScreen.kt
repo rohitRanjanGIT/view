@@ -1,5 +1,7 @@
 package com.rohit.gallery.feature.viewer
 
+import com.rohit.gallery.core.ui.components.LocalUndoBar
+import android.provider.MediaStore
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
@@ -391,18 +393,27 @@ private fun ViewerContent(
 
     // Favourite and trash go through the system's confirmation (skipped when "Skip confirmation" is allowed).
     // What a pending write will do to the favourite (null: not a favourite change), for the toggle haptic once done.
-    val pendingWrite = remember { object { var favorite: Boolean? = null } }
+    // [trashed]: the photo a pending trash removes, for Undo once done.
+    val pendingWrite = remember { object { var favorite: Boolean? = null; var trashed: MediaItem? = null } }
+    val undoBar = LocalUndoBar.current
     val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         val favorite = pendingWrite.favorite
         pendingWrite.favorite = null
+        val trashed = pendingWrite.trashed
+        pendingWrite.trashed = null
         if (result.resultCode == Activity.RESULT_OK) {
             // Felt when the change is actually saved, not when the button is pressed.
             if (favorite != null) haptic.performHapticFeedback(if (favorite) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
             viewModel.onWritten()
+            // "Skip confirmation" on: Android trashed it without asking, so offer Undo (it is in Trash either way).
+            if (trashed != null && undoBar != null && runCatching { MediaStore.canManageMedia(context) }.getOrDefault(false)) {
+                undoBar.show("Moved to trash", undo = { viewModel.untrashRequest(trashed) }, onUndone = viewModel::onWritten)
+            }
         }
     }
-    fun write(favorite: Boolean? = null, request: suspend () -> IntentSender?) {
+    fun write(favorite: Boolean? = null, trashed: MediaItem? = null, request: suspend () -> IntentSender?) {
         pendingWrite.favorite = favorite
+        pendingWrite.trashed = trashed
         scope.launch {
             val sender = request()
             if (sender == null) {
@@ -465,7 +476,7 @@ private fun ViewerContent(
                         }),
                     )
                 }
-                if (canWrite) add(ViewerAction(Icons.Outlined.Delete, "Move to trash", { write { viewModel.trashRequest(currentItem) } }))
+                if (canWrite) add(ViewerAction(Icons.Outlined.Delete, "Move to trash", { write(trashed = currentItem) { viewModel.trashRequest(currentItem) } }))
             },
         )
     }

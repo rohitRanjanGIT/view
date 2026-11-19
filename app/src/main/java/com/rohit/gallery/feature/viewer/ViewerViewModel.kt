@@ -100,7 +100,11 @@ class ViewerViewModel @AssistedInject constructor(
     /** Items the pager swipes through, newest first; null until the index is ready. */
     val items: StateFlow<List<MediaItem>?> = when {
         route.trashed -> trashItems
-        route.vault -> vault.items
+        route.vault -> route.vaultAlbum?.let { album ->
+            vault.items
+                .map { list -> list?.filter { it.bucketName == album } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        } ?: vault.items
         route.externalUri != null -> externalTarget
             .flatMapLatest { target ->
                 when (target) {
@@ -208,6 +212,10 @@ class ViewerViewModel @AssistedInject constructor(
     /** System confirmation to add or remove the favourite mark (skipped by Android with "Skip confirmation"). */
     suspend fun favoriteRequest(item: MediaItem): IntentSender? =
         runCatching { actions.favoriteRequest(listOf(item), favorite = !item.isFavorite) }.getOrNull()
+
+    /** Takes a just-trashed photo back out (silent with "Manage media" access). */
+    suspend fun untrashRequest(item: MediaItem): IntentSender? =
+        runCatching { actions.restoreRequest(listOf(item.copy(isTrashed = true))) }.getOrNull()
 
     /** System confirmation to move the photo to the trash (recoverable). */
     suspend fun trashRequest(item: MediaItem): IntentSender? =

@@ -194,7 +194,7 @@ fun AlbumsScreen(
  * fingers stays in place while the old layout cross-fades into the new one (see GridZoomState).
  */
 @Composable
-private fun AlbumGrid(
+internal fun AlbumGrid(
     list: List<AlbumEntry>,
     columns: Int,
     selection: AlbumSelection,

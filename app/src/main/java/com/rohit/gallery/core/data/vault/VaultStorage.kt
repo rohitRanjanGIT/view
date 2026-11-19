@@ -101,6 +101,9 @@ object VaultIds {
     fun mediaIdOf(entityId: Long): Long = -(BASE + entityId)
 
     fun entityIdOf(mediaId: Long): Long? = (-mediaId - BASE).takeIf { mediaId < 0 && it > 0 }
+
+    /** A stable album id for the album a photo was locked from (grouped by name; negative, like vault item ids). */
+    fun albumIdOf(albumName: String): Long = -(1L + (albumName.hashCode().toLong() and 0xFFFFFFFFL))
 }
 
 /** What to do with a vault copy whose lock was interrupted, given whether the original still exists. */

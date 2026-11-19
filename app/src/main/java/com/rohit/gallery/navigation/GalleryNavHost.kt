@@ -1,5 +1,6 @@
 package com.rohit.gallery.navigation
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import dev.chrisbanes.haze.hazeSource
 import com.rohit.gallery.core.ui.components.frostedChrome
 import com.rohit.gallery.core.ui.components.rememberChromeHaze
@@ -46,6 +47,9 @@ import androidx.navigation.toRoute
 import com.rohit.gallery.core.ui.components.FloatingTab
 import com.rohit.gallery.core.ui.components.FloatingTabBar
 import com.rohit.gallery.core.ui.components.LocalSharedPhoto
+import com.rohit.gallery.core.ui.components.LocalUndoBar
+import com.rohit.gallery.core.ui.components.UndoBarHost
+import com.rohit.gallery.core.ui.components.UndoBarState
 import com.rohit.gallery.core.ui.components.LocalSharedTransitionScope
 import com.rohit.gallery.feature.albums.AlbumDetailScreen
 import com.rohit.gallery.feature.albums.AlbumsScreen
@@ -94,6 +98,8 @@ fun GalleryNavHost(
     val scope = rememberCoroutineScope()
     // The bottom bar is frosted glass over the tabs, which scroll on underneath it.
     val navHaze = rememberChromeHaze()
+    // "Moved to trash · Undo", shown above the tab bar on any screen.
+    val undoBar = remember { UndoBarState() }
     val context = LocalContext.current
     val windowSize = LocalWindowInfo.current.containerSize
 
@@ -112,7 +118,7 @@ fun GalleryNavHost(
     }
 
     SharedTransitionLayout {
-        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this, LocalUndoBar provides undoBar) {
             Box(Modifier.fillMaxSize()) {
                 NavHost(
                     navController = navController,
@@ -199,7 +205,7 @@ fun GalleryNavHost(
                     topLevel<VaultRoute>(navController) { host ->
                         VaultScreen(
                             onBack = { navController.popBackStack() },
-                            onOpenMedia = { item -> openViewer(host, item, ViewerRoute(item.id, vault = true)) },
+                            onOpenMedia = { item, album -> openViewer(host, item, ViewerRoute(item.id, vault = true, vaultAlbum = album)) },
                             // Locking again closes a locked photo that is still open.
                             onRelock = { host.close() },
                         )
@@ -246,6 +252,13 @@ fun GalleryNavHost(
                         modifier = Modifier.dragsPager(homePager, scope),
                     )
                 }
+                UndoBarHost(
+                    state = undoBar,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = NavigationBarHeight),
+                )
             }
         }
     }

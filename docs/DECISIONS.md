@@ -438,3 +438,18 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
 - **Uninstall / backup:** `android:hasFragileUserData="true"` makes Android ask "keep app data?" on uninstall;
   clearing data still wipes the vault, so "Unlock everything" is the escape hatch. `allowBackup` is now false (Google's
   cloud backup would have uploaded the vault; the offline rule forbids it).
+- **Locked, second round (2026-11-19):**
+  - *Uninstall:* Android runs no app code on uninstall, so the vault can't empty itself then (user chose to keep it
+    private over a shared hidden folder). The Locked screen and the Unlock-everything dialog say to unlock everything
+    first and to keep app data when uninstalling (`hasFragileUserData`).
+  - *Pages:* Locked is laid out like the main gallery: a Photos page (timeline grid) and an Albums page (the Albums
+    tab's `AlbumGrid`, now internal, fed with vault items grouped by the album they were locked from;
+    `VaultIds.albumIdOf(name)`), swiped between with the floating tab bar. An album opens its own timeline, and the
+    viewer then pages through that album only (`ViewerRoute.vaultAlbum`). Selected albums: Share / Unlock / Delete.
+  - *No pop-ups:* with "Skip confirmation pop-ups" (`MANAGE_MEDIA`) on, Android deletes the originals of a lock
+    without asking, so locking is one tap. With it off, the first lock shows a one-time hint (`lockHintShown` in
+    DataStore) that links to the system switch; otherwise Android's prompt stays (it can't be avoided).
+  - *Trash with Undo* (user's pick over a confirmation dialog): with that access on, trash happens at once and an
+    "Moved to trash · Undo" bar (`UndoBarHost` at the app root, `LocalUndoBar`) shows for 5 s; Undo is a silent
+    `createTrashRequest(..., false)` on the trashed URIs. With it off, Android's own trash dialog stays and no Undo is
+    shown (it would pop a second system dialog). Delete forever keeps its in-app confirmation everywhere.

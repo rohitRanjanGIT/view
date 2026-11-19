@@ -120,6 +120,13 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         context.dataStore.edit { it[ALBUM_OLDEST_FIRST] = oldestFirst }
     }
 
+    /** True once the "lock without the delete pop-up" hint has been shown (it is shown only once). */
+    val lockHintShown: Flow<Boolean> = context.dataStore.data.map { it[LOCK_HINT_SHOWN] ?: false }
+
+    suspend fun setLockHintShown() {
+        context.dataStore.edit { it[LOCK_HINT_SHOWN] = true }
+    }
+
     private companion object {
         val ALBUM_SORT = stringPreferencesKey("album_sort")
         val ALBUM_OLDEST_FIRST = booleanPreferencesKey("album_oldest_first")
@@ -131,6 +138,7 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         val MOTION_AUTOPLAY = booleanPreferencesKey("motion_autoplay")
         val ULTRA_HDR = booleanPreferencesKey("ultra_hdr")
         val VIDEO_POSITIONS = stringPreferencesKey("video_positions")
+        val LOCK_HINT_SHOWN = booleanPreferencesKey("lock_hint_shown")
         /** Unit separator: cannot be typed, so it never appears inside a search. */
         const val SEARCH_SEPARATOR = "\u001F"
         const val MAX_RECENT_SEARCHES = 8

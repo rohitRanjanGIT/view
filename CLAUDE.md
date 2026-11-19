@@ -225,6 +225,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   gestures".
 - **Committed, not yet tried by me (2026-11-19): Locked (vault).** Menu > Locked, lock from selection More menu,
   viewer menu, Albums tab. Test with copies only (e.g. `Pictures/Gallery test`). See DECISIONS "Locked".
+  Second round: Photos / Albums pages in Locked, one-tap locking and trash Undo with Skip confirmation on.
 - **Next (pick with me):**
   1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes
      after sharing). Proposed 2026-11-18; my answers on notification vs in-app card, delay (5 min suggested), and

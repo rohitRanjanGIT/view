@@ -1,5 +1,9 @@
 package com.rohit.gallery.feature.vault
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.MediaStore
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -11,6 +15,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -22,26 +27,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.rohit.gallery.core.data.prefs.AppPreferences
 import com.rohit.gallery.core.data.vault.VaultRepository
 import com.rohit.gallery.core.model.MediaItem
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface VaultEntryPoint {
     fun vaultRepository(): VaultRepository
+
+    fun appPreferences(): AppPreferences
 }
 
-/** Progress of the copy into the vault, for the dialog; null when idle. */
+/** Progress of a copy into or out of the vault, for its dialog. */
 class LockProgress(val done: Int, val total: Int)
 
 /**
  * Locks photos from any screen: copies them into the vault (with a progress dialog), then asks Android to delete the
  * originals, then keeps or rolls back each copy depending on whether its original is gone (see [VaultRepository]).
+ *
+ * With "Skip confirmation pop-ups" (Android's "Manage media" access) on, Android deletes the originals without asking,
+ * so locking takes one tap. Without it, the first lock explains how to turn it on (once), then Android asks as usual.
  */
 @Stable
 class VaultLocker internal constructor(private val start: (List<MediaItem>) -> Unit) {
@@ -53,10 +65,14 @@ class VaultLocker internal constructor(private val start: (List<MediaItem>) -> U
 fun rememberVaultLocker(onLocked: (Int) -> Unit = {}): VaultLocker {
     val context = LocalContext.current
     val app = context.applicationContext
-    val repository = remember(app) { EntryPointAccessors.fromApplication(app, VaultEntryPoint::class.java).vaultRepository() }
+    val entry = remember(app) { EntryPointAccessors.fromApplication(app, VaultEntryPoint::class.java) }
+    val repository = remember(entry) { entry.vaultRepository() }
+    val prefs = remember(entry) { entry.appPreferences() }
     val scope = rememberCoroutineScope()
     val latestOnLocked by rememberUpdatedState(onLocked)
     var progress by remember { mutableStateOf<LockProgress?>(null) }
+    // Items waiting on the one-time hint, shown before anything is copied.
+    var hintFor by remember { mutableStateOf<List<MediaItem>?>(null) }
     // The batch waiting for Android's delete confirmation (plain holder: not drawn).
     val pending = remember { object { var batch: VaultRepository.LockBatch? = null } }
 
@@ -77,34 +93,70 @@ fun rememberVaultLocker(onLocked: (Int) -> Unit = {}): VaultLocker {
         }
     }
 
+    fun copyAndDelete(items: List<MediaItem>) {
+        scope.launch {
+            progress = LockProgress(0, items.size)
+            val batch = try {
+                repository.prepareLock(items) { done, total -> progress = LockProgress(done, total) }
+            } catch (e: Exception) {
+                null
+            } finally {
+                progress = null
+            }
+            if (batch == null || batch.originals.isEmpty()) {
+                Toast.makeText(context, "Couldn't lock that", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val sender = runCatching { repository.deleteOriginalsRequest(batch) }.getOrNull()
+            if (sender == null) {
+                repository.finishLock(batch) // originals still there: removes the copies again
+                Toast.makeText(context, "Couldn't lock that", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            pending.batch = batch
+            // With "Manage media" access Android completes this at once, without a dialog.
+            deleteLauncher.launch(IntentSenderRequest.Builder(sender).build())
+        }
+    }
+
     val locker = remember(repository) {
         VaultLocker { items ->
-            if (items.isEmpty() || progress != null) return@VaultLocker
+            if (items.isEmpty() || progress != null || hintFor != null) return@VaultLocker
             scope.launch {
-                progress = LockProgress(0, items.size)
-                val batch = try {
-                    repository.prepareLock(items) { done, total -> progress = LockProgress(done, total) }
-                } catch (e: Exception) {
-                    null
-                } finally {
-                    progress = null
-                }
-                if (batch == null || batch.originals.isEmpty()) {
-                    Toast.makeText(context, "Couldn't lock that", Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-                val sender = runCatching { repository.deleteOriginalsRequest(batch) }.getOrNull()
-                if (sender == null) {
-                    repository.finishLock(batch) // originals still there: removes the copies again
-                    Toast.makeText(context, "Couldn't lock that", Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-                pending.batch = batch
-                deleteLauncher.launch(IntentSenderRequest.Builder(sender).build())
+                val canSkip = MediaStore.canManageMedia(context)
+                if (!canSkip && !prefs.lockHintShown.first()) hintFor = items else copyAndDelete(items)
             }
         }
     }
 
+    hintFor?.let { items ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Lock without the delete pop-up?") },
+            text = {
+                Text(
+                    "Locking moves photos here, so Android asks before removing the originals. Turn on " +
+                        "\"Skip confirmation pop-ups\" and locking takes one tap. Moving to trash then shows an Undo instead.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    hintFor = null
+                    scope.launch { prefs.setLockHintShown() }
+                    val intent = Intent(Settings.ACTION_REQUEST_MANAGE_MEDIA, Uri.parse("package:${context.packageName}"))
+                    runCatching { context.startActivity(intent) }
+                    Toast.makeText(context, "Turn it on, then lock again", Toast.LENGTH_LONG).show()
+                }) { Text("Turn on") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    hintFor = null
+                    scope.launch { prefs.setLockHintShown() }
+                    copyAndDelete(items)
+                }) { Text("Not now") }
+            },
+        )
+    }
     progress?.let { LockProgressDialog(it) }
     return locker
 }
