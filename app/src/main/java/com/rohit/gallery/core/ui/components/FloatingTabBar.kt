@@ -36,9 +36,9 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 
 /** Height of the capsule; it floats [BarBottom] above the bottom inset. */
-val FloatingTabBarHeight = 56.dp
+val FloatingTabBarHeight = 64.dp
 private val BarBottom = 12.dp
-private val SlotWidth = 112.dp
+private val SlotWidth = 96.dp
 private val Inset = 4.dp
 
 /** One tab of [FloatingTabBar]: an icon and its label (the label shows only on the selected tab). */

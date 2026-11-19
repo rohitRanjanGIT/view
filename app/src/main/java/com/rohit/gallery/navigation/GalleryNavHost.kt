@@ -66,8 +66,8 @@ import com.rohit.gallery.feature.videos.VideosScreen
 import kotlinx.coroutines.launch
 
 /** Height of the M3 navigation bar, without the system navigation-bar inset. */
-// Room the content keeps above the bottom edge: the floating capsule (56 dp), its margin, and some air above it.
-private val NavigationBarHeight = 84.dp
+// Room the content keeps above the bottom edge: the floating capsule (64 dp), its margin, and some air above it.
+private val NavigationBarHeight = 92.dp
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
