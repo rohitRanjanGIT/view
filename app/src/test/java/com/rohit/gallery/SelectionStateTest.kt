@@ -13,14 +13,39 @@ class SelectionStateTest {
     private val items = (10L downTo 1L).map { testItem(it) }
 
     @Test
-    fun `toggle selects then deselects and keeps selection mode on`() {
+    fun `deselecting the last item ends selection mode`() {
         val s = SelectionState()
         s.toggle(5)
+        s.toggle(6)
         assertTrue(s.isSelecting)
-        assertEquals(setOf(5L), s.ids)
         s.toggle(5)
+        assertEquals(setOf(6L), s.ids)
+        assertTrue(s.isSelecting)
+        s.toggle(6)
+        assertEquals(emptySet(), s.ids)
+        assertFalse(s.isSelecting)
+    }
+
+    @Test
+    fun `a drag that deselects everything ends selection mode when the finger lifts, not before`() {
+        val s = SelectionState()
+        s.toggle(items[3].id)
+        // A drag that starts on the only selected item removes its range, so nothing is left selected.
+        s.startDrag(index = 3, id = items[3].id)
         assertEquals(emptySet(), s.ids)
         assertTrue(s.isSelecting)
+        s.dragTo(4, items)
+        assertTrue(s.isSelecting)
+        s.endDrag()
+        assertFalse(s.isSelecting)
+    }
+
+    @Test
+    fun `selection ends when the selected items disappear`() {
+        val s = SelectionState()
+        s.toggle(5)
+        s.retainOnly(setOf(1L, 2L))
+        assertFalse(s.isSelecting)
     }
 
     @Test

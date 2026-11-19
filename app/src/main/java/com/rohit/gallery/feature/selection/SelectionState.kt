@@ -11,8 +11,9 @@ import kotlin.math.min
 /**
  * Multi-select state for a media grid. Holds only ids, so it stays valid when the index refreshes.
  *
- * Selection mode ([isSelecting]) stays on when the last item is deselected, like One UI; the user
- * leaves it with the close button or Back.
+ * Selection mode ([isSelecting]) ends by itself once nothing is selected (the last item tapped off, a drag that
+ * deselected everything, or the selected items disappearing), as well as with the close button or Back. During a
+ * drag it stays on even if the range briefly covers nothing, so the drag isn't cut short.
  */
 @Stable
 class SelectionState {
@@ -31,6 +32,7 @@ class SelectionState {
     fun toggle(id: Long) {
         isSelecting = true
         ids = if (id in ids) ids - id else ids + id
+        if (ids.isEmpty() && anchorIndex < 0) isSelecting = false
     }
 
     /** Starts a long-press drag at [index] in the flat, newest-first item list. */
@@ -54,6 +56,7 @@ class SelectionState {
 
     fun endDrag() {
         anchorIndex = -1
+        if (ids.isEmpty()) isSelecting = false
     }
 
     fun selectAll(items: List<MediaItem>) {
@@ -65,6 +68,7 @@ class SelectionState {
     fun retainOnly(present: Set<Long>) {
         if (ids.all { it in present }) return
         ids = ids.filterTo(HashSet()) { it in present }
+        if (ids.isEmpty() && anchorIndex < 0) isSelecting = false
     }
 
     fun clear() {

@@ -86,7 +86,8 @@ Non-obvious technical choices, newest last.
   (Main pass, so the list can claim scrolls); after it, it takes the events on the Initial pass so the list does
   not scroll during drag-select. Cells no longer have their own `clickable`.
 - **`SelectionState` holds only ids** plus the drag anchor/base. Dragging adds the range anchor..finger; if the
-  drag started on an already-selected item it removes the range instead. Selection mode stays on at 0 selected.
+  drag started on an already-selected item it removes the range instead. Selection mode ends at 0 selected (changed
+  2026-11-19 at my request; it used to stay on, One UI style), but only once a drag has ended.
 - **Auto-scroll while dragging** near the top/bottom edge; the pointer is kept in a plain holder, not state, so
   finger movement never recomposes the grid.
 - **Nav bar is replaced by the selection action bar.** Top-level screens now receive `contentBottomPadding` and
