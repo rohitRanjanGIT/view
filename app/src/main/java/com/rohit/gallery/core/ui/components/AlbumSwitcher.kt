@@ -79,12 +79,20 @@ fun AlbumSwitcherDrawer(
     var open by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     var offset by remember { mutableFloatStateOf(if (open) widthPx else 0f) }
     val settle = remember { object { var job: Job? = null } }
+    // True only while the strip is moving on its own: then a touch grabs it at once. Kept as state so it turns off
+    // again when the strip comes to rest (a stale "true" made every tap on a cover start a drag instead).
+    var settling by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     fun settleTo(target: Float, velocity: Float = 0f) {
         open = target > 0f
         settle.job?.cancel()
         settle.job = scope.launch {
-            animate(offset, target, velocity, GalleryMotion.dragReturn()) { value, _ -> offset = value }
+            settling = true
+            try {
+                animate(offset, target, velocity, GalleryMotion.dragReturn()) { value, _ -> offset = value }
+            } finally {
+                settling = false
+            }
         }
     }
 
@@ -110,7 +118,7 @@ fun AlbumSwitcherDrawer(
                 orientation = Orientation.Horizontal,
                 enabled = enabled || open,
                 // Grabbing the strip mid-flight takes it over from where it is.
-                startDragImmediately = settle.job?.isActive == true,
+                startDragImmediately = settling,
                 onDragStarted = { settle.job?.cancel() },
                 onDragStopped = { velocity ->
                     val projected = offset + GalleryMotion.project(velocity)
