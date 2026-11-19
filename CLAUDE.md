@@ -216,6 +216,10 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   panel → album row → back (viewer should still be open). Files: `navigation/ViewerOverlay.kt` (new),
   `GalleryNavHost.kt`, `SharedTransition.kt`, `ViewerViewModel.kt`, `ViewerScreen.kt`, `SharedFlight.kt`,
   `TimelineScreen.kt`, `MediaGrid.kt`, `Motion.kt` (close 380 ms). See DECISIONS "Viewer overlay".
+- **Committed, not yet tried by me (2026-11-19): Apple-style fluid viewer gestures** (items 1-3 of the
+  /apple-design pass: springs with velocity handoff into the close flight, momentum projection, 1:1 interruptible
+  details panel). See DECISIONS "Fluid viewer gestures". Remaining items of that pass: 4 rubber-banding, 5 press
+  feedback, 6 haptics, 7 translucent chrome (blur library undecided), 8 type + reduced motion.
 - **Next (pick with me):**
   1. My screenshot idea: when I take a screenshot, a notification offers Share / Share & delete (trash a few minutes
      after sharing). Proposed 2026-11-18; my answers on notification vs in-app card, delay (5 min suggested), and
