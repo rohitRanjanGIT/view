@@ -1,9 +1,11 @@
 package com.rohit.gallery.core.ui.icons
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathBuilder
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
@@ -31,40 +33,58 @@ object GalleryIcons {
         }
     }
 
-    /** Pictures tab: a frame with a mountain and a sun inside. */
+    /** Pictures tab (line icon): a rounded frame with a mountain ridge and a sun. */
     val PicturesTab: ImageVector by lazy {
-        icon("PicturesTab", PathFillType.EvenOdd) {
-            moveTo(3f, 5f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(3f); close()
-            moveTo(5f, 7f); verticalLineTo(17f); horizontalLineTo(19f); verticalLineTo(7f); close()
-            moveTo(5f, 17f); lineTo(9.5f, 12f); lineTo(12.2f, 14.8f); lineTo(14.4f, 12.4f); lineTo(19f, 17f); close()
-            moveTo(17f, 9.8f); arcTo(1.2f, 1.2f, 0f, true, true, 14.6f, 9.8f); arcTo(1.2f, 1.2f, 0f, true, true, 17f, 9.8f); close()
+        lineIcon("PicturesTab") {
+            roundRect(3f, 4.5f, 21f, 19.5f, 3f)
+            moveTo(3.5f, 16.5f); lineTo(8.5f, 11.5f); lineTo(12.5f, 15.5f); lineTo(15f, 13f); lineTo(20.5f, 18.5f)
+            moveTo(17.6f, 8.8f); arcTo(1.6f, 1.6f, 0f, true, true, 14.4f, 8.8f); arcTo(1.6f, 1.6f, 0f, true, true, 17.6f, 8.8f)
         }
     }
 
-    /** Albums tab: a stack of two cards. */
+    /** Albums tab (line icon): a card with two more stacked behind it. */
     val AlbumsTab: ImageVector by lazy {
-        icon("AlbumsTab") {
-            moveTo(6f, 3.5f); horizontalLineTo(18f); verticalLineTo(6f); horizontalLineTo(6f); close()
-            moveTo(3f, 7.5f); horizontalLineTo(21f); verticalLineTo(20f); horizontalLineTo(3f); close()
+        lineIcon("AlbumsTab") {
+            roundRect(3f, 9f, 21f, 20.5f, 3f)
+            moveTo(5.5f, 6.25f); horizontalLineTo(18.5f)
+            moveTo(8f, 3.5f); horizontalLineTo(16f)
         }
     }
 
-    /** Menu tab: four tiles in a grid. */
+    /** Menu tab (line icon): four rounded tiles. */
     val MenuTab: ImageVector by lazy {
-        icon("MenuTab") {
-            moveTo(4f, 4f); horizontalLineTo(10.5f); verticalLineTo(10.5f); horizontalLineTo(4f); close()
-            moveTo(13.5f, 4f); horizontalLineTo(20f); verticalLineTo(10.5f); horizontalLineTo(13.5f); close()
-            moveTo(4f, 13.5f); horizontalLineTo(10.5f); verticalLineTo(20f); horizontalLineTo(4f); close()
-            moveTo(13.5f, 13.5f); horizontalLineTo(20f); verticalLineTo(20f); horizontalLineTo(13.5f); close()
+        lineIcon("MenuTab") {
+            roundRect(3.5f, 3.5f, 10.5f, 10.5f, 2.2f)
+            roundRect(13.5f, 3.5f, 20.5f, 10.5f, 2.2f)
+            roundRect(3.5f, 13.5f, 10.5f, 20.5f, 2.2f)
+            roundRect(13.5f, 13.5f, 20.5f, 20.5f, 2.2f)
         }
     }
 
-    private fun icon(
-        name: String,
-        fillType: PathFillType = PathFillType.NonZero,
-        block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
-    ): ImageVector =
+    private fun icon(name: String, block: PathBuilder.() -> Unit): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
-            .path(fill = SolidColor(Color.Black), pathFillType = fillType, pathBuilder = block)
+            .path(fill = SolidColor(Color.Black), pathBuilder = block)
             .build()
+
+    /** Outlined: 1.8-unit strokes with round ends and corners. The icon's tint colours the stroke. */
+    private fun lineIcon(name: String, block: PathBuilder.() -> Unit): ImageVector =
+        ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
+            .path(
+                fill = null,
+                stroke = SolidColor(Color.Black),
+                strokeLineWidth = 1.8f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+                pathBuilder = block,
+            )
+            .build()
+
+    private fun PathBuilder.roundRect(left: Float, top: Float, right: Float, bottom: Float, r: Float) {
+        moveTo(left + r, top)
+        horizontalLineTo(right - r); arcTo(r, r, 0f, false, true, right, top + r)
+        verticalLineTo(bottom - r); arcTo(r, r, 0f, false, true, right - r, bottom)
+        horizontalLineTo(left + r); arcTo(r, r, 0f, false, true, left, bottom - r)
+        verticalLineTo(top + r); arcTo(r, r, 0f, false, true, left + r, top)
+        close()
+    }
 }

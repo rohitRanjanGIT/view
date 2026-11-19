@@ -405,3 +405,9 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   `drawOutline` isn't available from our Compose imports). The content padding above the bar is now 92 dp (was 80).
   Icons: `GalleryIcons.PicturesTab` (frame, mountain, sun), `AlbumsTab` (stacked cards), `MenuTab` (four tiles),
   replacing the material-icons-core placeholders. Selection action bars are still full-width (not floating).
+- **Tab bar, second pass** (user: the first capsule "doesn't look very good"): the glass was too thin (photos showed
+  through with edges), spacing uneven, filled-block icons crude, olive wallpaper-colour pill muddy. Now: a compact
+  capsule centred and sized to its tabs (3 equal 112 dp slots, 56 dp tall), heavier glass (`floatingHazeStyle`:
+  blur 48 dp, surfaceContainerHigh at 86 %), outlined 1.8-stroke line icons (`GalleryIcons.lineIcon`), and one
+  neutral pill (onSurface at 12 %) that slides with the pager's live position via `graphicsLayer` (no recomposition
+  while swiping). No ripple on tabs: the sliding pill is the feedback. Content padding above it 84 dp.

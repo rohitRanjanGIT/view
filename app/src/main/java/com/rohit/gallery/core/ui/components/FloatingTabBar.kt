@@ -1,30 +1,31 @@
 package com.rohit.gallery.core.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -34,87 +35,87 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 
-/** Height of the capsule itself; the bar floats [BarMargin] above the bottom edge. */
-val FloatingTabBarHeight = 64.dp
-private val BarMargin = 16.dp
+/** Height of the capsule; it floats [BarBottom] above the bottom inset. */
+val FloatingTabBarHeight = 56.dp
 private val BarBottom = 12.dp
-private val PillHeight = 48.dp
+private val SlotWidth = 112.dp
+private val Inset = 4.dp
 
 /** One tab of [FloatingTabBar]: an icon and its label (the label shows only on the selected tab). */
 data class FloatingTab(val label: String, val icon: ImageVector)
 
 /**
- * The bottom navigation as a floating frosted capsule, inset from the screen edges. The selected tab opens into a
- * pill with its label; the others show their icon alone. Sits above the content, which scrolls underneath it.
+ * The bottom navigation as a compact floating capsule, centred above the bottom edge and sized to its tabs. Every
+ * tab has the same width, so spacing is always even. One soft light pill marks the selected tab; it follows
+ * [position] (the pager's live page, fractional while swiping), so it slides with the finger between tabs. The
+ * selected tab shows its label next to its icon; the others show the icon alone.
  */
 @Composable
 fun FloatingTabBar(
     tabs: List<FloatingTab>,
     selectedIndex: Int,
+    position: () -> Float,
     onSelect: (Int) -> Unit,
     haze: HazeState?,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    val pill = RoundedCornerShape(percent = 50)
+    val indicator = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    Box(
         modifier
-            .navigationBarsPadding()
-            .padding(start = BarMargin, end = BarMargin, bottom = BarBottom)
             .fillMaxWidth()
-            .height(FloatingTabBarHeight)
-            .frostedChrome(haze, capsule = true)
-            .padding(horizontal = 6.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
+            .navigationBarsPadding()
+            .padding(bottom = BarBottom),
+        contentAlignment = Alignment.Center,
     ) {
-        tabs.forEachIndexed { index, tab ->
-            FloatingTabItem(
-                tab = tab,
-                selected = index == selectedIndex,
-                onClick = { onSelect(index) },
+        Box(
+            Modifier
+                .height(FloatingTabBarHeight)
+                .width(SlotWidth * tabs.size + Inset * 2)
+                .frostedChrome(haze, capsule = true, style = floatingHazeStyle())
+                .padding(Inset),
+        ) {
+            // The selection pill: moved by the graphics layer only, so following a swipe never recomposes the bar.
+            Box(
+                Modifier
+                    .width(SlotWidth)
+                    .fillMaxHeight()
+                    .graphicsLayer { translationX = position().coerceIn(0f, (tabs.size - 1).toFloat()) * SlotWidth.toPx() }
+                    .background(indicator, pill),
             )
+            Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                tabs.forEachIndexed { index, tab ->
+                    FloatingTabItem(tab, selected = index == selectedIndex, onClick = { onSelect(index) })
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun FloatingTabItem(tab: FloatingTab, selected: Boolean, onClick: () -> Unit) {
-    val container = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
-    val content = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val colors = MaterialTheme.colorScheme
+    val tint = if (selected) colors.onSurface else colors.onSurfaceVariant
     Row(
         Modifier
-            .height(PillHeight)
-            // Opens and closes its width as the label appears, so the neighbours glide instead of jumping.
-            .animateContentSize()
-            .clip(RoundedCornerShape(percent = 50))
+            .width(SlotWidth)
+            .fillMaxHeight()
             .semantics { this.selected = selected; role = Role.Tab }
-            .clickable(onClick = onClick),
+            // The sliding pill is the feedback; a ripple would flash a second shape over it.
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier
-                .clip(RoundedCornerShape(percent = 50))
-                .background(container)
-                .padding(horizontal = if (selected) 16.dp else 0.dp)
-                .height(PillHeight)
-                .widthIn(min = PillHeight),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(tab.icon, contentDescription = null, tint = content, modifier = Modifier.size(24.dp))
-            AnimatedVisibility(
-                visible = selected,
-                enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally(),
-            ) {
-                Text(
-                    tab.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = content,
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
+        Icon(tab.icon, contentDescription = tab.label.takeUnless { selected }, tint = tint, modifier = Modifier.size(22.dp))
+        AnimatedVisibility(visible = selected, enter = fadeIn(tween(160)), exit = fadeOut(tween(100))) {
+            Text(
+                tab.label,
+                style = MaterialTheme.typography.labelLarge,
+                color = tint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 6.dp),
+            )
         }
     }
 }

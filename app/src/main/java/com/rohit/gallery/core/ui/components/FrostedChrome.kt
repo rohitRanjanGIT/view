@@ -44,6 +44,23 @@ fun chromeHazeStyle(): HazeStyle {
 }
 
 /**
+ * A thicker material for small floating surfaces (the tab capsule): a much stronger blur and a near-solid tint, so a
+ * bright photo underneath only tints it instead of showing through with edges.
+ */
+@Composable
+fun floatingHazeStyle(): HazeStyle {
+    val colors = MaterialTheme.colorScheme
+    return HazeStyle(
+        backgroundColor = colors.surfaceContainerHigh,
+        tint = HazeTint(colors.surfaceContainerHigh.copy(alpha = FLOATING_TINT_ALPHA)),
+        blurRadius = 48.dp,
+        noiseFactor = 0f,
+    )
+}
+
+private const val FLOATING_TINT_ALPHA = 0.86f
+
+/**
  * Draws this bar as frosted glass over [state]'s content. Edge bars get a faint hairline on the edge that meets the
  * content ([edgeAtTop]: a bottom bar's top edge; false for a top bar's bottom edge). A [capsule] (a floating pill)
  * is clipped round and gets a hairline all round instead.
@@ -53,9 +70,9 @@ fun Modifier.frostedChrome(
     state: HazeState? = LocalChromeHaze.current,
     edgeAtTop: Boolean = true,
     capsule: Boolean = false,
+    style: HazeStyle = chromeHazeStyle(),
 ): Modifier {
     val hairline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-    val style = chromeHazeStyle()
     val clipped = if (capsule) clip(RoundedCornerShape(percent = 50)) else this
     val material = if (state != null) clipped.hazeEffect(state, style) else clipped
     return material.drawWithContent {
