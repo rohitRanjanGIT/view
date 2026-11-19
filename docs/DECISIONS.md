@@ -475,3 +475,8 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   centred 12 dp above the bottom inset, equal 76 dp slots, pill-shaped press ripple.
 - Pull-down title and icon row draw *over* the grid: on Pictures the grid's opaque background reaches up under the
   icon row (status-bar inset), which hid the search icon.
+- **Copy to clipboard** (2026-11-19): a Copy icon next to the viewer's ⋮, and in the selection top bar when exactly
+  one item is selected (Pictures, albums, Favourites, Videos, Search). Not in Trash, and not in Locked (the clipboard
+  would hand a private photo to other apps). The clip carries the content URI (`core/domain/Clipboard.kt`), built by
+  hand with the known MIME type (`ClipData.newUri` would query the provider on the main thread); the pasting app gets
+  read access to that one file, and Android 13+ shows its own "Copied" preview. Copying ends the selection.

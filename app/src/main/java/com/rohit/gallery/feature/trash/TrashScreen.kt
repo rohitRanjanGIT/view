@@ -70,6 +70,7 @@ fun TrashScreen(
         onBack = onBack,
         onOpenMedia = onOpenMedia,
         gridHeader = "Items here are deleted automatically after 30 days.",
+        allowCopy = false,
     ) { modifier ->
         FloatingActionPill(modifier) {
             ActionItem(Icons.Filled.Refresh, "Restore", count > 0, { launch { viewModel.restoreRequest() } }, Modifier.pillSlot())

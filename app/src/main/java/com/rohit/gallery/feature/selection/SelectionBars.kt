@@ -1,5 +1,9 @@
 package com.rohit.gallery.feature.selection
 
+import com.rohit.gallery.core.ui.icons.GalleryIcons
+import com.rohit.gallery.core.domain.copyToClipboard
+import com.rohit.gallery.core.model.MediaItem
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +54,7 @@ fun SelectionTopBar(
     onClose: () -> Unit,
     onSelectAll: () -> Unit,
     modifier: Modifier = Modifier,
+    onCopy: (() -> Unit)? = null,
 ) {
     Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome(edgeAtTop = false)) {
         Row(
@@ -64,6 +69,10 @@ fun SelectionTopBar(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
+            // Copy to clipboard works on one photo at a time (most apps paste only the first anyway).
+            if (onCopy != null && count == 1) {
+                IconButton(onClick = onCopy) { Icon(GalleryIcons.Copy, contentDescription = "Copy to clipboard") }
+            }
             TextButton(onClick = onSelectAll) { Text("All") }
         }
     }
@@ -149,4 +158,13 @@ fun SelectionCheck(selected: Boolean, modifier: Modifier = Modifier) {
             Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
         }
     }
+}
+
+/**
+ * For [SelectionTopBar]'s Copy: copies the one selected item among [items] to the clipboard and ends the selection.
+ */
+fun copySelected(context: Context, selection: SelectionState, items: List<MediaItem>?) {
+    val id = selection.ids.singleOrNull() ?: return
+    items?.firstOrNull { it.id == id }?.let { copyToClipboard(context, it) }
+    selection.clear()
 }

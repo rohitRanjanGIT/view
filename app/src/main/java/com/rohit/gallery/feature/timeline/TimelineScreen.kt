@@ -100,6 +100,7 @@ import com.rohit.gallery.feature.selection.SelectionActionsBar
 import com.rohit.gallery.feature.selection.SelectionCheck
 import com.rohit.gallery.feature.selection.SelectionState
 import com.rohit.gallery.feature.selection.SelectionTopBar
+import com.rohit.gallery.feature.selection.copySelected
 import com.rohit.gallery.feature.selection.gridGestures
 import com.rohit.gallery.feature.selection.GridPressState
 import com.rohit.gallery.feature.selection.pressScale
@@ -197,12 +198,14 @@ private fun SelectionBars(
         }
     }
 
+    val context = LocalContext.current
     Box(modifier) {
         SelectionTopBar(
             count = selection.ids.size,
             onClose = selection::clear,
             onSelectAll = { selection.selectAll(content.items) },
             modifier = Modifier.align(Alignment.TopCenter),
+            onCopy = { copySelected(context, selection, content.items) },
         )
         SelectionActionsBar(
             controller = viewModel.selectionActions,

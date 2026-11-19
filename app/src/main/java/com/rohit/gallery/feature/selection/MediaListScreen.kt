@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.selection
 
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
 import com.rohit.gallery.core.ui.components.frostedChrome
@@ -99,6 +100,7 @@ fun MediaListScreen(
     gridHeader: String? = null,
     asTimeline: Boolean = false,
     titleActions: @Composable RowScope.() -> Unit = {},
+    allowCopy: Boolean = true,
     contentKey: Any? = null,
     selectionBar: @Composable (Modifier) -> Unit,
 ) {
@@ -109,6 +111,7 @@ fun MediaListScreen(
     val level by sizes.level.collectAsStateWithLifecycle()
     val columns by sizes.trashColumns.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
     val haze = rememberChromeHaze()
     // The title bar's name fades out while the grid is pulled down and the big title shows.
     val reach = rememberReachState()
@@ -121,6 +124,7 @@ fun MediaListScreen(
                     count = selection.ids.size,
                     onClose = selection::clear,
                     onSelectAll = { items?.let(selection::selectAll) },
+                    onCopy = if (allowCopy) { { copySelected(context, selection, items) } } else null,
                 )
             }
 

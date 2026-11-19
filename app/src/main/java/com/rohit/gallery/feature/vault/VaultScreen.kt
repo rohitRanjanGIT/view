@@ -223,6 +223,7 @@ private fun VaultContent(viewModel: VaultViewModel, onBack: () -> Unit, onOpenMe
                 onOpenMedia = { onOpenMedia(it, album) },
                 asTimeline = true,
                 contentKey = album,
+                allowCopy = false,
                 selectionBar = bar,
             )
         }
@@ -311,6 +312,7 @@ private fun VaultPages(
                     onBack = onBack,
                     onOpenMedia = onOpenMedia,
                     asTimeline = true,
+                    allowCopy = false,
                     titleActions = { VaultMenu(enabled = !items.isNullOrEmpty(), onUnlockAll = { onConfirm(ConfirmRequest.UnlockAll) }) },
                     selectionBar = photoBar,
                 )

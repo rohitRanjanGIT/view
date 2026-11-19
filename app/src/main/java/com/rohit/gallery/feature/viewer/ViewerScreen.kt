@@ -1,5 +1,6 @@
 package com.rohit.gallery.feature.viewer
 
+import com.rohit.gallery.core.domain.copyToClipboard
 import com.rohit.gallery.core.ui.components.LocalUndoBar
 import android.provider.MediaStore
 import androidx.compose.material3.Text
@@ -628,6 +629,10 @@ private fun ViewerContent(
                     onBack = ::close,
                     menu = viewerMenu(currentItem),
                     modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
+                    // Not for Trash, and not for Locked (the clipboard would hand a private photo to other apps).
+                    onCopy = if (viewModel.isTrash || viewModel.isVault) null else {
+                        { copyToClipboard(context, currentItem) }
+                    },
                 )
             }
         }

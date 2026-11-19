@@ -54,6 +54,7 @@ fun ViewerTopBar(
     onBack: () -> Unit,
     menu: List<ViewerMenuEntry>,
     modifier: Modifier = Modifier,
+    onCopy: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     Row(
@@ -84,6 +85,11 @@ fun ViewerTopBar(
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f),
                 )
+            }
+        }
+        if (onCopy != null) {
+            IconButton(onClick = onCopy) {
+                Icon(GalleryIcons.Copy, contentDescription = "Copy to clipboard", tint = Color.White)
             }
         }
         if (menu.isNotEmpty()) {

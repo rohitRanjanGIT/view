@@ -62,6 +62,17 @@ object GalleryIcons {
     }
 
     /** Unlock (line icon): a padlock with its shackle swung open. */
+    /** Copy to clipboard: a sheet in front of another. */
+    val Copy: ImageVector by lazy {
+        lineIcon("Copy") {
+            roundRect(8.5f, 8.5f, 20f, 20f, 2.5f)
+            // The sheet behind: only its top and left edges show.
+            moveTo(4.5f, 15.5f)
+            verticalLineTo(6.5f); arcTo(2.5f, 2.5f, 0f, false, true, 7f, 4f)
+            horizontalLineTo(15.5f)
+        }
+    }
+
     val LockOpen: ImageVector by lazy {
         lineIcon("LockOpen") {
             roundRect(4.5f, 10.5f, 19.5f, 20.5f, 2.5f)
