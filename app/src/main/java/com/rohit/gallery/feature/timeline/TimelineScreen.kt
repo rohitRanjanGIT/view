@@ -318,7 +318,7 @@ fun TimelineGrid(
                         snapshot = { gridLayer.toImageBitmap() },
                         anchorAt = ::anchorAt,
                         onSwitch = { zoomIn ->
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             (if (zoomIn) level.zoomIn() else level.zoomOut())?.let(onLevelChange)
                         },
                     )

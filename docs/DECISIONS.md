@@ -373,3 +373,10 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   a long-press is coming) and springs back with a little give when the touch becomes a tap, scroll or long-press.
   `GridPressState` holds the pressed id and one `Animatable`; cells read it only inside `graphicsLayer`, so pressing
   never recomposes the grid. Buttons, menu rows and album cards keep Android's ripple (familiar platform feedback).
+- **Haptics** (item 6; Apple's causality / harmony / utility rules): fired on the causal frame, only at meaningful
+  moments, and through `LocalHapticFeedback`, so the system "touch feedback" setting still applies.
+  New: swipe-down ticks (`GestureThresholdActivate`) when letting go would close the viewer, once per crossing;
+  filmstrip scrubbing ticks (`SegmentFrequentTick`) per photo passed; viewer favourite gives `ToggleOn` / `ToggleOff`
+  when MediaStore reports the change saved (not on the button press). Changed: pinch density switches use
+  `SegmentTick` (a detent) and the fast-scroller's month change `SegmentFrequentTick`, instead of `TextHandleMove`.
+  Not added: drag-select per item (too buzzy on fast drags), details panel open/close, trash.

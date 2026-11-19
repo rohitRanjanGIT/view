@@ -81,7 +81,7 @@ fun FastScroller(
     val latestFraction by rememberUpdatedState(scrollFraction)
     val haptic = LocalHapticFeedback.current
     val label = if (dragging) labelAt(dragFraction) else ""
-    LaunchedEffect(label) { if (dragging && label.isNotEmpty()) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    LaunchedEffect(label) { if (dragging && label.isNotEmpty()) haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick) }
 
     BoxWithConstraints(modifier.fillMaxHeight().padding(top = topPadding, bottom = bottomPadding)) {
         val density = LocalDensity.current

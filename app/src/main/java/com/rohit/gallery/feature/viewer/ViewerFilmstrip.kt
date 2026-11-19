@@ -27,7 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.MediaItem
@@ -77,12 +79,19 @@ fun ViewerFilmstrip(
     val latestScrubbing by rememberUpdatedState(scrubbing)
     val latestIndex by rememberUpdatedState(currentIndex)
     val latestOnSelect by rememberUpdatedState(onSelect)
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(listState) {
         snapshotFlow { if (latestScrubbing) listState.centeredIndex() else null }
             .filterNotNull()
             .distinctUntilChanged()
-            .collect { index -> if (index != latestIndex) latestOnSelect(index) }
+            .collect { index ->
+                if (index != latestIndex) {
+                    // A light tick for each photo the strip passes, like the detents of a dial.
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                    latestOnSelect(index)
+                }
+            }
     }
 
     // With half a screen of content padding, scrolling an item to the start centers it.

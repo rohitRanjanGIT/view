@@ -263,7 +263,7 @@ private fun AlbumGrid(
                         snapshot = { gridLayer.toImageBitmap() },
                         anchorAt = ::anchorAt,
                         onSwitch = { zoomIn ->
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             onColumnsChange(ALBUM_COLUMN_STEPS[if (zoomIn) step - 1 else step + 1])
                         },
                     )

@@ -23,6 +23,8 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import androidx.activity.compose.BackHandler
@@ -258,7 +260,10 @@ private fun ViewerContent(
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
     val flickBackPx = with(LocalDensity.current) { FlickBackVelocity.toPx() }
     // Plain holder (not state): per-gesture bookkeeping that must not trigger recomposition.
-    val swipe = remember { object { var mode = SwipeMode.None; var infoStart = 0f; var infoTravel = 0f; var dismissRaw = 0f } }
+    val swipe = remember {
+        object { var mode = SwipeMode.None; var infoStart = 0f; var infoTravel = 0f; var dismissRaw = 0f; var armed = false }
+    }
+    val haptic = LocalHapticFeedback.current
     // How far past their limits the photo and the details panel can be stretched, at most.
     val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     val stretchPx = screenHeightPx * StretchFraction
@@ -357,10 +362,19 @@ private fun ViewerContent(
     BackHandler(enabled = zoomed && !showInfo) { close() }
 
     // Favourite and trash go through the system's confirmation (skipped when "Skip confirmation" is allowed).
+    // What a pending write will do to the favourite (null: not a favourite change), for the toggle haptic once done.
+    val pendingWrite = remember { object { var favorite: Boolean? = null } }
     val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) viewModel.onWritten()
+        val favorite = pendingWrite.favorite
+        pendingWrite.favorite = null
+        if (result.resultCode == Activity.RESULT_OK) {
+            // Felt when the change is actually saved, not when the button is pressed.
+            if (favorite != null) haptic.performHapticFeedback(if (favorite) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+            viewModel.onWritten()
+        }
     }
-    fun write(request: suspend () -> IntentSender?) {
+    fun write(favorite: Boolean? = null, request: suspend () -> IntentSender?) {
+        pendingWrite.favorite = favorite
         scope.launch {
             val sender = request()
             if (sender == null) {
@@ -393,7 +407,7 @@ private fun ViewerContent(
                         ViewerAction(
                             if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             if (favorite) "Remove from favourites" else "Add to favourites",
-                            { write { viewModel.favoriteRequest(currentItem) } },
+                            { write(favorite = !favorite) { viewModel.favoriteRequest(currentItem) } },
                             tint = if (favorite) FavoriteHeartRed else null,
                         ),
                     )
@@ -467,6 +481,7 @@ private fun ViewerContent(
                                 // Grabbed while springing back above its resting place: resume from the matching
                                 // finger position, so the photo doesn't jump.
                                 swipe.dismissRaw = if (dragY < 0f) GalleryMotion.rubberBandInverse(dragY, stretchPx) else dragY
+                                swipe.armed = dragY > dismissDistancePx
                             }
                         }
                         when (swipe.mode) {
@@ -478,6 +493,10 @@ private fun ViewerContent(
                                 swipe.dismissRaw += delta.y
                                 val raw = swipe.dismissRaw
                                 dragY = if (raw >= 0f) raw else GalleryMotion.rubberBand(raw, stretchPx)
+                                // A tick the moment letting go here would close the viewer (once per crossing).
+                                val armed = dragY > dismissDistancePx
+                                if (armed && !swipe.armed) haptic.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                                swipe.armed = armed
                             }
                             else -> Unit
                         }

@@ -186,7 +186,7 @@ fun SelectableMediaGrid(
                         snapshot = { gridLayer.toImageBitmap() },
                         anchorAt = ::anchorAt,
                         onSwitch = { zoomIn ->
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             onColumnsChange(FLAT_GRID_COLUMNS[if (zoomIn) position - 1 else position + 1])
                         },
                     )
