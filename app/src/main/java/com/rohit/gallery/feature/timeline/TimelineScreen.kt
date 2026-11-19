@@ -516,7 +516,8 @@ private fun TimelineFastScroller(
 /** Search, at the right end of the pinned day header (the header leaves that space empty). */
 @Composable
 private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier.windowInsetsPadding(WindowInsets.statusBars).height(DayHeaderHeight), Alignment.Center) {
+    // 8 dp in from the edge, like the Albums tab's ⋮, so the icon doesn't jump sideways when switching tabs.
+    Box(modifier.windowInsetsPadding(WindowInsets.statusBars).padding(end = 8.dp).height(DayHeaderHeight), Alignment.Center) {
         SearchIcon(onClick)
     }
 }
