@@ -235,7 +235,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     (2026-11-19, not yet tried on the phone): folder rules, double-tap guard, Stop, name clash, picker order; see
     DECISIONS "Album fixes after a review". Also not yet tried: dates kept through Trash (restore
     writes back the saved date) and Remove album (keep photos); see DECISIONS.
-- **Git:** everything pushed up to `399c75b` (video features, landscape viewer) on 2026-11-20. Push only when I say so.
+- **Git:** everything pushed up to `1bc4bab` (albums redesign, Move to folder) on 2026-11-20. Push only when I say so.
 - **Next (pick with me):**
   1. **No Menu** (built 2026-11-20, not yet tried by me): bottom bar is Pictures + Albums. Favourites, Videos, Trash are
      "Collections" tiles at the end of the Albums grid; Settings: swipe left past Albums and hold 0.6 s. iOS-style swipe-right back in
