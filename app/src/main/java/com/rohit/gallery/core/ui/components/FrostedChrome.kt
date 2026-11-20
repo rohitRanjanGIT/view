@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
@@ -71,17 +72,25 @@ fun Modifier.frostedChrome(
     edgeAtTop: Boolean = true,
     capsule: Boolean = false,
     style: HazeStyle = chromeHazeStyle(),
+    /** A floating card instead of a capsule: rounded by this much, with the hairline all round. */
+    corner: Dp? = null,
 ): Modifier {
     val hairline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-    val clipped = if (capsule) clip(RoundedCornerShape(percent = 50)) else this
+    val rounded = capsule || corner != null
+    val clipped = when {
+        corner != null -> clip(RoundedCornerShape(corner))
+        capsule -> clip(RoundedCornerShape(percent = 50))
+        else -> this
+    }
     val material = if (state != null) clipped.hazeEffect(state, style) else clipped
     return material.drawWithContent {
+        val radius = CornerRadius(corner?.toPx() ?: (size.height / 2))
         if (state == null) {
-            if (capsule) drawRoundRect(style.backgroundColor, cornerRadius = CornerRadius(size.height / 2)) else drawRect(style.backgroundColor)
+            if (rounded) drawRoundRect(style.backgroundColor, cornerRadius = radius) else drawRect(style.backgroundColor)
         }
         drawContent()
-        if (capsule) {
-            drawRoundRect(hairline, cornerRadius = CornerRadius(size.height / 2), style = Stroke(width = 1f))
+        if (rounded) {
+            drawRoundRect(hairline, cornerRadius = radius, style = Stroke(width = 1f))
         } else {
             val y = if (edgeAtTop) 0f else size.height
             drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)

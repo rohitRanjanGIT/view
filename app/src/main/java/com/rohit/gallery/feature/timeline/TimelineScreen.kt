@@ -76,7 +76,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -100,7 +99,6 @@ import com.rohit.gallery.feature.selection.SelectionActionsBar
 import com.rohit.gallery.feature.selection.SelectionCheck
 import com.rohit.gallery.feature.selection.SelectionState
 import com.rohit.gallery.feature.selection.SelectionTopBar
-import com.rohit.gallery.feature.selection.copySelected
 import com.rohit.gallery.feature.selection.gridGestures
 import com.rohit.gallery.feature.selection.GridPressState
 import com.rohit.gallery.feature.selection.pressScale
@@ -200,14 +198,12 @@ private fun SelectionBars(
         }
     }
 
-    val context = LocalContext.current
     Box(modifier) {
         SelectionTopBar(
             count = selection.ids.size,
             onClose = selection::clear,
             onSelectAll = { selection.selectAll(content.items) },
             modifier = Modifier.align(Alignment.TopCenter),
-            onCopy = { copySelected(context, selection, content.items) },
         )
         SelectionActionsBar(
             controller = viewModel.selectionActions,

@@ -215,7 +215,6 @@ private fun VaultContent(viewModel: VaultViewModel, onBack: () -> Unit, onOpenMe
             onOpenMedia = { onOpenMedia(it, album) },
             asTimeline = true,
             contentKey = album,
-            allowCopy = false,
             // Swipe sideways on the grid: a strip of the locked albums slides in beside it.
             gridWrapper = { grid ->
                 AlbumSwitcherDrawer(
@@ -316,7 +315,6 @@ private fun VaultPages(
                     onBack = onBack,
                     onOpenMedia = onOpenMedia,
                     asTimeline = true,
-                    allowCopy = false,
                     titleActions = { VaultMenu(enabled = !items.isNullOrEmpty(), onUnlockAll = { onConfirm(ConfirmRequest.UnlockAll) }) },
                     selectionBar = photoBar,
                 )

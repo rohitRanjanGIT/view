@@ -553,3 +553,13 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   photos without one (copies, or moved before this) go where the user picks in the album sheet. Then the folder
   is empty and the album is gone; nothing goes to Trash. If anything can't move, the album stays and says so.
   Room schema 3 (two new tables, auto-migrated).
+- **More menu as a frosted card** (2026-11-20, user's pick): the selection bar's More opens a small frosted card
+  (`MoreMenuCard` in `SelectionBars.kt`) instead of Material's dropdown: same material as the capsule
+  (`floatingHazeStyle`, `frostedChrome(corner = 24.dp)`), right-aligned 10 dp above the capsule
+  (`AboveAnchor` position provider; the More slot spans the capsule's height), springing out of the More button
+  (scale 0.6 → 1, damping 0.78) with a light haptic. Rows have line icons drawn in `GalleryIcons` (FolderMove,
+  FolderCopy, Clipboard, Lock); Lock sits under a hairline. It is a `Popup`, which works with Haze because Haze
+  places its blur by screen position.
+- **Copy to clipboard moved into More** (out of the selection top bar). One photo only: Android's clipboard can hold
+  several, but nearly every app pastes only the first, so with more selected the row is greyed out with "One photo
+  at a time".

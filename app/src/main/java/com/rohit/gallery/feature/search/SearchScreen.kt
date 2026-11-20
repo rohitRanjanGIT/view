@@ -1,6 +1,5 @@
 package com.rohit.gallery.feature.search
 
-import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -63,7 +62,6 @@ import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.feature.selection.MediaTimeline
 import com.rohit.gallery.feature.selection.SelectionActionsBar
 import com.rohit.gallery.feature.selection.SelectionTopBar
-import com.rohit.gallery.feature.selection.copySelected
 import com.rohit.gallery.feature.timeline.GridLevel
 import java.text.NumberFormat
 
@@ -107,7 +105,6 @@ fun SearchScreen(
         }
     }
 
-    val context = LocalContext.current
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             if (selection.isSelecting) {
@@ -115,7 +112,6 @@ fun SearchScreen(
                     count = selection.ids.size,
                     onClose = selection::clear,
                     onSelectAll = { (state as? SearchUiState.Results)?.items?.let(selection::selectAll) },
-                    onCopy = { copySelected(context, selection, (state as? SearchUiState.Results)?.items) },
                 )
             } else {
                 SearchField(

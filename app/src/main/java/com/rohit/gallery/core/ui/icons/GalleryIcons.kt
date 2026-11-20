@@ -61,7 +61,6 @@ object GalleryIcons {
         }
     }
 
-    /** Unlock (line icon): a padlock with its shackle swung open. */
     /** Copy to clipboard: a sheet in front of another. */
     val Copy: ImageVector by lazy {
         lineIcon("Copy") {
@@ -73,6 +72,47 @@ object GalleryIcons {
         }
     }
 
+    /** Move to album (line icon): a folder with an arrow going in. */
+    val FolderMove: ImageVector by lazy {
+        lineIcon("FolderMove") {
+            folderOutline()
+            moveTo(8.5f, 13f); horizontalLineTo(15.5f)
+            moveTo(13f, 10.5f); lineTo(15.5f, 13f); lineTo(13f, 15.5f)
+        }
+    }
+
+    /** Copy to album (line icon): a folder with a plus. */
+    val FolderCopy: ImageVector by lazy {
+        lineIcon("FolderCopy") {
+            folderOutline()
+            moveTo(12f, 10f); verticalLineTo(16f)
+            moveTo(9f, 13f); horizontalLineTo(15f)
+        }
+    }
+
+    /** Copy to clipboard (line icon): a clipboard with its clip and two lines of text. */
+    val Clipboard: ImageVector by lazy {
+        lineIcon("Clipboard") {
+            moveTo(9f, 4.5f); horizontalLineTo(7f); arcTo(2f, 2f, 0f, false, false, 5f, 6.5f)
+            verticalLineTo(19f); arcTo(2f, 2f, 0f, false, false, 7f, 21f)
+            horizontalLineTo(17f); arcTo(2f, 2f, 0f, false, false, 19f, 19f)
+            verticalLineTo(6.5f); arcTo(2f, 2f, 0f, false, false, 17f, 4.5f); horizontalLineTo(15f)
+            roundRect(9f, 3f, 15f, 6.5f, 1.2f)
+            moveTo(8.5f, 11f); horizontalLineTo(15.5f)
+            moveTo(8.5f, 15f); horizontalLineTo(13f)
+        }
+    }
+
+    /** Lock (line icon): a closed padlock. */
+    val Lock: ImageVector by lazy {
+        lineIcon("Lock") {
+            roundRect(4.5f, 10.5f, 19.5f, 20.5f, 2.5f)
+            moveTo(8f, 10.5f); verticalLineTo(7.5f); arcTo(4f, 4f, 0f, false, true, 16f, 7.5f); verticalLineTo(10.5f)
+            moveTo(12f, 14.5f); verticalLineTo(16.5f)
+        }
+    }
+
+    /** Unlock (line icon): a padlock with its shackle swung open. */
     val LockOpen: ImageVector by lazy {
         lineIcon("LockOpen") {
             roundRect(4.5f, 10.5f, 19.5f, 20.5f, 2.5f)
@@ -98,6 +138,15 @@ object GalleryIcons {
                 pathBuilder = block,
             )
             .build()
+
+    /** A folder's outline with its tab, filling most of the grid (for line icons). */
+    private fun PathBuilder.folderOutline() {
+        moveTo(3f, 6.5f); arcTo(2f, 2f, 0f, false, true, 5f, 4.5f)
+        horizontalLineTo(9.5f); lineTo(11.5f, 6.5f); horizontalLineTo(19f)
+        arcTo(2f, 2f, 0f, false, true, 21f, 8.5f); verticalLineTo(17.5f)
+        arcTo(2f, 2f, 0f, false, true, 19f, 19.5f); horizontalLineTo(5f)
+        arcTo(2f, 2f, 0f, false, true, 3f, 17.5f); close()
+    }
 
     private fun PathBuilder.roundRect(left: Float, top: Float, right: Float, bottom: Float, r: Float) {
         moveTo(left + r, top)
