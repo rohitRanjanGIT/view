@@ -111,7 +111,7 @@ com.rohit.gallery
 
 ## 6. UX direction (One UI-inspired, original implementation)
 - Bottom navigation: **Pictures**, **Albums**. Favorites, Videos and Trash are tiles at the end of Albums;
-  Settings is a swipe left from Albums (no tab). One-handed reach: key actions in the lower half.
+  Settings is a swipe left past Albums held 0.6 s (no tab). One-handed reach: key actions in the lower half.
 - Large collapsing title header that shrinks on scroll.
 - Timeline grid grouped by day with sticky date headers; pinch to change
   density (e.g. 3 / 4 / 7 columns, plus a month view) with animated transitions.
@@ -238,7 +238,8 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 - **Git:** everything pushed up to `327dd69` (More card) on 2026-11-20. Push only when I say so.
 - **Next (pick with me):**
   1. **No Menu** (built 2026-11-20, not yet tried by me): bottom bar is Pictures + Albums. Favourites, Videos, Trash are
-     "Collections" tiles at the end of the Albums grid; Settings is a hidden third pager page (swipe left from Albums).
+     "Collections" tiles at the end of the Albums grid; Settings: swipe left past Albums and hold 0.6 s. iOS-style swipe-right back in
+     Favourites, Videos, Trash (`swipeBack`).
   2. My screenshot idea: a notification offers Share / Share & delete after a screenshot (answers still pending).
   3. App icon (deferred by me). Then Phase 4 (see Known gaps).
 
@@ -246,9 +247,9 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 - **Setup:** `com.rohit.gallery`, AGP 9.5.1 (built-in Kotlin), Kotlin 2.2.10, Gradle 9.6.0, Compose BOM
   2026.02.01, Hilt + KSP, Navigation Compose (type-safe routes in `navigation/Routes.kt`), release (R8 + shrink)
   and `benchmark` build types, Material 3 dynamic colour.
-- **Navigation:** `HomeRoute` is one destination holding Pictures / Albums / Settings (no tab) in `HomePager`
+- **Navigation:** `HomeRoute` is one destination holding Pictures / Albums in `HomePager`
   (`navigation/HomePager.kt`: pages follow the finger, no-bounce spring stiffness 900, 30% threshold; still while
-  selecting or with two fingers; Back on Settings slides to Albums, on Albums to Pictures; dragging the bottom bar drives it too).
+  selecting or with two fingers; Back on Albums slides to Pictures; dragging the bottom bar drives it too).
   The pager state lives in `GalleryNavHost`, so the tab survives opening the viewer. Other screens are normal routes.
 - **Foundation:** permission flow (full / partial / denied), `MediaStoreDataSource` + in-memory `MediaRepository`
   index (`StateFlow<MediaIndexState>`) with debounced `ContentObserver`, own `ThumbnailCache` + prefetch.

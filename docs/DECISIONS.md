@@ -586,3 +586,14 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   bar fades out as it comes in and hides once it settles, and dragging the bar stops at Albums (`dragsPager`
   `lastPage`). Back (or Settings' own arrow) slides back to Albums. `SettingsRoute`, `MenuSidebar` and the ☰ button
   are gone. Locked's push-past-the-end now starts below the Collections tiles (they are the end of the list).
+- **Settings by swipe-and-hold, not a page** (2026-11-20, user's call: "make the user wait" like Locked): Settings is
+  a route again (`SettingsRoute`, slides in from the right). On Albums, swipe left past the edge (the pager stretches)
+  and hold 0.6 s: buzz, then Settings (`holdPastLastPage`, watches in the initial pass and consumes nothing; moving
+  back, lifting, a second finger or a vertical drag cancels). A quick swipe does nothing. The third pager page is gone.
+- **iOS-style back in Favourites, Videos and Trash** (2026-11-20, user's pick: finger moves right): drag right from
+  anywhere and the screen slides away with the finger, Albums underneath (`swipeBack`, `MediaListScreen(swipeBack =
+  true)`). It feeds the drag into the activity's `OnBackPressedDispatcher` as predictive back events (started /
+  progressed / cancelled, `onBackPressed` to finish), so the NavHost plays its existing predictive-pop animation and
+  all Back handlers behave as with an edge swipe. Past 30 % or a flick goes back. Ignores drags that start as a long
+  press (drag-select), vertical drags, two fingers, and is off while selecting. Not on album screens (the album strip
+  uses a sideways swipe there).

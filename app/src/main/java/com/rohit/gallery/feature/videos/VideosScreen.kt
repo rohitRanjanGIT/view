@@ -72,5 +72,6 @@ fun VideosScreen(
         selectionActions = viewModel.selectionActions,
         onBack = onBack,
         onOpenMedia = onOpenMedia,
+        swipeBack = true,
     )
 }

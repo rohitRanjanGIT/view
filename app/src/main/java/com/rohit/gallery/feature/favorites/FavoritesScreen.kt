@@ -23,5 +23,6 @@ fun FavoritesScreen(
         selectionActions = viewModel.selectionActions,
         onBack = onBack,
         onOpenMedia = onOpenMedia,
+        swipeBack = true,
     )
 }

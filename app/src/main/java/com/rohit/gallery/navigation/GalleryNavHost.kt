@@ -13,6 +13,7 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import com.rohit.gallery.core.ui.theme.GalleryMotion
@@ -34,7 +35,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -88,11 +88,9 @@ fun GalleryNavHost(
     var selectionActive by remember { mutableStateOf(false) }
     // The Pictures viewer is a layer inside the home screen, so the bar has to be told when it is open.
     var homeViewerOpen by remember { mutableStateOf(false) }
-    // Which tab is showing; kept here so it survives opening the viewer and other screens. Settings is a third page
-    // past Albums (a swipe left from Albums), with no button in the bar.
-    val homePager = rememberPagerState { HOME_PAGE_COUNT }
-    val showBottomBar = !selectionActive && !homeViewerOpen && currentDestination?.hasRoute<HomeRoute>() == true &&
-        homePager.settledPage != SETTINGS_PAGE
+    val showBottomBar = !selectionActive && !homeViewerOpen && currentDestination?.hasRoute<HomeRoute>() == true
+    // Which tab is showing; kept here so it survives opening the viewer and other screens.
+    val homePager = rememberPagerState { homeTabs.size }
 
     // Content of top-level screens gets a constant bottom inset instead of Scaffold's, so the
     // grid does not resize when the bar disappears while the viewer opens.
@@ -147,7 +145,13 @@ fun GalleryNavHost(
                         HomePager(
                             state = homePager,
                             userScrollEnabled = !selectionActive,
-                            modifier = Modifier.hazeSource(navHaze),
+                            // Settings has no tab or button: swipe left past the edge of Albums and hold 0.6 s.
+                            modifier = Modifier
+                                .hazeSource(navHaze)
+                                .holdPastLastPage(
+                                    enabled = { homePager.currentPage == ALBUMS_PAGE && homePager.currentPageOffsetFraction == 0f && !selectionActive },
+                                    onHold = { navController.navigate(SettingsRoute) },
+                                ),
                         ) { page ->
                             when (page) {
                                 0 -> TimelineScreen(
@@ -169,17 +173,11 @@ fun GalleryNavHost(
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
                                 )
-                                // Settings: swipe left from Albums. Its Back arrow slides back to Albums.
-                                else -> SettingsScreen(
-                                    onBack = { scope.launch { homePager.animateScrollToPage(ALBUMS_PAGE, animationSpec = TabTapSpec) } },
-                                    onOpenLocked = { navController.navigate(VaultRoute) },
-                                )
                             }
                         }
-                        // Back from Settings slides to Albums, from Albums to Pictures.
+                        // Back from Albums slides to Pictures first.
                         BackHandler(enabled = homePager.currentPage != 0 && !selectionActive) {
-                            val back = if (homePager.currentPage == SETTINGS_PAGE) ALBUMS_PAGE else 0
-                            scope.launch { homePager.animateScrollToPage(back, animationSpec = TabTapSpec) }
+                            scope.launch { homePager.animateScrollToPage(0, animationSpec = TabTapSpec) }
                         }
                     }
                     topLevel<SearchRoute>(navController) { host ->
@@ -187,6 +185,13 @@ fun GalleryNavHost(
                             onBack = { navController.popBackStack() },
                             onOpenMedia = { item, query -> openViewer(host, item, ViewerRoute(item.id, searchQuery = query)) },
                         )
+                    }
+                    // Slides in from the right (it came from a swipe left past Albums) and back out to the right.
+                    composable<SettingsRoute>(
+                        enterTransition = { slideInHorizontally(tween(GalleryMotion.FADE_MS * 2)) { it } },
+                        popExitTransition = { slideOutHorizontally(tween(GalleryMotion.FADE_MS * 2)) { it } },
+                    ) {
+                        SettingsScreen(onBack = { navController.popBackStack() }, onOpenLocked = { navController.navigate(VaultRoute) })
                     }
                     composable<NewAlbumRoute> {
                         NewAlbumScreen(onClose = { navController.popBackStack() })
@@ -258,14 +263,11 @@ fun GalleryNavHost(
                 ) {
                     FloatingTabBar(
                         tabs = homeTabs.map { FloatingTab(it.label, it.icon) },
-                        selectedIndex = homePager.targetPage.coerceAtMost(ALBUMS_PAGE),
-                        position = { (homePager.currentPage + homePager.currentPageOffsetFraction).coerceAtMost(ALBUMS_PAGE.toFloat()) },
+                        selectedIndex = homePager.targetPage,
+                        position = { homePager.currentPage + homePager.currentPageOffsetFraction },
                         onSelect = { index -> scope.launch { homePager.animateScrollToPage(index, animationSpec = TabTapSpec) } },
                         haze = navHaze,
-                        // Fades out as Settings slides in over Albums.
-                        modifier = Modifier
-                            .graphicsLayer { alpha = 1f - (homePager.currentPage + homePager.currentPageOffsetFraction - ALBUMS_PAGE).coerceIn(0f, 1f) }
-                            .dragsPager(homePager, scope, lastPage = ALBUMS_PAGE),
+                        modifier = Modifier.dragsPager(homePager, scope),
                     )
                 }
                 UndoBarHost(

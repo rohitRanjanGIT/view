@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.rohit.gallery.core.ui.icons.GalleryIcons
 import kotlinx.serialization.Serializable
 
-/** The home screen: Pictures and Albums (the two tabs), then Settings, side by side in one pager. */
+/** The home screen: Pictures and Albums, side by side in one pager. */
 @Serializable data object HomeRoute
 
 /** A bottom-bar tab, in pager order. */
@@ -17,11 +17,6 @@ val homeTabs: List<HomeTab> = listOf(
 
 /** The Albums tab's page. */
 const val ALBUMS_PAGE = 1
-
-/** Settings: a page past Albums (swipe left from Albums), with no tab in the bar. */
-const val SETTINGS_PAGE = 2
-
-const val HOME_PAGE_COUNT = 3
 
 /**
  * Full-screen viewer. [bucketId] limits the pager to one album; null means the whole timeline. [trashed] pages
@@ -60,6 +55,9 @@ const val HOME_PAGE_COUNT = 3
 
 /** Search the library, opened from the Pictures tab. */
 @Serializable data object SearchRoute
+
+/** Settings: swipe left past the edge of Albums and hold (no tab, no button). */
+@Serializable data object SettingsRoute
 
 /** App settings, opened from the Menu tab. */
 

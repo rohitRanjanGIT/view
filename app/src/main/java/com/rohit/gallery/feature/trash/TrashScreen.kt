@@ -69,6 +69,7 @@ fun TrashScreen(
         selection = selection,
         onBack = onBack,
         onOpenMedia = onOpenMedia,
+        swipeBack = true,
         gridHeader = "Items here are deleted automatically after 30 days.",
         allowCopy = false,
     ) { modifier ->

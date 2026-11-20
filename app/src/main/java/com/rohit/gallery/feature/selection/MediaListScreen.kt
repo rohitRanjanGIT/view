@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.hazeSource
 import com.rohit.gallery.core.ui.components.frostedChrome
 import com.rohit.gallery.core.ui.components.rememberChromeHaze
+import com.rohit.gallery.core.ui.components.swipeBack
 import com.rohit.gallery.core.ui.components.LocalChromeHaze
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.BackHandler
@@ -70,6 +71,8 @@ fun MediaListScreen(
     titleActions: @Composable RowScope.() -> Unit = {},
     contentKey: Any? = null,
     gridWrapper: @Composable (@Composable () -> Unit) -> Unit = { it() },
+    /** iOS-style back: drag right anywhere to slide this screen away (Favourites, Videos, Trash). */
+    swipeBack: Boolean = false,
 ) {
     val allFavorite by remember(items) {
         derivedStateOf {
@@ -80,6 +83,7 @@ fun MediaListScreen(
     MediaListScreen(
         title, emptyText, items, selection, onBack, onOpenMedia,
         asTimeline = true, titleActions = titleActions, contentKey = contentKey, gridWrapper = gridWrapper,
+        swipeBack = swipeBack,
     ) { modifier ->
         SelectionActionsBar(selectionActions, selection, modifier, allFavorite = allFavorite)
     }
@@ -104,6 +108,8 @@ fun MediaListScreen(
     allowCopy: Boolean = true,
     gridWrapper: @Composable (@Composable () -> Unit) -> Unit = { it() },
     contentKey: Any? = null,
+    /** iOS-style back: drag right anywhere to slide this screen away (Favourites, Videos, Trash). */
+    swipeBack: Boolean = false,
     selectionBar: @Composable (Modifier) -> Unit,
 ) {
     BackHandler(enabled = selection.isSelecting) { selection.clear() }
@@ -117,7 +123,7 @@ fun MediaListScreen(
     val haze = rememberChromeHaze()
     // Pull-down-to-reach: the name glides between the bar and the centre; the bar's icons (not Back) ride down too.
     val reach = rememberReachState()
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().swipeBack(enabled = swipeBack && !selection.isSelecting)) {
         Column(Modifier.fillMaxSize().hazeSource(haze)) {
             if (!selection.isSelecting) {
                 TitleBar(title, onBack, titleActions, reach)
