@@ -923,6 +923,8 @@ private fun VideoPage(
             onDispose { onZoomState(null) }
         }
     }
+    val hold = rememberVideoHoldState()
+    val haptic = LocalHapticFeedback.current
     val shutter: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             thumbnail?.let {
@@ -937,6 +939,8 @@ private fun VideoPage(
             .fillMaxSize()
             .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f }
             .then(if (dragLayer != null) Modifier.graphicsLayer { dragLayer(aspect) } else Modifier)
+            // Hold for 2x, hold and slide to seek (before zoom, so a hold takes the touch from it).
+            .then(if (playback != null) Modifier.videoHold(playback, hold, haptic) else Modifier)
             .zoomable(zoomState, onClick = { onTap() }),
     ) {
         if (playback != null) {
@@ -963,6 +967,7 @@ private fun VideoPage(
             )
         }
     }
+    if (playback != null) VideoHoldOverlay(hold)
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,6 +84,9 @@ class PlaybackState internal constructor(
         private set
     var isMuted by mutableStateOf(false)
         private set
+    /** The chosen playback speed (a hold for 2x is on top of this and does not change it). */
+    var speed by mutableFloatStateOf(1f)
+        private set
 
     init {
         player.addListener(this)
@@ -114,6 +118,11 @@ class PlaybackState internal constructor(
     fun seekTo(ms: Long) {
         player.seekTo(ms)
         positionMs = ms
+    }
+
+    fun changeSpeed(value: Float) {
+        player.setPlaybackSpeed(value)
+        speed = value
     }
 
     fun applyMuted(muted: Boolean) {

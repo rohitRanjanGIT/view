@@ -651,3 +651,10 @@ rubber-bands (one buzz) and a flick ends on the first / last frame at most; leav
 tapping it closed (user's call: strip swipes past the video felt too easy). Scrubbing pauses, seeks with
 `SeekParameters.CLOSEST_SYNC`, then lands with an exact seek and resumes. Play / time / mute stay in a row above the
 strip for any video (`VideoControlsRow`); the old Slider controls are gone. Videos get a small play badge in the strip.
+
+## Hold for 2x, hold and slide to seek (2026-11-20)
+`Modifier.videoHold` (VideoHold.kt) sits before `zoomable` on the video page and watches in the Initial pass without
+consuming until the long-press timeout passes with the finger still; from then it consumes every change (so pager,
+dismiss, zoom and the tap ignore the touch). Held still: `setPlaybackSpeed(2f)` on top of the chosen speed
+(`PlaybackState.speed`, restored on release). Sliding past the touch slop switches to seeking: paused, CLOSEST_SYNC
+seeks, one screen width = the video's length clamped to 20 s..2 min, then an exact seek and play on if it was playing.
