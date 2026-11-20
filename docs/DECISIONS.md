@@ -658,3 +658,10 @@ consuming until the long-press timeout passes with the finger still; from then i
 dismiss, zoom and the tap ignore the touch). Held still: `setPlaybackSpeed(2f)` on top of the chosen speed
 (`PlaybackState.speed`, restored on release). Sliding past the touch slop switches to seeking: paused, CLOSEST_SYNC
 seeks, one screen width = the video's length clamped to 20 s..2 min, then an exact seek and play on if it was playing.
+
+## Video zoom at rest was 2.2x on portrait videos (2026-11-20)
+Telephoto applies a base zoom of `ContentScale.Fit(contentLocation, page)`; `scaledInsideAndCenterAligned(size)` only
+scales down. The stand-in size `aspect * 1000` stayed smaller than a portrait page, so portrait videos rested at ~2.17x
+(looked stretched, no bars). Now `aspect * 100_000`, which always scales down to the fitted frame (base zoom 1).
+`scaledToFitAndCenterAligned` would be exact but is deprecated in 0.19.0. A fit option (Best fit / Fill) was tried and
+dropped: videos always show whole.

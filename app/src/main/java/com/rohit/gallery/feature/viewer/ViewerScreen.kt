@@ -905,12 +905,15 @@ private fun VideoPage(
     val transitionActive = rememberSharedTransitionActive()
     val flightEnabled = isCurrent
     // Pinch, double-tap and pan zoom like a photo (the frame keeps playing). The video's fitted frame is the content,
-    // so it zooms around the picture rather than the black bars.
+    // so it zooms around the picture rather than the black bars. The frame is drawn fitted to the page, and Telephoto
+    // zooms the whole layer until the content location fits the page, so the location must be the fitted frame
+    // itself. "Scaled inside" only scales down, hence a stand-in size far larger than any screen: a 1000 px one stayed
+    // smaller than a portrait page and left portrait videos zoomed 2.2x at rest (they looked stretched, no bars).
     val zoomState = rememberZoomableState()
     val aspect = contentAspect(item, thumbnail)
     LaunchedEffect(zoomState, aspect) {
         zoomState.setContentLocation(
-            if (aspect > 0f) ZoomableContentLocation.scaledInsideAndCenterAligned(Size(aspect * 1000f, 1000f))
+            if (aspect > 0f) ZoomableContentLocation.scaledInsideAndCenterAligned(Size(aspect * 100_000f, 100_000f))
             else ZoomableContentLocation.SameAsLayoutBounds,
         )
     }
