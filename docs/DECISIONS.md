@@ -746,3 +746,10 @@ The selection Move to folder sheet shows only device folders whose path (`destin
 opens) is in that table, case-insensitive (`createdFolderChoices`), minus the current folder, under "New folder"; empty
 shows a hint line. Not changed: "Move here" picker, Add to album, Remove album's own sheet (still lists all folders).
 Folders made before this update aren't remembered, so they no longer show there.
+
+## Albums stay lists; folders stay folders (2026-11-20)
+Considered making user albums real folders (one concept). Rejected by the owner: a file lives in one folder, so a photo
+could only be in one album, and app folders (WhatsApp...) could join only as copies. Kept as is: user albums are Room
+lists (a photo can be in many; nothing moves on disk), device folders stay fully editable (+ moves in, Remove album,
+Delete album to Trash for clearing out e.g. extracted zips, Lock, Pin; no Rename). Also considered and dropped: making
+device folders read-only, and protecting Camera / Screenshots from Delete album.
