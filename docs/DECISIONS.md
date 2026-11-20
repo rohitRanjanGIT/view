@@ -564,7 +564,7 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   The card was made more compact after the first look (196 dp wide, smaller rows).
 - **Menu sidebar replaces the Menu tab** (2026-11-20, agreed with the user): two tabs (Pictures, Albums). On Albums a
   finger-left swipe (where the Menu page used to come from) or the ☰ button in the Albums bar slides a frosted panel
-  in from the right (`MenuSidebar`: 72 % wide, max 320 dp, blurring the pager like the tab bar, 35 % dim behind),
+  in from the right (`MenuSidebar`: 60 % wide, max 260 dp, blurring the pager like the tab bar, 35 % dim behind),
   with Favourites, Videos, Trash, Settings; Locked stays hidden. The swipe is `sidebarDrag`, an initial-pass detector
   on the pager that only claims finger-left drags while Albums is settled and nothing is selected, and consumes them
   so the pager never sees them; right swipes, vertical scrolls and two fingers pass through. It follows the finger and

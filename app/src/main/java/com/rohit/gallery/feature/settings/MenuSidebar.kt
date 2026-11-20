@@ -191,7 +191,7 @@ fun MenuSidebar(
     BackHandler(enabled = state.isVisible) { state.close() }
     if (!state.isVisible) return
     BoxWithConstraints(modifier.fillMaxSize().sidebarDrag(state, opening = false) { true }) {
-        val width = min(maxWidth * 0.72f, 320.dp)
+        val width = min(maxWidth * 0.6f, 260.dp)
         val widthPx = with(LocalDensity.current) { width.toPx() }
         state.widthPx = widthPx
         // The dim over Albums; a tap on it closes.
@@ -202,7 +202,7 @@ fun MenuSidebar(
                 .background(Color.Black.copy(alpha = 0.35f))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = state::close),
         )
-        val shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+        val shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
         val hairline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         Column(
             Modifier
@@ -224,8 +224,8 @@ fun MenuSidebar(
         ) {
             Text(
                 "Menu",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(start = 12.dp, top = 24.dp, bottom = 16.dp),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 8.dp),
             )
             SidebarRow(Icons.Outlined.FavoriteBorder, "Favourites", onOpenFavorites)
             SidebarRow(Icons.Outlined.PlayArrow, "Videos", onOpenVideos)
@@ -243,10 +243,10 @@ private fun SidebarRow(icon: ImageVector, label: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 14.dp),
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 16.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 14.dp))
     }
 }
