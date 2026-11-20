@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,9 +58,6 @@ import com.rohit.gallery.feature.albums.EditAlbumsScreen
 import com.rohit.gallery.feature.albums.NewAlbumScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.search.SearchScreen
-import com.rohit.gallery.feature.settings.MenuSidebar
-import com.rohit.gallery.feature.settings.rememberMenuSidebarState
-import com.rohit.gallery.feature.settings.sidebarDrag
 import com.rohit.gallery.feature.settings.SettingsScreen
 import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.trash.RestoreRepairEffect
@@ -90,11 +88,11 @@ fun GalleryNavHost(
     var selectionActive by remember { mutableStateOf(false) }
     // The Pictures viewer is a layer inside the home screen, so the bar has to be told when it is open.
     var homeViewerOpen by remember { mutableStateOf(false) }
-    val showBottomBar = !selectionActive && !homeViewerOpen && currentDestination?.hasRoute<HomeRoute>() == true
-    // Which tab is showing; kept here so it survives opening the viewer and other screens.
-    val homePager = rememberPagerState { homeTabs.size }
-    // The Menu: a sidebar over the Albums tab, opened by a finger-left swipe or its button.
-    val sidebar = rememberMenuSidebarState()
+    // Which tab is showing; kept here so it survives opening the viewer and other screens. Settings is a third page
+    // past Albums (a swipe left from Albums), with no button in the bar.
+    val homePager = rememberPagerState { HOME_PAGE_COUNT }
+    val showBottomBar = !selectionActive && !homeViewerOpen && currentDestination?.hasRoute<HomeRoute>() == true &&
+        homePager.settledPage != SETTINGS_PAGE
 
     // Content of top-level screens gets a constant bottom inset instead of Scaffold's, so the
     // grid does not resize when the bar disappears while the viewer opens.
@@ -149,12 +147,7 @@ fun GalleryNavHost(
                         HomePager(
                             state = homePager,
                             userScrollEnabled = !selectionActive,
-                            // On Albums (settled, not selecting) a finger-left swipe pulls the Menu sidebar in.
-                            modifier = Modifier
-                                .hazeSource(navHaze)
-                                .sidebarDrag(sidebar, opening = true) {
-                                    homePager.currentPage == ALBUMS_PAGE && homePager.currentPageOffsetFraction == 0f && !selectionActive
-                                },
+                            modifier = Modifier.hazeSource(navHaze),
                         ) { page ->
                             when (page) {
                                 0 -> TimelineScreen(
@@ -163,22 +156,30 @@ fun GalleryNavHost(
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
                                 )
-                                else -> AlbumsScreen(
+                                ALBUMS_PAGE -> AlbumsScreen(
                                     onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
                                     // The hidden way in: push up past the last album and hold for 1.2 seconds.
                                     onOpenLocked = { navController.navigate(VaultRoute) },
                                     onOpenSearch = { navController.navigate(SearchRoute) },
                                     onCreateAlbum = { name -> navController.navigate(NewAlbumRoute(name)) },
                                     onEditAlbums = { navController.navigate(EditAlbumsRoute) },
-                                    onOpenMenu = sidebar::open,
+                                    onOpenFavorites = { navController.navigate(FavoritesRoute) },
+                                    onOpenVideos = { navController.navigate(VideosRoute) },
+                                    onOpenTrash = { navController.navigate(TrashRoute) },
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
                                 )
+                                // Settings: swipe left from Albums. Its Back arrow slides back to Albums.
+                                else -> SettingsScreen(
+                                    onBack = { scope.launch { homePager.animateScrollToPage(ALBUMS_PAGE, animationSpec = TabTapSpec) } },
+                                    onOpenLocked = { navController.navigate(VaultRoute) },
+                                )
                             }
                         }
-                        // Back from Albums slides to Pictures first (the open sidebar closes before that, see MenuSidebar).
+                        // Back from Settings slides to Albums, from Albums to Pictures.
                         BackHandler(enabled = homePager.currentPage != 0 && !selectionActive) {
-                            scope.launch { homePager.animateScrollToPage(0, animationSpec = TabTapSpec) }
+                            val back = if (homePager.currentPage == SETTINGS_PAGE) ALBUMS_PAGE else 0
+                            scope.launch { homePager.animateScrollToPage(back, animationSpec = TabTapSpec) }
                         }
                     }
                     topLevel<SearchRoute>(navController) { host ->
@@ -186,9 +187,6 @@ fun GalleryNavHost(
                             onBack = { navController.popBackStack() },
                             onOpenMedia = { item, query -> openViewer(host, item, ViewerRoute(item.id, searchQuery = query)) },
                         )
-                    }
-                    topLevel<SettingsRoute>(navController) {
-                        SettingsScreen(onBack = { navController.popBackStack() }, onOpenLocked = { navController.navigate(VaultRoute) })
                     }
                     composable<NewAlbumRoute> {
                         NewAlbumScreen(onClose = { navController.popBackStack() })
@@ -260,27 +258,14 @@ fun GalleryNavHost(
                 ) {
                     FloatingTabBar(
                         tabs = homeTabs.map { FloatingTab(it.label, it.icon) },
-                        selectedIndex = homePager.targetPage,
-                        position = { homePager.currentPage + homePager.currentPageOffsetFraction },
+                        selectedIndex = homePager.targetPage.coerceAtMost(ALBUMS_PAGE),
+                        position = { (homePager.currentPage + homePager.currentPageOffsetFraction).coerceAtMost(ALBUMS_PAGE.toFloat()) },
                         onSelect = { index -> scope.launch { homePager.animateScrollToPage(index, animationSpec = TabTapSpec) } },
                         haze = navHaze,
-                        modifier = Modifier.dragsPager(homePager, scope),
-                    )
-                }
-                // Over the tab bar too, so the dim covers everything. Only on the home screen: opening a row shuts it at
-                // once, before the new screen fades in.
-                if (currentDestination?.hasRoute<HomeRoute>() == true) {
-                    fun go(route: Any) {
-                        sidebar.closeNow()
-                        navController.navigate(route)
-                    }
-                    MenuSidebar(
-                        state = sidebar,
-                        haze = navHaze,
-                        onOpenFavorites = { go(FavoritesRoute) },
-                        onOpenVideos = { go(VideosRoute) },
-                        onOpenTrash = { go(TrashRoute) },
-                        onOpenSettings = { go(SettingsRoute) },
+                        // Fades out as Settings slides in over Albums.
+                        modifier = Modifier
+                            .graphicsLayer { alpha = 1f - (homePager.currentPage + homePager.currentPageOffsetFraction - ALBUMS_PAGE).coerceIn(0f, 1f) }
+                            .dragsPager(homePager, scope, lastPage = ALBUMS_PAGE),
                     )
                 }
                 UndoBarHost(

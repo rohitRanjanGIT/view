@@ -578,3 +578,11 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   drag the grid could not use (nested scroll, consumes nothing), so scrolling and the stretch are unchanged; lifting
   or moving back down cancels. No tick before the buzz, so nothing hints it exists. Off while selecting or with
   Locked turned off. The old pull-down-and-hold in `ReachDown` is removed.
+- **No Menu at all; Collections under the albums and Settings past Albums** (2026-11-20, user's call, after trying
+  the sidebar; replaces the two Menu sidebar entries above). Favourites, Videos and Trash are tiles at the end of the
+  Albums grid (`CollectionsSection`, a full-width footer item of `AlbumGrid`, two tiles per row, dimmed while
+  selecting albums), like Google Photos' "Other collections" but our own look. Settings is a third page of the home
+  pager (`SETTINGS_PAGE`): a swipe left from Albums brings it in following the finger, with no tab in the bar; the
+  bar fades out as it comes in and hides once it settles, and dragging the bar stops at Albums (`dragsPager`
+  `lastPage`). Back (or Settings' own arrow) slides back to Albums. `SettingsRoute`, `MenuSidebar` and the ☰ button
+  are gone. Locked's push-past-the-end now starts below the Collections tiles (they are the end of the list).

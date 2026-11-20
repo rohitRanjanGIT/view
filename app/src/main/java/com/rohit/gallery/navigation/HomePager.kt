@@ -35,8 +35,8 @@ val TabTapSpec: AnimationSpec<Float> = spring(dampingRatio = Spring.DampingRatio
 private const val SNAP_THRESHOLD = 0.3f
 
 /**
- * Pictures, Albums and Menu side by side: the page follows the finger and snaps to the nearest tab. All three stay
- * composed, so each keeps its scroll position. A second finger (a pinch to resize the grid) or [userScrollEnabled]
+ * Pictures, Albums and Settings side by side: the page follows the finger and snaps to the nearest one. Neighbours of
+ * the page showing stay composed, so Pictures and Albums keep their scroll positions. A second finger (a pinch to resize the grid) or [userScrollEnabled]
  * false (selecting) keeps the pages still; the grids then get the gesture.
  */
 @Composable
@@ -82,7 +82,7 @@ fun HomePager(
  * Dragging sideways on the bottom bar moves the pages too (they follow the finger), then settles on the next or
  * previous tab once the drag went far enough.
  */
-fun Modifier.dragsPager(state: PagerState, scope: CoroutineScope): Modifier = pointerInput(state) {
+fun Modifier.dragsPager(state: PagerState, scope: CoroutineScope, lastPage: Int = state.pageCount - 1): Modifier = pointerInput(state, lastPage) {
     var startPage = 0
     var total = 0f
     val threshold = 48.dp.toPx()
@@ -96,12 +96,15 @@ fun Modifier.dragsPager(state: PagerState, scope: CoroutineScope): Modifier = po
                 abs(total) < threshold -> startPage
                 total < 0 -> startPage + 1
                 else -> startPage - 1
-            }.coerceIn(0, state.pageCount - 1)
+            }.coerceIn(0, lastPage)
             scope.launch { state.animateScrollToPage(target, animationSpec = TabTapSpec) }
         },
         onDragCancel = { scope.launch { state.animateScrollToPage(state.currentPage, animationSpec = TabTapSpec) } },
         onHorizontalDrag = { change, amount ->
             change.consume()
+            // Never past [lastPage] (Settings has no tab): a drag further left stops there.
+            val atLast = state.currentPage + state.currentPageOffsetFraction >= lastPage
+            if (amount < 0 && atLast) return@detectHorizontalDragGestures
             total += amount
             state.dispatchRawDelta(-amount)
         },

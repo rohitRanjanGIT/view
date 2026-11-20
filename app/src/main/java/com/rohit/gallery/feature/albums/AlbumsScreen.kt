@@ -2,7 +2,6 @@ package com.rohit.gallery.feature.albums
 
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.rohit.gallery.feature.selection.NewAlbumDialog
@@ -40,6 +39,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -123,8 +123,10 @@ fun AlbumsScreen(
     onOpenLocked: () -> Unit,
     onOpenSearch: () -> Unit,
     onCreateAlbum: (name: String) -> Unit,
-    /** Opens the Menu sidebar (Favourites, Videos, Trash, Settings). */
-    onOpenMenu: () -> Unit,
+    // The Collections tiles under the albums.
+    onOpenFavorites: () -> Unit,
+    onOpenVideos: () -> Unit,
+    onOpenTrash: () -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
     contentBottomPadding: Dp,
     modifier: Modifier = Modifier,
@@ -158,7 +160,6 @@ fun AlbumsScreen(
             IconButton(onClick = { naming = true }) { Icon(Icons.Filled.Add, contentDescription = "New album") }
             IconButton(onClick = onOpenSearch) { Icon(Icons.Filled.Search, contentDescription = "Search") }
             AlbumsMenu(current?.sort ?: AlbumSort.Newest, viewModel::setSort, onEditAlbums)
-            IconButton(onClick = onOpenMenu) { Icon(Icons.Filled.Menu, contentDescription = "Menu") }
         }
         if (naming) {
             NewAlbumDialog(
@@ -207,6 +208,14 @@ fun AlbumsScreen(
                                     contentBottomPadding = contentBottomPadding,
                                     onOpenAlbum = onOpenAlbum,
                                     onColumnsChange = viewModel::setColumns,
+                                    footer = {
+                                        CollectionsSection(
+                                            enabled = !selection.isSelecting,
+                                            onOpenFavorites = onOpenFavorites,
+                                            onOpenVideos = onOpenVideos,
+                                            onOpenTrash = onOpenTrash,
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -243,6 +252,8 @@ internal fun AlbumGrid(
     contentBottomPadding: Dp,
     onOpenAlbum: (Album) -> Unit,
     onColumnsChange: (Int) -> Unit,
+    /** Shown after the last album, across the whole width (Favourites, Videos, Trash). */
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val gridState = rememberLazyGridState()
     val density = LocalDensity.current
@@ -288,7 +299,8 @@ internal fun AlbumGrid(
     /** The album nearest to [position]; its picture's centre, in the grid's own coordinates. */
     fun anchorAt(position: Offset): ZoomAnchorCell? {
         val info = gridState.layoutInfo
-        val cell = info.visibleItemsInfo.minByOrNull {
+        // Albums only: the footer after them is no anchor.
+        val cell = info.visibleItemsInfo.filter { it.index < currentList.size }.minByOrNull {
             val centreY = it.offset.y - info.viewportStartOffset + it.size.width / 2f
             kotlin.math.abs(centreY - position.y) * 4 + kotlin.math.abs(it.offset.x + it.size.width / 2f - position.x)
         } ?: return null
@@ -355,6 +367,7 @@ internal fun AlbumGrid(
                     modifier = Modifier.animateItem(placementSpec = if (columnsChanged) null else CardPlacement),
                 )
             }
+            if (footer != null) item(key = "collections", span = { GridItemSpan(maxLineSpan) }, contentType = "collections") { footer() }
         }
         ZoomOverlay(zoom)
     }
