@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -39,12 +37,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.model.Album
 import com.rohit.gallery.core.ui.theme.GalleryMotion
@@ -58,7 +58,7 @@ private val CoverShape = RoundedCornerShape(12.dp)
 
 /**
  * Inside an album: a swipe left on the grid ([content]) slides in a narrow strip of album covers from the right,
- * pushing the grid over (still visible and usable) rather than covering it. Tapping a cover switches album
+ * shrinking the grid beside it (every column still visible and usable) rather than covering it. Tapping a cover switches album
  * ([onPick]) and leaves the strip open, to flick through albums; swiping right or Back closes it. With the strip
  * closed, a swipe right is the screen's own back gesture (see swipeBack); [onOpenChange] tells the screen which. The screen edges stay
  * the system back gesture: the grid only scrolls up and down, so a sideways swipe in the middle is free.
@@ -115,8 +115,6 @@ fun AlbumSwitcherDrawer(
     BackHandler(enabled = open) { settleTo(0f) }
     val latestOnOpenChange by rememberUpdatedState(onOpenChange)
     LaunchedEffect(open) { latestOnOpenChange(open) }
-    // One lambda for good (it reads the live offset), so providing it never recomposes the grid.
-    val pushedAside = remember { { offset } }
 
     val shown by remember { derivedStateOf { offset > 0.5f } }
     Box(
@@ -137,10 +135,25 @@ fun AlbumSwitcherDrawer(
                 },
             ),
     ) {
-        Box(Modifier.fillMaxSize().offset { IntOffset(-offset.roundToInt(), 0) }) {
-            // Tells pull-down-to-reach how much of the grid is pushed off screen (it centres its title in the rest).
-            CompositionLocalProvider(LocalPushedAside provides pushedAside) { content() }
-        }
+        // The grid shrinks into the space left of the strip, so every column stays in view: it is scaled down to the
+        // free width and laid out that much taller, so the smaller grid still reaches the bottom (more rows show).
+        // Read in layout / placement only, so following the finger never recomposes the grid.
+        Box(
+            Modifier.fillMaxSize().layout { measurable, constraints ->
+                val width = constraints.maxWidth
+                val height = constraints.maxHeight
+                val scale = if (width == 0) 1f else ((width - offset.coerceIn(0f, width * 0.5f)) / width)
+                val tallHeight = (height / scale).roundToInt()
+                val placeable = measurable.measure(Constraints.fixed(width, tallHeight))
+                layout(width, height) {
+                    placeable.placeWithLayer(0, 0) {
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    }
+                }
+            },
+        ) { content() }
         if (shown) {
             AlbumStrip(
                 albums = albums,

@@ -607,3 +607,9 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   (`BackCardEasing`), while it slides with the finger (linear); the screen underneath grows from 95 % to full size.
   NavHost `predictivePopExit/EnterTransition` (seeked by the gesture, `BACK_MS` = 320) plus `backCard`, which rounds
   the corners from the destination's own enter/exit transition in the graphics layer (no recomposition).
+
+## Album strip shrinks the grid (2026-11-20)
+With the album strip open, the grid is no longer pushed partly off screen: it is scaled down to the width left of the
+strip and laid out taller by the same factor, so all columns show and it still fills the height (more rows). Done in a
+`layout` modifier + `placeWithLayer` scale, so dragging the strip never recomposes the grid. `LocalPushedAside` is no
+longer provided (stays 0).
