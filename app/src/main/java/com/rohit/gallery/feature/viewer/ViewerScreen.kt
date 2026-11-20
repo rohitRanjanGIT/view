@@ -53,15 +53,16 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.snapshotFlow
 import me.saket.telephoto.zoomable.rememberZoomableImageState
-import me.saket.telephoto.zoomable.ZoomableImageState
+import me.saket.telephoto.zoomable.ZoomableState
+import me.saket.telephoto.zoomable.ZoomableContentLocation
+import me.saket.telephoto.zoomable.rememberZoomableState
+import me.saket.telephoto.zoomable.zoomable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
@@ -286,8 +287,6 @@ private fun ViewerContent(
     // 0..1 while the system back gesture is in progress (see PredictiveBackHandler below).
     var backShrink by remember { mutableFloatStateOf(0f) }
     var zoomed by remember { mutableStateOf(false) }
-    // Videos do not zoom; make sure a previous photo's zoom state cannot block the dismiss gesture.
-    LaunchedEffect(currentItem.isVideo) { if (currentItem.isVideo) zoomed = false }
     val dismissDistancePx = with(LocalDensity.current) { DismissDistance.toPx() }
     val flickBackPx = with(LocalDensity.current) { FlickBackVelocity.toPx() }
     // Plain holder (not state): per-gesture bookkeeping that must not trigger recomposition.
@@ -376,14 +375,14 @@ private fun ViewerContent(
 
     // Closing while zoomed in: animate the zoom out first, then close, so the flight back to the grid
     // starts from the fitted photo instead of jumping to it. Plain holder: set by the current image page.
-    val currentZoom = remember { object { var state: ZoomableImageState? = null; var closing = false } }
+    val currentZoom = remember { object { var state: ZoomableState? = null; var closing = false } }
     fun close() {
         if (currentZoom.closing) return
         val zoomState = currentZoom.state
         if (zoomed && zoomState != null) {
             currentZoom.closing = true
             scope.launch {
-                runCatching { zoomState.zoomableState.resetZoom(tween(ZOOM_OUT_MS)) }
+                runCatching { zoomState.resetZoom(tween(ZOOM_OUT_MS)) }
                 onBack()
             }
         } else {
@@ -733,7 +732,7 @@ private fun ImagePage(
     dragLayer: (GraphicsLayerScope.(Float) -> Unit)?,
     flightPlacement: (() -> FlightPlacement)?,
     onZoomedChange: (Boolean) -> Unit,
-    onZoomState: (ZoomableImageState?) -> Unit,
+    onZoomState: (ZoomableState?) -> Unit,
     onTap: () -> Unit,
     animateGif: Boolean = false,
     motionClip: (@Composable (Modifier) -> Unit)? = null,
@@ -768,7 +767,7 @@ private fun ImagePage(
             snapshotFlow { (zoomState.zoomableState.zoomFraction ?: 0f) > 0.02f }.collect(onZoomedChange)
         }
         DisposableEffect(zoomState) {
-            onZoomState(zoomState)
+            onZoomState(zoomState.zoomableState)
             onDispose { onZoomState(null) }
         }
     }
@@ -845,13 +844,13 @@ private fun ViewerPage(
     dragLayer: (GraphicsLayerScope.(Float) -> Unit)?,
     flightPlacement: (() -> FlightPlacement)?,
     onZoomedChange: (Boolean) -> Unit,
-    onZoomState: (ZoomableImageState?) -> Unit,
+    onZoomState: (ZoomableState?) -> Unit,
     onTap: () -> Unit,
     animateGif: Boolean,
     motionClip: (@Composable (Modifier) -> Unit)?,
 ) {
     if (item.isVideo) {
-        VideoPage(item, isCurrent, playback, dragLayer, flightPlacement, onTap)
+        VideoPage(item, isCurrent, playback, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap)
     } else {
         ImagePage(item, isCurrent, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap, animateGif, motionClip)
     }
@@ -869,11 +868,32 @@ private fun VideoPage(
     playback: PlaybackState?,
     dragLayer: (GraphicsLayerScope.(Float) -> Unit)?,
     flightPlacement: (() -> FlightPlacement)?,
+    onZoomedChange: (Boolean) -> Unit,
+    onZoomState: (ZoomableState?) -> Unit,
     onTap: () -> Unit,
 ) {
     val thumbnail = rememberThumbnail(item)
     val transitionActive = rememberSharedTransitionActive()
     val flightEnabled = isCurrent
+    // Pinch, double-tap and pan zoom like a photo (the frame keeps playing). The video's fitted frame is the content,
+    // so it zooms around the picture rather than the black bars.
+    val zoomState = rememberZoomableState()
+    val aspect = contentAspect(item, thumbnail)
+    LaunchedEffect(zoomState, aspect) {
+        zoomState.setContentLocation(
+            if (aspect > 0f) ZoomableContentLocation.scaledInsideAndCenterAligned(Size(aspect * 1000f, 1000f))
+            else ZoomableContentLocation.SameAsLayoutBounds,
+        )
+    }
+    if (isCurrent) {
+        LaunchedEffect(zoomState) {
+            snapshotFlow { (zoomState.zoomFraction ?: 0f) > 0.02f }.collect(onZoomedChange)
+        }
+        DisposableEffect(zoomState) {
+            onZoomState(zoomState)
+            onDispose { onZoomState(null) }
+        }
+    }
     val shutter: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             thumbnail?.let {
@@ -887,8 +907,8 @@ private fun VideoPage(
         Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f }
-            .then(if (dragLayer != null) Modifier.graphicsLayer { dragLayer(contentAspect(item, thumbnail)) } else Modifier)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTap() },
+            .then(if (dragLayer != null) Modifier.graphicsLayer { dragLayer(aspect) } else Modifier)
+            .zoomable(zoomState, onClick = { onTap() }),
     ) {
         if (playback != null) {
             // TextureView (not SurfaceView) so the drag-to-dismiss scale, rounding and fade apply to the video.

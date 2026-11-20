@@ -613,3 +613,9 @@ With the album strip open, the grid is no longer pushed partly off screen: it is
 strip and laid out taller by the same factor, so all columns show and it still fills the height (more rows). Done in a
 `layout` modifier + `placeWithLayer` scale, so dragging the strip never recomposes the grid. `LocalPushedAside` is no
 longer provided (stays 0).
+
+## Videos zoom like photos (2026-11-20)
+Video pages use Telephoto's general `Modifier.zoomable` (photos use `ZoomableAsyncImage`, the same engine) on the
+TextureView frame, with the fitted video frame as the content location, so pinch, double-tap zoom and pan behave as for
+photos while it keeps playing. The viewer's zoom holder is now a plain `ZoomableState` (zoomed blocks dismiss / back,
+closing zooms out first) for both page kinds. Tap still toggles the chrome (it waits for the double-tap timeout, as on photos).
