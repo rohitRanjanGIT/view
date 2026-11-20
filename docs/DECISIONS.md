@@ -639,3 +639,15 @@ outside its own bounds (`navigation/BackStack.kt`, draw phase only; it is on top
 `swipeBack` keeps seeking with a spring started at the finger's speed (`GalleryMotion.fluid(0.3)`), then completes or
 cancels the back, so the motion never switches to the transition's fixed tween. Direction decides via projection; a
 flick back left always keeps the screen. Replaces the "card shrinks" back card.
+
+## Filmstrip as a video timeline (2026-11-20)
+The filmstrip is now one custom `Layout` (no LazyRow): every item sits on one line and a single number says which point
+is under the centre (the pager's position, blended to the video's playhead while open, or the finger's while dragging /
+gliding). Only items near the screen are composed (`derivedStateOf` range); positions, sizes and the size step are applied
+in layout / placement layers, so moving never recomposes. Tapping the current video's thumbnail opens it from the centre
+into its frames (`VideoFrameStore`: `MediaMetadataRetriever.getScaledFrameAtTime`, nearest the playhead first, last 3
+videos kept); the centre line is then the playhead. A drag that starts inside an open video is walled in: past its ends it
+rubber-bands (one buzz) and a flick ends on the first / last frame at most; leaving is by swiping the big picture or
+tapping it closed (user's call: strip swipes past the video felt too easy). Scrubbing pauses, seeks with
+`SeekParameters.CLOSEST_SYNC`, then lands with an exact seek and resumes. Play / time / mute stay in a row above the
+strip for any video (`VideoControlsRow`); the old Slider controls are gone. Videos get a small play badge in the strip.

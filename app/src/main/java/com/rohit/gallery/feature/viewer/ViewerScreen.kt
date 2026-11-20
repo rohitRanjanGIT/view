@@ -692,9 +692,6 @@ private fun ViewerContent(
                 exit = fadeOut(tween(GalleryMotion.FADE_MS)),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    if (playback != null) {
-                        VideoControls(playback, onToggleMute = { muted = !muted })
-                    }
                     if (playable) {
                         PlayPill(
                             playing = playing,
@@ -702,22 +699,23 @@ private fun ViewerContent(
                             modifier = Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally),
                         )
                     }
+                    // A video: play, time and mute above the filmstrip; tapping its thumbnail there opens its frames timeline.
+                    if (playback != null) VideoControlsRow(playback, onToggleMute = { muted = !muted })
                     ViewerFilmstrip(
                         items = items,
                         pagerState = pagerState,
+                        playback = playback,
                         onScrub = { scrubIndex = it },
                         onSelect = { index, animated ->
-                            scope.launch {
-                                when {
-                                    index == pagerState.currentPage -> Unit
-                                    // A tap on a thumbnail: the photo slides over, and the strip glides with it.
-                                    animated -> pagerState.animateScrollToPage(index, animationSpec = GalleryMotion.fluid(response = 0.25f))
-                                    else -> pagerState.scrollToPage(index)
-                                }
-                                // Keep the stand-in up until the photo's page has drawn, so nothing flashes.
-                                withFrameNanos { }
-                                scrubIndex = null
+                            when {
+                                index == pagerState.currentPage -> Unit
+                                // A tap on a thumbnail: the photo slides over, and the strip glides with it.
+                                animated -> pagerState.animateScrollToPage(index, animationSpec = GalleryMotion.fluid(response = 0.25f))
+                                else -> pagerState.scrollToPage(index)
                             }
+                            // Keep the stand-in up until the photo's page has drawn, so nothing flashes.
+                            withFrameNanos { }
+                            scrubIndex = null
                         },
                     )
                 }
