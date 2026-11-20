@@ -53,7 +53,7 @@ private const val MAX_FRAMES = 80
 internal fun frameCountFor(durationMs: Long): Int =
     if (durationMs <= 0) MIN_FRAMES else (durationMs / MS_PER_FRAME).toInt().coerceIn(MIN_FRAMES, MAX_FRAMES)
 
-/** Play / pause, elapsed and remaining time, and mute, above the filmstrip while a video is on screen. */
+/** Play / pause, elapsed and remaining time, speed and mute, above the filmstrip while a video is on screen. */
 @Composable
 fun VideoControlsRow(playback: PlaybackState, onToggleMute: () -> Unit, modifier: Modifier = Modifier) {
     val duration = playback.durationMs
@@ -73,6 +73,7 @@ fun VideoControlsRow(playback: PlaybackState, onToggleMute: () -> Unit, modifier
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.8f),
         )
+        VideoSpeedChip(playback, Modifier.padding(start = 6.dp))
         IconButton(onClick = onToggleMute) {
             Icon(
                 imageVector = if (playback.isMuted) PlayerIcons.VolumeOff else PlayerIcons.VolumeUp,
