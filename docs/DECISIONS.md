@@ -619,3 +619,13 @@ Video pages use Telephoto's general `Modifier.zoomable` (photos use `ZoomableAsy
 TextureView frame, with the fitted video frame as the content location, so pinch, double-tap zoom and pan behave as for
 photos while it keeps playing. The viewer's zoom holder is now a plain `ZoomableState` (zoomed blocks dismiss / back,
 closing zooms out first) for both page kinds. Tap still toggles the chrome (it waits for the double-tap timeout, as on photos).
+
+## Filmstrip: strip leads while scrubbed, size step (2026-11-20)
+Measured before: scrubbing the strip ran at ~10 fps (median frame 105 ms, debug), all main-thread work: each thumbnail
+crossing the centre jumped the pager (three pages rebuilt, full-size decodes, a new player for videos) and every
+thumbnail recomposed for the border. Now, while the strip is dragged or gliding, only the strip moves; the big photo shows
+the centred item's cached thumbnail (`ScrubPreview`) and the pager jumps once, when the strip rests (stand-in kept one
+more frame). Otherwise the strip follows `currentPage + currentPageOffsetFraction` continuously. The fling projects the
+flick (`GalleryMotion.project`) and lands with a spring (response 0.25 s) started at the finger's speed. The centred
+thumbnail and two on each side are drawn bigger (22 / 12 / 5 %, blended, pushed apart by the exact integral so they never
+overlap) in the graphics layer only. No border.

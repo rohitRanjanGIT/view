@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.ZoomableContentLocation
@@ -218,6 +219,10 @@ private fun ViewerContent(
     val pagerState = rememberPagerState(initialPage = startIndex) { latestItems.size }
     val currentIndex = pagerState.currentPage.coerceIn(0, items.lastIndex)
     val currentItem = items[currentIndex]
+    // While the filmstrip is scrubbed: the item at its centre. The big photo shows that item's thumbnail and only
+    // opens the full photo when the strip comes to rest (opening each one passed made scrubbing drop frames).
+    var scrubIndex by remember { mutableStateOf<Int?>(null) }
+    val scrubItem = scrubIndex?.takeIf { it != currentIndex }?.let { items.getOrNull(it) }
 
     // Keep the grid's shared-element target in sync with what is on screen, so closing the
     // viewer flies back to the right thumbnail.
@@ -616,6 +621,8 @@ private fun ViewerContent(
                     },
                 )
             }
+            // Scrubbing the filmstrip: the centred item's thumbnail (from memory) stands in for the photo.
+            scrubItem?.let { ScrubPreview(it) }
 
             AnimatedVisibility(
                 visible = chromeVisible,
@@ -624,7 +631,7 @@ private fun ViewerContent(
                 modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart),
             ) {
                 ViewerTopBar(
-                    item = currentItem,
+                    item = scrubItem ?: currentItem,
                     onBack = ::close,
                     menu = viewerMenu(currentItem),
                     modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
@@ -697,8 +704,21 @@ private fun ViewerContent(
                     }
                     ViewerFilmstrip(
                         items = items,
-                        currentIndex = currentIndex,
-                        onSelect = { index -> scope.launch { pagerState.scrollToPage(index) } },
+                        pagerState = pagerState,
+                        onScrub = { scrubIndex = it },
+                        onSelect = { index, animated ->
+                            scope.launch {
+                                when {
+                                    index == pagerState.currentPage -> Unit
+                                    // A tap on a thumbnail: the photo slides over, and the strip glides with it.
+                                    animated -> pagerState.animateScrollToPage(index, animationSpec = GalleryMotion.fluid(response = 0.25f))
+                                    else -> pagerState.scrollToPage(index)
+                                }
+                                // Keep the stand-in up until the photo's page has drawn, so nothing flashes.
+                                withFrameNanos { }
+                                scrubIndex = null
+                            }
+                        },
                     )
                 }
             }
@@ -859,6 +879,17 @@ private fun ViewerPage(
 private val MediaItem.isGif: Boolean get() = mimeType.equals("image/gif", ignoreCase = true)
 
 
+
+/** What the big photo shows while the filmstrip is scrubbed: [item]'s thumbnail, fitted on black. */
+@Composable
+private fun ScrubPreview(item: MediaItem) {
+    val thumbnail = rememberThumbnail(item)
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        thumbnail?.let {
+            Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        }
+    }
+}
 
 /** A video page: the cached thumbnail until the first frame is drawn, then the player surface. */
 @Composable
