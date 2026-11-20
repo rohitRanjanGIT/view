@@ -14,8 +14,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import com.rohit.gallery.core.ui.theme.GalleryMotion
@@ -132,14 +130,14 @@ fun GalleryNavHost(
                     // Opened by another app: only the viewer, no permission gate or timeline underneath.
                     startDestination = externalStart ?: HomeRoute,
                     modifier = Modifier.fillMaxSize(),
-                    // Back gesture: the screen slides away with the finger (towards the side it was swiped from)
-                    // while the one underneath stays still. The viewer handles its own back gesture (see ViewerScreen).
-                    // The screen shrinks into a card early in the swipe and slides with the finger; the one underneath grows
-                    // back to full size (see BackCard). The transitions are seeked by the gesture, so their easing sets the shape.
-                    predictivePopEnterTransition = { scaleIn(tween(BACK_MS, easing = LinearEasing), initialScale = 0.95f) },
+                    // Back gesture, iOS-style stack: the screen slides off with the finger at full size (towards the side it
+                    // was swiped from), while the one underneath slides in from a third of the way over, brightening (see
+                    // BackStack). Both are linear, so the screen stays exactly under the finger. The viewer has its own.
+                    predictivePopEnterTransition = { swipeEdge ->
+                        slideInHorizontally(tween(BACK_MS, easing = LinearEasing)) { width -> if (swipeEdge == BackEventCompat.EDGE_LEFT) -width / 3 else width / 3 }
+                    },
                     predictivePopExitTransition = { swipeEdge ->
-                        slideOutHorizontally(tween(BACK_MS, easing = LinearEasing)) { width -> if (swipeEdge == BackEventCompat.EDGE_LEFT) width else -width } +
-                            scaleOut(tween(BACK_MS, easing = BackCardEasing), targetScale = 0.9f)
+                        slideOutHorizontally(tween(BACK_MS, easing = LinearEasing)) { width -> if (swipeEdge == BackEventCompat.EDGE_LEFT) width else -width }
                     },
                 ) {
                     topLevel<HomeRoute>(navController) { host ->
@@ -196,7 +194,7 @@ fun GalleryNavHost(
                         enterTransition = { slideInHorizontally(tween(GalleryMotion.FADE_MS * 2)) { it } },
                         popExitTransition = { slideOutHorizontally(tween(GalleryMotion.FADE_MS * 2)) { it } },
                     ) {
-                        Box(Modifier.fillMaxSize().backCard(this@composable).background(MaterialTheme.colorScheme.background)) {
+                        Box(Modifier.fillMaxSize().backStack(this@composable).background(MaterialTheme.colorScheme.background)) {
                             SettingsScreen(onBack = { navController.popBackStack() }, onOpenLocked = { navController.navigate(VaultRoute) })
                         }
                     }
@@ -304,7 +302,7 @@ private inline fun <reified T : Any> androidx.navigation.NavGraphBuilder.topLeve
         val host = rememberViewerHost()
         CompositionLocalProvider(LocalSharedPhoto provides host) {
             // Opaque, so a screen sliding away during the back gesture never shows the one beneath through it.
-            Box(Modifier.fillMaxSize().backCard(this@composable).background(MaterialTheme.colorScheme.background)) {
+            Box(Modifier.fillMaxSize().backStack(this@composable).background(MaterialTheme.colorScheme.background)) {
                 content(host)
                 ViewerOverlay(
                     host = host,

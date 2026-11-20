@@ -629,3 +629,13 @@ more frame). Otherwise the strip follows `currentPage + currentPageOffsetFractio
 flick (`GalleryMotion.project`) and lands with a spring (response 0.25 s) started at the finger's speed. The centred
 thumbnail and two on each side are drawn bigger (22 / 12 / 5 %, blended, pushed apart by the exact integral so they never
 overlap) in the graphics layer only. No border.
+
+## Back swipe: iOS stack (2026-11-20)
+Measured before: the back swipe dropped 1-3 frames at a time several times per swipe, with 10-15 ms of render-thread
+work per frame early on (two full screens scaled and corner-clipped every frame). Now the predictive transitions are
+pure linear slides: the leaving screen goes off at full size, the one underneath comes in from a third over. The
+shadow on the leaving screen's edge and the dim over the screen underneath are both drawn by the leaving screen just
+outside its own bounds (`navigation/BackStack.kt`, draw phase only; it is on top while it leaves). After the finger lifts,
+`swipeBack` keeps seeking with a spring started at the finger's speed (`GalleryMotion.fluid(0.3)`), then completes or
+cancels the back, so the motion never switches to the transition's fixed tween. Direction decides via projection; a
+flick back left always keeps the screen. Replaces the "card shrinks" back card.
