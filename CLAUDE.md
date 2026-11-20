@@ -235,8 +235,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     (2026-11-19, not yet tried on the phone): folder rules, double-tap guard, Stop, name clash, picker order; see
     DECISIONS "Album fixes after a review". Also not yet tried: dates kept through Trash (restore
     writes back the saved date) and Remove album (keep photos); see DECISIONS.
-- **Git:** pushed up to `0ec32f3` (Delete album). Committed after that, not pushed: Albums + / search,
-  New album, + inside an album, this handoff. Push when I say so.
+- **Git:** everything pushed up to `327dd69` (More card) on 2026-11-20. Push only when I say so.
 - **Next (pick with me):**
   1. **Swipe-left menu sidebar** (agreed, not started): on the Albums tab, finger-left swipe slides in a sidebar from
      the right with Favourites, Videos, Trash, Settings, replacing the Menu tab (bottom bar becomes Pictures + Albums).
