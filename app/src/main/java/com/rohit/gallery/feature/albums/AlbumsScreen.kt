@@ -2,6 +2,7 @@ package com.rohit.gallery.feature.albums
 
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.rohit.gallery.feature.selection.NewAlbumDialog
@@ -121,6 +122,8 @@ fun AlbumsScreen(
     onOpenLocked: () -> Unit,
     onOpenSearch: () -> Unit,
     onCreateAlbum: (name: String) -> Unit,
+    /** Opens the Menu sidebar (Favourites, Videos, Trash, Settings). */
+    onOpenMenu: () -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
     contentBottomPadding: Dp,
     modifier: Modifier = Modifier,
@@ -154,6 +157,7 @@ fun AlbumsScreen(
             IconButton(onClick = { naming = true }) { Icon(Icons.Filled.Add, contentDescription = "New album") }
             IconButton(onClick = onOpenSearch) { Icon(Icons.Filled.Search, contentDescription = "Search") }
             AlbumsMenu(current?.sort ?: AlbumSort.Newest, viewModel::setSort, onEditAlbums)
+            IconButton(onClick = onOpenMenu) { Icon(Icons.Filled.Menu, contentDescription = "Menu") }
         }
         if (naming) {
             NewAlbumDialog(

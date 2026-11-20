@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.rohit.gallery.core.ui.icons.GalleryIcons
 import kotlinx.serialization.Serializable
 
-/** The three tabs (Pictures, Albums, Menu), side by side in one pager. */
+/** The two tabs (Pictures, Albums), side by side in one pager; the Menu is a sidebar on Albums. */
 @Serializable data object HomeRoute
 
 /** A bottom-bar tab, in pager order. */
@@ -13,8 +13,10 @@ data class HomeTab(val label: String, val icon: ImageVector)
 val homeTabs: List<HomeTab> = listOf(
     HomeTab("Pictures", GalleryIcons.PicturesTab),
     HomeTab("Albums", GalleryIcons.AlbumsTab),
-    HomeTab("Menu", GalleryIcons.MenuTab),
 )
+
+/** The Albums tab's page; the Menu sidebar opens from there. */
+const val ALBUMS_PAGE = 1
 
 /**
  * Full-screen viewer. [bucketId] limits the pager to one album; null means the whole timeline. [trashed] pages

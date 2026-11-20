@@ -51,16 +51,6 @@ object GalleryIcons {
         }
     }
 
-    /** Menu tab (line icon): four rounded tiles. */
-    val MenuTab: ImageVector by lazy {
-        lineIcon("MenuTab") {
-            roundRect(3.5f, 3.5f, 10.5f, 10.5f, 2.2f)
-            roundRect(13.5f, 3.5f, 20.5f, 10.5f, 2.2f)
-            roundRect(3.5f, 13.5f, 10.5f, 20.5f, 2.2f)
-            roundRect(13.5f, 13.5f, 20.5f, 20.5f, 2.2f)
-        }
-    }
-
     /** Copy to clipboard: a sheet in front of another. */
     val Copy: ImageVector by lazy {
         lineIcon("Copy") {

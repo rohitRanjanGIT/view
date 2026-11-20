@@ -110,7 +110,7 @@ com.rohit.gallery
   even without media permission.
 
 ## 6. UX direction (One UI-inspired, original implementation)
-- Bottom navigation: **Pictures**, **Albums**, **Menu** (Favorites,
+- Bottom navigation: **Pictures**, **Albums**; the **Menu** is a sidebar on Albums (Favorites,
   Trash, Videos, Settings). One-handed reach: key actions in the lower half.
 - Large collapsing title header that shrinks on scroll.
 - Timeline grid grouped by day with sticky date headers; pinch to change
@@ -237,9 +237,9 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     writes back the saved date) and Remove album (keep photos); see DECISIONS.
 - **Git:** everything pushed up to `327dd69` (More card) on 2026-11-20. Push only when I say so.
 - **Next (pick with me):**
-  1. **Swipe-left menu sidebar** (agreed, not started): on the Albums tab, finger-left swipe slides in a sidebar from
-     the right with Favourites, Videos, Trash, Settings, replacing the Menu tab (bottom bar becomes Pictures + Albums).
-     Open questions from me still: exact direction confirmed as finger-left; whether a small icon also opens it.
+  1. **Menu sidebar** (built 2026-11-20, not yet tried by me): the Menu tab is gone (bottom bar: Pictures + Albums).
+     On Albums a finger-left swipe or the ☰ button slides in a frosted panel from the right (Favourites, Videos,
+     Trash, Settings); dim, swipe right or Back closes. `feature/settings/MenuSidebar.kt`.
   2. My screenshot idea: a notification offers Share / Share & delete after a screenshot (answers still pending).
   3. App icon (deferred by me). Then Phase 4 (see Known gaps).
 

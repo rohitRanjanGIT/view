@@ -57,7 +57,9 @@ import com.rohit.gallery.feature.albums.EditAlbumsScreen
 import com.rohit.gallery.feature.albums.NewAlbumScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.search.SearchScreen
-import com.rohit.gallery.feature.settings.MenuScreen
+import com.rohit.gallery.feature.settings.MenuSidebar
+import com.rohit.gallery.feature.settings.rememberMenuSidebarState
+import com.rohit.gallery.feature.settings.sidebarDrag
 import com.rohit.gallery.feature.settings.SettingsScreen
 import com.rohit.gallery.feature.trash.TrashScreen
 import com.rohit.gallery.feature.trash.RestoreRepairEffect
@@ -91,6 +93,8 @@ fun GalleryNavHost(
     val showBottomBar = !selectionActive && !homeViewerOpen && currentDestination?.hasRoute<HomeRoute>() == true
     // Which tab is showing; kept here so it survives opening the viewer and other screens.
     val homePager = rememberPagerState { homeTabs.size }
+    // The Menu: a sidebar over the Albums tab, opened by a finger-left swipe or its button.
+    val sidebar = rememberMenuSidebarState()
 
     // Content of top-level screens gets a constant bottom inset instead of Scaffold's, so the
     // grid does not resize when the bar disappears while the viewer opens.
@@ -145,7 +149,12 @@ fun GalleryNavHost(
                         HomePager(
                             state = homePager,
                             userScrollEnabled = !selectionActive,
-                            modifier = Modifier.hazeSource(navHaze),
+                            // On Albums (settled, not selecting) a finger-left swipe pulls the Menu sidebar in.
+                            modifier = Modifier
+                                .hazeSource(navHaze)
+                                .sidebarDrag(sidebar, opening = true) {
+                                    homePager.currentPage == ALBUMS_PAGE && homePager.currentPageOffsetFraction == 0f && !selectionActive
+                                },
                         ) { page ->
                             when (page) {
                                 0 -> TimelineScreen(
@@ -154,26 +163,20 @@ fun GalleryNavHost(
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
                                 )
-                                1 -> AlbumsScreen(
+                                else -> AlbumsScreen(
                                     onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
                                     // The only way in: pull down on Albums and hold for 2 seconds.
                                     onOpenLocked = { navController.navigate(VaultRoute) },
                                     onOpenSearch = { navController.navigate(SearchRoute) },
                                     onCreateAlbum = { name -> navController.navigate(NewAlbumRoute(name)) },
                                     onEditAlbums = { navController.navigate(EditAlbumsRoute) },
+                                    onOpenMenu = sidebar::open,
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
                                 )
-                                else -> MenuScreen(
-                                    onOpenFavorites = { navController.navigate(FavoritesRoute) },
-                                    onOpenVideos = { navController.navigate(VideosRoute) },
-                                    onOpenTrash = { navController.navigate(TrashRoute) },
-                                    onOpenSettings = { navController.navigate(SettingsRoute) },
-                                    modifier = Modifier.padding(bottom = contentBottomPadding),
-                                )
                             }
                         }
-                        // Back from Albums or Menu slides to Pictures first, like before.
+                        // Back from Albums slides to Pictures first (the open sidebar closes before that, see MenuSidebar).
                         BackHandler(enabled = homePager.currentPage != 0 && !selectionActive) {
                             scope.launch { homePager.animateScrollToPage(0, animationSpec = TabTapSpec) }
                         }
@@ -262,6 +265,22 @@ fun GalleryNavHost(
                         onSelect = { index -> scope.launch { homePager.animateScrollToPage(index, animationSpec = TabTapSpec) } },
                         haze = navHaze,
                         modifier = Modifier.dragsPager(homePager, scope),
+                    )
+                }
+                // Over the tab bar too, so the dim covers everything. Only on the home screen: opening a row shuts it at
+                // once, before the new screen fades in.
+                if (currentDestination?.hasRoute<HomeRoute>() == true) {
+                    fun go(route: Any) {
+                        sidebar.closeNow()
+                        navController.navigate(route)
+                    }
+                    MenuSidebar(
+                        state = sidebar,
+                        haze = navHaze,
+                        onOpenFavorites = { go(FavoritesRoute) },
+                        onOpenVideos = { go(VideosRoute) },
+                        onOpenTrash = { go(TrashRoute) },
+                        onOpenSettings = { go(SettingsRoute) },
                     )
                 }
                 UndoBarHost(
