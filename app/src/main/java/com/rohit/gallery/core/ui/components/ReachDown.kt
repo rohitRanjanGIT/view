@@ -68,7 +68,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * How far (px) something like the album strip has pushed the content aside, off the right edge. Pull-down-to-reach
+ * How far (px) something like the album strip has pushed the content aside, off the left edge (the strip comes in from
+ * the right, so what stays on screen is the content's right part). Pull-down-to-reach
  * centres its title and keeps its icons within what is left on screen. (Not the window position: tab pages sliding
  * in are partly off screen too, and must not re-centre.)
  */
@@ -111,6 +112,9 @@ class ReachState internal constructor(expanded: Boolean) {
 
     /** How much of an area [width] px wide is on screen: less while the album strip pushes it aside. */
     internal fun visibleWidth(width: Float): Float = (width - pushedAside()).coerceIn(0f, width)
+
+    /** Where the on-screen part of the area starts, from its left: what the strip pushed off the left edge. */
+    internal fun visibleStart(width: Float): Float = pushedAside().coerceIn(0f, width)
 
     /**
      * Where the screen's top bar shows the title ([ReachBarTitle]), on screen, and its font size in px; null when the
@@ -346,7 +350,7 @@ private fun ReachTitle(title: String?, subtitle: String?, state: ReachState, top
                     .graphicsLayer {
                         transformOrigin = TransformOrigin(0f, 0f)
                         val p = state.progress
-                        val expandedX = (state.visibleWidth(widthPx) - titleSize.width) / 2
+                        val expandedX = state.visibleStart(widthPx) + (state.visibleWidth(widthPx) - titleSize.width) / 2
                         val expandedY = groupTop(state.offset)
                         val bar = state.barTitle
                         val area = state.area
@@ -389,7 +393,7 @@ private fun ReachTitle(title: String?, subtitle: String?, state: ReachState, top
                     .onSizeChanged { subtitleSize = it }
                     .graphicsLayer {
                         alpha = ((state.progress - 0.5f) / 0.5f).coerceIn(0f, 1f)
-                        translationX = (state.visibleWidth(widthPx) - subtitleSize.width) / 2
+                        translationX = state.visibleStart(widthPx) + (state.visibleWidth(widthPx) - subtitleSize.width) / 2
                         translationY = groupTop(state.offset) + if (title != null) titleSize.height + gapPx else 0f
                     },
             )
@@ -433,12 +437,14 @@ private fun ReachActions(state: ReachState, topInset: Dp, actions: @Composable R
     val rowPx = with(density) { ActionsRowHeight.toPx() }
     Row(
         Modifier
-            // Only as wide as the part of the area on screen, so the icons stay at the screen's right edge even
+            // Only as wide as the part of the area on screen, and placed over it, so the icons stay within the screen
             // while the album strip pushes this area partly off it. Read at layout time: no recomposition.
             .layout { measurable, constraints ->
-                val width = state.visibleWidth(constraints.maxWidth.toFloat()).roundToInt().coerceAtLeast(0)
+                val full = constraints.maxWidth.toFloat()
+                val width = state.visibleWidth(full).roundToInt().coerceAtLeast(0)
+                val start = state.visibleStart(full).roundToInt()
                 val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
-                layout(constraints.maxWidth, placeable.height) { placeable.place(0, 0) }
+                layout(constraints.maxWidth, placeable.height) { placeable.place(start, 0) }
             }
             .height(ActionsRowHeight)
             .padding(end = 8.dp)

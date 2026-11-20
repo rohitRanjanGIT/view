@@ -32,8 +32,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -55,9 +57,10 @@ private const val STRIP_FRACTION = 0.26f
 private val CoverShape = RoundedCornerShape(12.dp)
 
 /**
- * Inside an album: a sideways swipe on the grid ([content]) slides in a narrow strip of album covers from the left,
+ * Inside an album: a swipe left on the grid ([content]) slides in a narrow strip of album covers from the right,
  * pushing the grid over (still visible and usable) rather than covering it. Tapping a cover switches album
- * ([onPick]) and leaves the strip open, to flick through albums; swiping left or Back closes it. The screen edges stay
+ * ([onPick]) and leaves the strip open, to flick through albums; swiping right or Back closes it. With the strip
+ * closed, a swipe right is the screen's own back gesture (see swipeBack); [onOpenChange] tells the screen which. The screen edges stay
  * the system back gesture: the grid only scrolls up and down, so a sideways swipe in the middle is free.
  *
  * The strip follows the finger 1:1, and on release goes where the gesture's momentum points ([GalleryMotion.project]),
@@ -69,6 +72,7 @@ fun AlbumSwitcherDrawer(
     currentId: Long?,
     enabled: Boolean,
     onPick: (Album) -> Unit,
+    onOpenChange: (Boolean) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -97,8 +101,9 @@ fun AlbumSwitcherDrawer(
         }
     }
 
+    // The finger moving left (negative delta) pulls the strip out.
     val dragState = rememberDraggableState { delta ->
-        val next = offset + delta
+        val next = offset - delta
         // Past fully open it resists (rubber band) instead of stopping dead.
         offset = when {
             next < 0f -> 0f
@@ -108,6 +113,8 @@ fun AlbumSwitcherDrawer(
     }
 
     BackHandler(enabled = open) { settleTo(0f) }
+    val latestOnOpenChange by rememberUpdatedState(onOpenChange)
+    LaunchedEffect(open) { latestOnOpenChange(open) }
     // One lambda for good (it reads the live offset), so providing it never recomposes the grid.
     val pushedAside = remember { { offset } }
 
@@ -124,12 +131,13 @@ fun AlbumSwitcherDrawer(
                 startDragImmediately = settling,
                 onDragStarted = { settle.job?.cancel() },
                 onDragStopped = { velocity ->
-                    val projected = offset + GalleryMotion.project(velocity)
-                    settleTo(if (projected > widthPx / 2) widthPx else 0f, velocity)
+                    // In the strip's terms: a flick left (negative) opens.
+                    val projected = offset + GalleryMotion.project(-velocity)
+                    settleTo(if (projected > widthPx / 2) widthPx else 0f, -velocity)
                 },
             ),
     ) {
-        Box(Modifier.fillMaxSize().offset { IntOffset(offset.roundToInt(), 0) }) {
+        Box(Modifier.fillMaxSize().offset { IntOffset(-offset.roundToInt(), 0) }) {
             // Tells pull-down-to-reach how much of the grid is pushed off screen (it centres its title in the rest).
             CompositionLocalProvider(LocalPushedAside provides pushedAside) { content() }
         }
@@ -139,9 +147,10 @@ fun AlbumSwitcherDrawer(
                 currentId = currentId,
                 onPick = onPick,
                 modifier = Modifier
+                    .align(Alignment.TopEnd)
                     .width(stripWidth)
                     .fillMaxHeight()
-                    .graphicsLayer { translationX = offset - widthPx },
+                    .graphicsLayer { translationX = widthPx - offset },
             )
         }
     }
@@ -159,7 +168,7 @@ private fun AlbumStrip(albums: List<Album>, currentId: Long?, onPick: (Album) ->
     val coverPx = with(LocalDensity.current) { 96.dp.roundToPx() }
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(start = 10.dp, end = 6.dp, top = 8.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 6.dp, end = 10.dp, top = 8.dp, bottom = 96.dp),
         modifier = modifier.background(MaterialTheme.colorScheme.background),
     ) {
         items(albums, key = { it.bucketId }) { album ->

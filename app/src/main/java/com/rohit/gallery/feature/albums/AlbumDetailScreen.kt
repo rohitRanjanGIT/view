@@ -44,6 +44,8 @@ fun AlbumDetailScreen(
     // Remove album: the album goes, its photos stay (moved back where they came from); then back to Albums.
     val remover = rememberAlbumRemover(onRemoved = onBack)
     val title = items?.firstOrNull()?.bucketName?.ifBlank { null } ?: "Album"
+    // Swipe right goes back (iOS-style) unless the album strip is out: then it closes the strip.
+    var stripOpen by remember { mutableStateOf(false) }
     MediaListScreen(
         title = title,
         emptyText = "This album is empty",
@@ -69,13 +71,15 @@ fun AlbumDetailScreen(
             )
         },
         contentKey = bucketId,
-        // Swipe sideways on the grid: a strip of albums slides in beside it, below the title bar.
+        swipeBack = !stripOpen,
+        // Swipe left on the grid: a strip of albums slides in from the right, below the title bar.
         gridWrapper = { grid ->
             AlbumSwitcherDrawer(
                 albums = albums,
                 currentId = bucketId,
                 enabled = !viewModel.selection.isSelecting,
                 onPick = { viewModel.switchTo(it.bucketId) },
+                onOpenChange = { stripOpen = it },
                 content = grid,
             )
         },

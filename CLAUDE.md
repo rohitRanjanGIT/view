@@ -221,8 +221,8 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     down to status bar + 30% of the screen and stays until pushed up (also from the empty space above it). One title
     glides between the centre and the top bar (`ReachBarTitle`); the bar's icons (search, +, ⋮; not Back) ride down
     above the grid (`ReachTopIcons`). Pictures: search sits on the "Today" line.
-  - **Album switcher strip** (`AlbumSwitcher.kt`): in an album (and a locked album), swipe right on the grid: a
-    narrow strip of covers pushes the grid aside; tap switches album in place, strip stays open.
+  - **Album switcher strip** (`AlbumSwitcher.kt`): in an album (and a locked album), swipe left on the grid: a
+    narrow strip of covers comes in from the right and pushes the grid aside (swipe right with it closed goes back); tap switches album in place, strip stays open.
   - **Locked (vault):** only way in is pushing up past the last album on Albums and holding 1.2 s (buzz), or Settings > Open Locked.
     Settings > Locked folder switch: off asks for the screen lock, moves everything back, then hides all Lock actions.
     Fixed 2026-11-19, not yet re-checked by me: a stray "Locked albums" title in the status bar (moving title now

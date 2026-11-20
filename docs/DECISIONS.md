@@ -597,3 +597,13 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   all Back handlers behave as with an edge swipe. Past 30 % or a flick goes back. Ignores drags that start as a long
   press (drag-select), vertical drags, two fingers, and is off while selecting. Not on album screens (the album strip
   uses a sideways swipe there).
+- **Album strip from the right; swipe right goes back** (2026-11-20, user's call): inside an album a swipe left brings
+  the strip of other albums in from the right edge (same look), pushing the grid left; swipe right or Back closes it.
+  With the strip closed, swipe right is the iOS-style back (`swipeBack`), so `AlbumDetailScreen` turns swipe-back off
+  while the strip is out (`onOpenChange`). `LocalPushedAside` now means pushed off the left edge: pull-down-to-reach
+  centres its title and places its icons over the right, visible part (`visibleStart`). Locked's album strip follows.
+- **Back swipe "pop": the screen becomes a card** (2026-11-20, user's pick): every predictive back (edge swipe or
+  `swipeBack`) shrinks the leaving screen to 90 % with 28 dp corners within the first third of the swipe
+  (`BackCardEasing`), while it slides with the finger (linear); the screen underneath grows from 95 % to full size.
+  NavHost `predictivePopExit/EnterTransition` (seeked by the gesture, `BACK_MS` = 320) plus `backCard`, which rounds
+  the corners from the destination's own enter/exit transition in the graphics layer (no recomposition).
