@@ -23,7 +23,6 @@ import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -66,7 +65,6 @@ import com.rohit.gallery.core.ui.theme.GalleryMotion
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -78,9 +76,6 @@ val LocalPushedAside = staticCompositionLocalOf<() -> Float> { { 0f } }
 
 /** How far the grid comes down when pulled: this share of the area it fills. */
 private const val REACH_FRACTION = 0.3f
-
-/** How long a pull-down has to be held for [ReachDown]'s onHold. */
-private const val HOLD_MS = 2_000L
 
 /** Top of the band the big title is centred in: just under where screens keep their top bar. */
 private val TitleBandTop = 72.dp
@@ -132,10 +127,6 @@ class ReachState internal constructor(expanded: Boolean) {
     internal var dragging by mutableStateOf(false)
         private set
 
-    /** This drag has been pulled past halfway at some point (the hold count then runs until the finger lifts). */
-    internal var pulledFar by mutableStateOf(false)
-        private set
-
     /** Finger travel before rubber-banding, so a drag past the open position keeps tracking smoothly. */
     private var raw = 0f
     private var settleJob: Job? = null
@@ -165,7 +156,6 @@ class ReachState internal constructor(expanded: Boolean) {
         val before = raw
         raw = (raw + dy).coerceAtLeast(0f)
         offset = shownFor(raw)
-        if (offset > maxPx / 2) pulledFar = true
         return raw - before
     }
 
@@ -174,7 +164,6 @@ class ReachState internal constructor(expanded: Boolean) {
     /** Ends a drag with [velocity] px/s: goes to the rest position the momentum points at. */
     internal fun release(velocity: Float, scope: CoroutineScope) {
         dragging = false
-        pulledFar = false
         val target = if (offset + GalleryMotion.project(velocity) > maxPx / 2) maxPx else 0f
         expanded = target > 0f
         if (offset == target) return
@@ -219,7 +208,6 @@ fun ReachDown(
     state: ReachState = rememberReachState(),
     actions: (@Composable RowScope.() -> Unit)? = null,
     actionsOffset: Dp = 0.dp,
-    onHold: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -265,19 +253,6 @@ fun ReachDown(
         }
     }
 
-
-    // Pull down past halfway and keep the finger down (it may drift): after [HOLD_MS] a buzz, then [onHold] (the Albums tab's hidden way into Locked).
-    if (onHold != null) {
-        val latestHold by rememberUpdatedState(onHold)
-        val holding by remember(state) { derivedStateOf { state.dragging && state.pulledFar } }
-        LaunchedEffect(holding) {
-            if (holding) {
-                delay(HOLD_MS)
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                latestHold()
-            }
-        }
-    }
 
     val density = LocalDensity.current
     // Where the grid's top lands when it is down, in screen terms: the same on every screen, whatever sits above.

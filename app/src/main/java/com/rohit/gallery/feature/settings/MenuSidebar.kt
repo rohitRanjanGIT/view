@@ -11,12 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -40,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,10 +48,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import com.rohit.gallery.core.ui.components.floatingHazeStyle
+import com.rohit.gallery.core.ui.components.frostedChrome
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -127,6 +123,10 @@ fun rememberMenuSidebarState(): MenuSidebarState {
 
 private const val OPEN_THRESHOLD = 0.3f
 
+/** The card's gap from the right edge, and its top below the status bar (under the Albums bar). */
+private val CardMargin = 12.dp
+private val CardTop = 60.dp
+
 /** No bounce, a touch softer than the tab snap: the panel is bigger than a tab's worth of movement. */
 private val SidebarSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 700f)
 
@@ -175,8 +175,8 @@ fun Modifier.sidebarDrag(state: MenuSidebarState, opening: Boolean, enabled: () 
 }
 
 /**
- * The sidebar itself, over everything on the home screen (the tab bar too): a frosted panel from the right edge,
- * blurring [haze]'s content, and a dim over the rest. Tap the dim, swipe right or press Back to close.
+ * The sidebar itself, over everything on the home screen (the tab bar too): a floating frosted card that slides in
+ * from the right just under the Albums bar, blurring [haze]'s content, and a dim over the rest. Tap the dim, swipe right or press Back to close.
  */
 @Composable
 fun MenuSidebar(
@@ -191,9 +191,10 @@ fun MenuSidebar(
     BackHandler(enabled = state.isVisible) { state.close() }
     if (!state.isVisible) return
     BoxWithConstraints(modifier.fillMaxSize().sidebarDrag(state, opening = false) { true }) {
-        val width = min(maxWidth * 0.6f, 260.dp)
-        val widthPx = with(LocalDensity.current) { width.toPx() }
-        state.widthPx = widthPx
+        val width = min(maxWidth * 0.6f, 240.dp)
+        // The card floats this far in from the right edge; closed, it sits just off screen.
+        val travelPx = with(LocalDensity.current) { (width + CardMargin).toPx() }
+        state.widthPx = travelPx
         // The dim over Albums; a tap on it closes.
         Box(
             Modifier
@@ -202,35 +203,27 @@ fun MenuSidebar(
                 .background(Color.Black.copy(alpha = 0.35f))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = state::close),
         )
-        val shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
-        val hairline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        // A floating card just under the Albums bar (by its ☰), only as tall as its rows.
         Column(
             Modifier
-                .align(Alignment.CenterEnd)
-                .width(width)
-                .fillMaxHeight()
-                .graphicsLayer { translationX = (1f - state.progress) * widthPx }
-                .clip(shape)
-                .then(if (haze != null) Modifier.hazeEffect(haze, floatingHazeStyle()) else Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh))
-                .drawWithContent {
-                    drawContent()
-                    drawLine(hairline, Offset(0f, 0f), Offset(0f, size.height), strokeWidth = 1f)
-                }
-                // Taps inside the panel never reach the dim behind it.
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp),
+                .padding(top = CardTop, end = CardMargin)
+                .width(width)
+                .graphicsLayer { translationX = (1f - state.progress) * travelPx }
+                .frostedChrome(state = haze, style = floatingHazeStyle(), corner = 24.dp)
+                // Taps inside the card never reach the dim behind it.
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .padding(6.dp),
         ) {
-            Text(
-                "Menu",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 8.dp),
-            )
             SidebarRow(Icons.Outlined.FavoriteBorder, "Favourites", onOpenFavorites)
             SidebarRow(Icons.Outlined.PlayArrow, "Videos", onOpenVideos)
             SidebarRow(Icons.Outlined.Delete, "Trash", onOpenTrash)
-            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(
+                Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
             SidebarRow(Icons.Outlined.Settings, "Settings", onOpenSettings)
         }
     }

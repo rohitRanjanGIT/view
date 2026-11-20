@@ -570,3 +570,11 @@ Pictures, Albums and Menu are pages of one `HorizontalPager` inside a single `Ho
   so the pager never sees them; right swipes, vertical scrolls and two fingers pass through. It follows the finger and
   settles like the tabs (30 % or a flick, no-bounce spring). Drawn above the tab bar in `GalleryNavHost`, only on
   the home screen; a row shuts it at once and opens the screen. Back closes it before Albums goes to Pictures.
+- **Menu sidebar is a floating card** (2026-11-20, user: "too big", then "make it a floating card"): a frosted card
+  (`frostedChrome(corner = 24.dp)`, 60 % wide, max 240 dp) under the Albums bar by its ☰, only as tall as its four
+  rows (Settings under a hairline), sliding in from the right; the dim and all ways of closing stay.
+- **Locked's door moved to the end of the album list** (2026-11-20, user's call): push up past the last album (the
+  list stretches) and hold 1.2 s: buzz, then Locked asks for the screen lock. `holdPastEnd` only watches the upward
+  drag the grid could not use (nested scroll, consumes nothing), so scrolling and the stretch are unchanged; lifting
+  or moving back down cancels. No tick before the buzz, so nothing hints it exists. Off while selecting or with
+  Locked turned off. The old pull-down-and-hold in `ReachDown` is removed.

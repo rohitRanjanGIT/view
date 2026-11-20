@@ -8,6 +8,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.rohit.gallery.feature.selection.NewAlbumDialog
 import com.rohit.gallery.core.model.albumCountLabel
 import com.rohit.gallery.core.ui.components.ReachDown
+import com.rohit.gallery.core.ui.components.holdPastEnd
 import com.rohit.gallery.core.ui.components.rememberReachState
 import com.rohit.gallery.core.ui.components.ReachState
 import com.rohit.gallery.core.ui.components.ReachTopIcons
@@ -113,7 +114,7 @@ private val ALBUM_GAP = 12.dp
 
 /**
  * The Albums tab: pinned albums first (in pin order), then the rest in the chosen sort. Long-press
- * selects albums to pin / unpin or lock. Pulling down and holding for 2 seconds opens Locked (its only way in).
+ * selects albums to pin / unpin or lock. Pushing up past the last album and holding for 1.2 s opens Locked (its only way in).
  */
 @Composable
 fun AlbumsScreen(
@@ -196,17 +197,18 @@ fun AlbumsScreen(
                             subtitle = albumCountLabel(list.size),
                             state = reach,
                             actions = icons,
-                            // Locked has no button anywhere: pull down here and hold for 2 seconds.
-                            onHold = if (locker.enabled) onOpenLocked else null,
                         ) {
-                            AlbumGrid(
-                                list = list,
-                                columns = cols,
-                                selection = selection,
-                                contentBottomPadding = contentBottomPadding,
-                                onOpenAlbum = onOpenAlbum,
-                                onColumnsChange = viewModel::setColumns,
-                            )
+                            // Locked has no button anywhere: push up past the last album and hold for 1.2 seconds.
+                            Box(Modifier.holdPastEnd(if (locker.enabled && !selection.isSelecting) onOpenLocked else null)) {
+                                AlbumGrid(
+                                    list = list,
+                                    columns = cols,
+                                    selection = selection,
+                                    contentBottomPadding = contentBottomPadding,
+                                    onOpenAlbum = onOpenAlbum,
+                                    onColumnsChange = viewModel::setColumns,
+                                )
+                            }
                         }
                     }
                 }

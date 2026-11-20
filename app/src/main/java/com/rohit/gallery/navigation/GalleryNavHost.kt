@@ -165,7 +165,7 @@ fun GalleryNavHost(
                                 )
                                 else -> AlbumsScreen(
                                     onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
-                                    // The only way in: pull down on Albums and hold for 2 seconds.
+                                    // The hidden way in: push up past the last album and hold for 1.2 seconds.
                                     onOpenLocked = { navController.navigate(VaultRoute) },
                                     onOpenSearch = { navController.navigate(SearchRoute) },
                                     onCreateAlbum = { name -> navController.navigate(NewAlbumRoute(name)) },

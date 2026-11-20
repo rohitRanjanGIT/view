@@ -223,7 +223,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     above the grid (`ReachTopIcons`). Pictures: search sits on the "Today" line.
   - **Album switcher strip** (`AlbumSwitcher.kt`): in an album (and a locked album), swipe right on the grid: a
     narrow strip of covers pushes the grid aside; tap switches album in place, strip stays open.
-  - **Locked (vault):** only way in is pulling down on Albums and holding 2 s (buzz), or Settings > Open Locked.
+  - **Locked (vault):** only way in is pushing up past the last album on Albums and holding 1.2 s (buzz), or Settings > Open Locked.
     Settings > Locked folder switch: off asks for the screen lock, moves everything back, then hides all Lock actions.
     Fixed 2026-11-19, not yet re-checked by me: a stray "Locked albums" title in the status bar (moving title now
     measured live).
@@ -238,7 +238,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 - **Git:** everything pushed up to `327dd69` (More card) on 2026-11-20. Push only when I say so.
 - **Next (pick with me):**
   1. **Menu sidebar** (built 2026-11-20, not yet tried by me): the Menu tab is gone (bottom bar: Pictures + Albums).
-     On Albums a finger-left swipe or the ☰ button slides in a frosted panel from the right (Favourites, Videos,
+     On Albums a finger-left swipe or the ☰ button slides in a floating frosted card from the right (Favourites, Videos,
      Trash, Settings); dim, swipe right or Back closes. `feature/settings/MenuSidebar.kt`.
   2. My screenshot idea: a notification offers Share / Share & delete after a screenshot (answers still pending).
   3. App icon (deferred by me). Then Phase 4 (see Known gaps).
@@ -283,7 +283,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 - **Pinch density:** `GridZoom.kt` / `PinchToZoom.kt` / `GridZoomAnchor.kt`. Pictures 2/4/6 + month; album lists
   share one size; Trash a flat 2/4/6 grid. All remembered across launches (`GridSizeKey` in `AppPreferences`).
 - **Albums tab:** + New album (`NewAlbumScreen`, `NewAlbumRoute(name, bucketId?)` also used by the + inside an album),
-  Search, ⋮ (sort, Edit albums); selection: Pin, Lock, Delete (`AlbumDelete.kt`, to Trash). Hold-pull opens Locked.
+  Search, ⋮ (sort, Edit albums); selection: Pin, Lock, Delete (`AlbumDelete.kt`, to Trash). Push past the last album and hold 1.2 s to open Locked.
 - **Album organisation:** Room `gallery.db` (`AlbumPrefEntity`: hidden, pinnedAt, position; schema in `app/schemas/`),
   DataStore `AppPreferences` (album sort, albums per row, oldest-first). Edit albums screen (pin, reorder).
   Hidden albums were removed (the `hidden` column stays in Room, unused).
