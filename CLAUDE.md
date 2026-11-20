@@ -240,7 +240,7 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
   1. **No Menu** (built 2026-11-20, not yet tried by me): bottom bar is Pictures + Albums. Favourites, Videos, Trash are
      "Collections" tiles at the end of the Albums grid; Settings: swipe left past Albums and hold 0.6 s. iOS-style swipe-right back in
      Favourites, Videos, Trash (`swipeBack`).
-  2. My screenshot idea: a notification offers Share / Share & delete after a screenshot (answers still pending).
+  2. My screenshot idea: a notification offers Share / Share & delete after a screenshot (skipped for now by me, 2026-11-20. If picked up: JobScheduler content-URI trigger on MediaStore, POST_NOTIFICATIONS, and Android never reports when a share finished, so "Share & delete" must delete later or ask).
   3. App icon (deferred by me). Then Phase 4 (see Known gaps).
 
 ### What exists
