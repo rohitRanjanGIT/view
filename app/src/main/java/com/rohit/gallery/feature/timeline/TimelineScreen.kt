@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -98,6 +99,9 @@ import com.rohit.gallery.core.ui.components.mediaSharedElement
 import com.rohit.gallery.core.ui.theme.GalleryMotion
 import com.rohit.gallery.feature.selection.SelectionActionsBar
 import com.rohit.gallery.feature.selection.SelectionCheck
+import com.rohit.gallery.feature.selection.GroupSelection
+import com.rohit.gallery.feature.selection.GroupSelectionCheck
+import com.rohit.gallery.feature.selection.groupSelection
 import com.rohit.gallery.feature.selection.SelectionState
 import com.rohit.gallery.feature.selection.SelectionTopBar
 import com.rohit.gallery.feature.selection.copySelected
@@ -402,7 +406,11 @@ fun TimelineGrid(
         val byMonth = content.level.byMonth
         content.days.forEach { day ->
             stickyHeader(key = "day-${day.epochDay}", contentType = "header") {
-                DayHeader(if (byMonth) monthLabel(day.epochDay, locale) else dayLabel(day.epochDay, today))
+                DayHeader(
+                    label = if (byMonth) monthLabel(day.epochDay, locale) else dayLabel(day.epochDay, today),
+                    day = day,
+                    selection = selection,
+                )
             }
             items(
                 items = day.rows,
@@ -538,15 +546,30 @@ private fun SearchIcon(onClick: () -> Unit) {
 private val DayHeaderHeight = 40.dp
 
 @Composable
-private fun DayHeader(label: String) {
+private fun DayHeader(label: String, day: TimelineDay, selection: SelectionState) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            label,
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-        )
+        Box(Modifier.fillMaxWidth().heightIn(min = DayHeaderHeight), Alignment.CenterStart) {
+            Text(
+                label,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+            if (selection.isSelecting) {
+                // The day's ids, taken once from the already grouped rows (not a library scan).
+                val ids = remember(day) { day.rows.flatMap { row -> row.map { it.id } } }
+                // derivedStateOf: this header recomposes only when its own none / some / all state changes.
+                val state by remember(ids) { derivedStateOf { groupSelection(ids, selection.ids) } }
+                GroupSelectionCheck(
+                    state = state,
+                    label = if (state == GroupSelection.All) "Deselect $label" else "Select $label",
+                    onClick = { selection.toggleGroup(ids) },
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp),
+                )
+            }
+        }
     }
 }
+
 
 @Composable
 private fun ThumbnailRow(row: List<MediaItem>, columns: Int, cellSizePx: Int, selection: SelectionState, press: GridPressState) {

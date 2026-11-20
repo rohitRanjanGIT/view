@@ -27,7 +27,7 @@ class AlbumsTest {
         val albums = buildAlbums(items)
         assertEquals(listOf("Trip", "Camera"), albums.map { it.name })
         assertEquals(listOf(2, 3), albums.map { it.count })
-        assertEquals(5L, albums[0].cover.id)
+        assertEquals(5L, albums[0].cover?.id)
     }
 
     @Test
@@ -75,12 +75,12 @@ class AlbumsTest {
 
     @Test
     fun `transfer messages say what was done and what was skipped`() {
-        assertEquals("Copied 3 items", transferMessage("Copied", 3, TransferResult(3, 0), null))
+        assertEquals("Moved 3 items", transferMessage("Moved", 3, TransferResult(3, 0), null))
         assertEquals("Moved 1 item", transferMessage("Moved", 1, TransferResult(1, 0), null))
-        assertEquals("Copied 2, 1 failed", transferMessage("Copied", 3, TransferResult(2, 1), null))
+        assertEquals("Moved 2, 1 failed", transferMessage("Moved", 3, TransferResult(2, 1), null))
         assertEquals(
-            "Copied 2 items. 1 skipped: Android doesn't allow photos in Movies",
-            transferMessage("Copied", 2, TransferResult(2, 0), "1 skipped: Android doesn't allow photos in Movies"),
+            "Moved 2 items. 1 skipped: Android doesn't allow photos in Movies",
+            transferMessage("Moved", 2, TransferResult(2, 0), "1 skipped: Android doesn't allow photos in Movies"),
         )
     }
 }

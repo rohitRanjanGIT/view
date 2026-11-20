@@ -10,14 +10,12 @@ import com.rohit.gallery.core.model.MediaItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
-/** Where moved or copied media goes: a folder path relative to the storage root, like `Pictures/Trip/`. */
+/** Where moved media goes: a folder path relative to the storage root, like `Pictures/Trip/`. */
 data class Destination(val relativePath: String)
 
 data class TransferResult(val done: Int, val failed: Int)
@@ -28,14 +26,16 @@ fun normalizeRelativePath(path: String): String = path.trim('/').let { if (it.is
 /**
  * Why a typed album name can't be used, or null if it is fine. [existingNames] are the albums already there:
  * a new album with one of those names (folders ignore upper / lower case) would quietly pour into that folder.
+ * [folder] false checks a user album's name (only a label in the app's database): any characters are fine there,
+ * and a name another user album has is refused the same way, ignoring case, so two albums never look alike.
  */
-fun albumNameError(name: String, existingNames: Collection<String> = emptyList()): String? {
+fun albumNameError(name: String, existingNames: Collection<String> = emptyList(), folder: Boolean = true): String? {
     val n = name.trim()
     return when {
         n.isEmpty() -> "Enter a name"
         n.length > 60 -> "Name is too long"
-        n.startsWith(".") -> "Name can't start with a dot"
-        n.any { it == '/' || it == '\\' || it == ':' || it == '*' || it == '?' || it == '"' || it == '<' || it == '>' || it == '|' } ->
+        folder && n.startsWith(".") -> "Name can't start with a dot"
+        folder && n.any { it == '/' || it == '\\' || it == ':' || it == '*' || it == '?' || it == '"' || it == '<' || it == '>' || it == '|' } ->
             "Name can't contain / \\ : * ? \" < > |"
         existingNames.any { it.trim().equals(n, ignoreCase = true) } -> "An album with this name already exists"
         else -> null
@@ -60,11 +60,37 @@ private val VIDEO_FOLDERS = listOf("DCIM", "Movies", "Pictures")
 fun folderLabel(relativePath: String): String = relativePath.trim('/').substringAfterLast('/').ifEmpty { relativePath }
 
 /**
- * Moves and copies media between albums (folders).
+ * What a move into [destPath] can take, and a note on what it leaves out (null when it takes everything):
+ * - photos in an app's own folder (WhatsApp Images...) never move: Android refuses ("changing ownership not allowed"),
+ *   so they are skipped up front, with a pointer to albums (adding to an album never moves a file);
+ * - photos or videos the destination folder doesn't accept (see [folderAccepts]).
+ */
+fun movable(items: List<MediaItem>, destPath: String): Pair<List<MediaItem>, String?> {
+    val (inApp, rest) = items.partition { it.isInAppFolder }
+    val (ok, refused) = rest.partition { folderAccepts(destPath, it.isVideo) }
+    val notes = buildList {
+        if (inApp.isNotEmpty()) {
+            val from = inApp.map { it.bucketName }.distinct().singleOrNull()?.takeIf { it.isNotBlank() } ?: "app folders"
+            val them = if (inApp.size == 1) "it" else "them"
+            add("${inApp.size} from $from can't be moved (Android keeps them there), add $them to an album instead")
+        }
+        if (refused.isNotEmpty()) {
+            val what = when {
+                refused.all { it.isVideo } -> "videos"
+                refused.none { it.isVideo } -> "photos"
+                else -> "photos or videos"
+            }
+            add("${refused.size} skipped: Android doesn't allow $what in ${folderLabel(destPath)}")
+        }
+    }
+    return ok to notes.joinToString(". ").ifEmpty { null }
+}
+
+/**
+ * Moves media between device folders.
  *
- * Originals are never modified in place: a *move* only changes the item's folder (after the system
- * has asked for write access), a *copy* creates a brand new MediaStore entry and streams the bytes
- * into it, leaving the source untouched.
+ * Originals are never modified in place: a move only changes the item's folder (after the system has asked for write
+ * access). User albums never come here: they are lists in the app's database (UserAlbumRepository).
  */
 @Singleton
 class MediaTransfer @Inject constructor(
@@ -153,75 +179,6 @@ class MediaTransfer @Inject constructor(
             if (it.moveToFirst()) it.getString(0)?.let(::normalizeRelativePath)?.takeIf { p -> p.isNotEmpty() } else null
         }
     }.getOrNull()
-
-    /**
-     * Copies [items] into [destination] as new files; the originals stay where they are. Cancelling stops mid-file
-     * too (a big video), and the half-written copy is removed.
-     */
-    suspend fun copy(
-        items: List<MediaItem>,
-        destination: Destination,
-        onProgress: (handled: Int, done: Int) -> Unit = { _, _ -> },
-    ): TransferResult = withContext(Dispatchers.IO) {
-        val job = coroutineContext[Job]
-        var done = 0
-        for ((i, item) in items.withIndex()) {
-            ensureActive()
-            val ok = candidatePaths(item, destination).any { path ->
-                try {
-                    copyOne(item, path) { job?.isActive != false }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    false
-                }
-            }
-            if (ok) done++
-            onProgress(i + 1, done)
-        }
-        TransferResult(done, items.size - done)
-    }
-
-    private fun copyOne(item: MediaItem, relativePath: String, active: () -> Boolean): Boolean {
-        val name = resolver.query(item.uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use {
-            if (it.moveToFirst()) it.getString(0) else null
-        } ?: return false
-
-        val collection = if (item.isVideo) {
-            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        } else {
-            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        }
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, item.mimeType)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
-            if (item.dateTakenMs > 0) put(MediaStore.MediaColumns.DATE_TAKEN, item.dateTakenMs)
-            put(MediaStore.MediaColumns.IS_PENDING, 1)
-        }
-        val target = resolver.insert(collection, values) ?: return false
-        try {
-            val input = resolver.openInputStream(item.uri) ?: error("no input")
-            val output = resolver.openOutputStream(target) ?: error("no output")
-            input.use { src ->
-                output.use { dst ->
-                    val buffer = ByteArray(256 * 1024)
-                    while (true) {
-                        if (!active()) throw CancellationException("Copy stopped")
-                        val read = src.read(buffer)
-                        if (read < 0) break
-                        dst.write(buffer, 0, read)
-                    }
-                }
-            }
-            resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
-            return true
-        } catch (e: Exception) {
-            // Never leave a half-written file behind.
-            runCatching { resolver.delete(target, null, null) }
-            throw e
-        }
-    }
 
     /**
      * Folders to try for [item]. The album's own folder first; a video can't live under Pictures on

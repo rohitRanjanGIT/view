@@ -3,6 +3,9 @@ package com.rohit.gallery
 import com.rohit.gallery.core.domain.commonMimeType
 import com.rohit.gallery.core.model.MediaType
 import com.rohit.gallery.feature.selection.SelectionState
+import com.rohit.gallery.feature.selection.GroupSelection
+import com.rohit.gallery.feature.selection.groupSelection
+import com.rohit.gallery.feature.selection.toggleGroup
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -103,5 +106,60 @@ class SelectionStateTest {
         assertEquals("image/*", commonMimeType(listOf(photo, testItem(3))))
         assertEquals("video/*", commonMimeType(listOf(video, testItem(4, type = MediaType.Video))))
         assertEquals("*/*", commonMimeType(listOf(photo, video)))
+    }
+}
+
+class GroupSelectionTest {
+    private val day = listOf(1L, 2L, 3L)
+
+    @Test
+    fun `none some and all`() {
+        assertEquals(GroupSelection.None, groupSelection(day, emptySet()))
+        assertEquals(GroupSelection.None, groupSelection(day, setOf(9L)))
+        assertEquals(GroupSelection.Some, groupSelection(day, setOf(2L, 9L)))
+        assertEquals(GroupSelection.All, groupSelection(day, setOf(1L, 2L, 3L, 9L)))
+        assertEquals(GroupSelection.None, groupSelection(emptyList(), setOf(1L)))
+    }
+
+    @Test
+    fun `toggle selects the rest unless all are selected`() {
+        assertEquals(setOf(1L, 2L, 3L), toggleGroup(day, emptySet()))
+        assertEquals(setOf(9L, 1L, 2L, 3L), toggleGroup(day, setOf(9L, 2L)))
+        assertEquals(setOf(9L), toggleGroup(day, setOf(9L, 1L, 2L, 3L)))
+    }
+
+    @Test
+    fun `state toggleGroup ends selection mode when it clears the last items`() {
+        val s = SelectionState()
+        s.toggleGroup(day)
+        assertTrue(s.isSelecting)
+        assertEquals(setOf(1L, 2L, 3L), s.ids)
+        s.toggleGroup(day)
+        assertFalse(s.isSelecting)
+        assertTrue(s.ids.isEmpty())
+    }
+
+    @Test
+    fun `second tap goes back to what was picked in the day before`() {
+        val s = SelectionState()
+        s.toggle(2L)
+        s.toggle(9L)
+        s.toggleGroup(day)
+        assertEquals(setOf(1L, 2L, 3L, 9L), s.ids)
+        s.toggleGroup(day)
+        assertEquals(setOf(2L, 9L), s.ids)
+        // Partial again: the next tap selects the whole day once more.
+        s.toggleGroup(day)
+        assertEquals(setOf(1L, 2L, 3L, 9L), s.ids)
+    }
+
+    @Test
+    fun `a day selected whole another way clears on its check`() {
+        val s = SelectionState()
+        s.toggle(1L)
+        s.toggle(2L)
+        s.toggle(3L)
+        s.toggleGroup(day)
+        assertTrue(s.ids.isEmpty())
     }
 }

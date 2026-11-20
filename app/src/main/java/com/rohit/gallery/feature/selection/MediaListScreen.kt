@@ -56,7 +56,8 @@ import androidx.compose.runtime.key
 
 /**
  * A secondary screen showing [items] as a selectable grid under a back/title bar, with the shared
- * selection actions (Share, Favorite, Trash, Move/Copy). Used by album detail, Favorites and Videos.
+ * selection actions (Share, Favorite, Trash, Add to album, Move to folder). Used by folders, user albums, Favorites
+ * and Videos.
  * [items] null means still loading.
  */
 @Composable
@@ -73,6 +74,10 @@ fun MediaListScreen(
     gridWrapper: @Composable (@Composable () -> Unit) -> Unit = { it() },
     /** iOS-style back: drag right anywhere to slide this screen away (Favourites, Videos, Trash). */
     swipeBack: Boolean = false,
+    /** Inside a user album: that album, and the extra selection actions (see SelectionActionsBar). */
+    currentUserAlbum: Long? = null,
+    onRemoveFromAlbum: (() -> Unit)? = null,
+    onSetCover: (() -> Unit)? = null,
 ) {
     val allFavorite by remember(items) {
         derivedStateOf {
@@ -85,7 +90,10 @@ fun MediaListScreen(
         asTimeline = true, titleActions = titleActions, contentKey = contentKey, gridWrapper = gridWrapper,
         swipeBack = swipeBack,
     ) { modifier ->
-        SelectionActionsBar(selectionActions, selection, modifier, allFavorite = allFavorite)
+        SelectionActionsBar(
+            selectionActions, selection, modifier, allFavorite = allFavorite,
+            currentUserAlbum = currentUserAlbum, onRemoveFromAlbum = onRemoveFromAlbum, onSetCover = onSetCover,
+        )
     }
 }
 

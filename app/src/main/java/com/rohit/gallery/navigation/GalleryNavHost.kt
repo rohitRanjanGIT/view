@@ -2,6 +2,10 @@ package com.rohit.gallery.navigation
 
 import androidx.compose.foundation.layout.navigationBarsPadding
 import dev.chrisbanes.haze.hazeSource
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.Icons
+import com.rohit.gallery.core.ui.components.swipeBack
+import com.rohit.gallery.core.ui.components.FloatingTabAction
 import com.rohit.gallery.core.ui.components.frostedChrome
 import com.rohit.gallery.core.ui.components.rememberChromeHaze
 import com.rohit.gallery.core.ui.components.LocalChromeHaze
@@ -56,6 +60,8 @@ import com.rohit.gallery.feature.albums.AlbumDetailScreen
 import com.rohit.gallery.feature.albums.AlbumsScreen
 import com.rohit.gallery.feature.albums.EditAlbumsScreen
 import com.rohit.gallery.feature.albums.NewAlbumScreen
+import com.rohit.gallery.feature.albums.PickForAlbumScreen
+import com.rohit.gallery.feature.albums.UserAlbumScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.search.SearchScreen
 import com.rohit.gallery.feature.settings.SettingsScreen
@@ -165,10 +171,11 @@ fun GalleryNavHost(
                                 )
                                 ALBUMS_PAGE -> AlbumsScreen(
                                     onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
+                                    onOpenUserAlbum = { navController.navigate(UserAlbumRoute(it)) },
                                     // The hidden way in: push up past the last album and hold for 1.2 seconds.
                                     onOpenLocked = { navController.navigate(VaultRoute) },
                                     onOpenSearch = { navController.navigate(SearchRoute) },
-                                    onCreateAlbum = { name -> navController.navigate(NewAlbumRoute(name)) },
+                                    onCreateAlbum = { name -> navController.navigate(PickForAlbumRoute(name)) },
                                     onEditAlbums = { navController.navigate(EditAlbumsRoute) },
                                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
                                     onOpenVideos = { navController.navigate(VideosRoute) },
@@ -194,12 +201,22 @@ fun GalleryNavHost(
                         enterTransition = { slideInHorizontally(tween(GalleryMotion.FADE_MS * 2)) { it } },
                         popExitTransition = { slideOutHorizontally(tween(GalleryMotion.FADE_MS * 2)) { it } },
                     ) {
-                        Box(Modifier.fillMaxSize().backStack(this@composable).background(MaterialTheme.colorScheme.background)) {
+                        // iOS-style: drag right anywhere to slide Settings away, back to Pictures / Albums.
+                        Box(Modifier.fillMaxSize().backStack(this@composable).background(MaterialTheme.colorScheme.background).swipeBack(enabled = true)) {
                             SettingsScreen(onBack = { navController.popBackStack() }, onOpenLocked = { navController.navigate(VaultRoute) })
                         }
                     }
                     composable<NewAlbumRoute> {
                         NewAlbumScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable<PickForAlbumRoute> {
+                        PickForAlbumScreen(
+                            onClose = { navController.popBackStack() },
+                            // A new album opens once made; Back from it goes to where + was tapped.
+                            onCreated = { id ->
+                                navController.navigate(UserAlbumRoute(id)) { popUpTo<PickForAlbumRoute> { inclusive = true } }
+                            },
+                        )
                     }
                     topLevel<EditAlbumsRoute>(navController) {
                         EditAlbumsScreen(onBack = { navController.popBackStack() })
@@ -211,6 +228,15 @@ fun GalleryNavHost(
                                 openViewer(host, item, ViewerRoute(item.id, bucketId = bucketId, oldestFirst = oldestFirst))
                             },
                             onAddPhotos = { bucketId, name -> navController.navigate(NewAlbumRoute(name, bucketId)) },
+                        )
+                    }
+                    topLevel<UserAlbumRoute>(navController) { host ->
+                        UserAlbumScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenMedia = { item, albumId, oldestFirst ->
+                                openViewer(host, item, ViewerRoute(item.id, userAlbumId = albumId, oldestFirst = oldestFirst))
+                            },
+                            onAddPhotos = { albumId, name -> navController.navigate(PickForAlbumRoute(name, albumId)) },
                         )
                     }
                     topLevel<FavoritesRoute>(navController) { host ->
@@ -273,6 +299,8 @@ fun GalleryNavHost(
                         onSelect = { index -> scope.launch { homePager.animateScrollToPage(index, animationSpec = TabTapSpec) } },
                         haze = navHaze,
                         modifier = Modifier.dragsPager(homePager, scope),
+                        // Settings: tap here, or swipe left past Albums and hold.
+                        action = FloatingTabAction("Settings", Icons.Outlined.Settings) { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                     )
                 }
                 UndoBarHost(

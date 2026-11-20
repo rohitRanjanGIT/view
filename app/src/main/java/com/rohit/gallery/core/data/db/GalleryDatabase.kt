@@ -91,13 +91,16 @@ interface MediaOriginDao {
     suspend fun deleteAll(mediaIds: List<Long>)
 }
 
-// Version 2 added the vault table, version 3 the trash snapshots and move origins (new tables only, so Room
-// migrates them from the exported schemas).
+// Version 2 added the vault table, version 3 the trash snapshots and move origins, version 4 the user albums (new
+// tables only, so Room migrates them from the exported schemas).
 @Database(
-    entities = [AlbumPrefEntity::class, VaultItemEntity::class, TrashSnapshotEntity::class, MediaOriginEntity::class],
-    version = 3,
+    entities = [
+        AlbumPrefEntity::class, VaultItemEntity::class, TrashSnapshotEntity::class, MediaOriginEntity::class,
+        UserAlbumEntity::class, UserAlbumMemberEntity::class,
+    ],
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class GalleryDatabase : RoomDatabase() {
     abstract fun albumPrefs(): AlbumPrefDao
@@ -107,4 +110,6 @@ abstract class GalleryDatabase : RoomDatabase() {
     abstract fun trashSnapshots(): TrashSnapshotDao
 
     abstract fun mediaOrigins(): MediaOriginDao
+
+    abstract fun userAlbums(): UserAlbumDao
 }

@@ -27,7 +27,7 @@ import com.rohit.gallery.core.model.MediaItem
 import com.rohit.gallery.core.ui.components.AlbumSwitcherDrawer
 import com.rohit.gallery.feature.selection.MediaListScreen
 
-/** One album: its photos and videos in a grid, with the full selection actions and a newest/oldest order. */
+/** One device folder: its photos and videos in a grid, with the full selection actions and a newest/oldest order. */
 @Composable
 fun AlbumDetailScreen(
     onBack: () -> Unit,
@@ -55,10 +55,10 @@ fun AlbumDetailScreen(
         onBack = onBack,
         onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
         titleActions = {
-            // Add photos from anywhere in the library into this album.
+            // Move photos from anywhere in the library into this folder (a real move; user albums add without one).
             // Only once the album is loaded, so the picker knows the album's real name.
             IconButton(onClick = { onAddPhotos(bucketId, title) }, enabled = !items.isNullOrEmpty()) {
-                Icon(Icons.Filled.Add, contentDescription = "Add photos")
+                Icon(Icons.Filled.Add, contentDescription = "Move photos here")
             }
             OrderMenu(
                 oldestFirst = oldestFirst,

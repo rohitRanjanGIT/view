@@ -2,35 +2,15 @@ package com.rohit.gallery.feature.albums
 
 import android.app.Activity
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -47,12 +27,9 @@ import com.rohit.gallery.core.domain.folderAccepts
 import com.rohit.gallery.core.domain.folderLabel
 import com.rohit.gallery.core.model.Album
 import com.rohit.gallery.core.model.MediaItem
-import com.rohit.gallery.core.ui.components.FloatingActionPill
 import com.rohit.gallery.core.ui.components.pillSlot
 import com.rohit.gallery.core.ui.icons.GalleryIcons
 import com.rohit.gallery.feature.selection.ActionItem
-import com.rohit.gallery.feature.selection.GridSizeViewModel
-import com.rohit.gallery.feature.selection.MediaTimeline
 import com.rohit.gallery.feature.selection.SelectionActions
 import com.rohit.gallery.feature.selection.SelectionState
 import com.rohit.gallery.feature.selection.TransferProgressDialog
@@ -80,8 +57,8 @@ private sealed interface TargetFolder {
 
 /**
  * A new album is made by putting photos in it (Android only knows a folder as an album once something is in it):
- * every photo and video, like Pictures; tap or drag to pick, then copy or move them into the album named [name].
- * The same screen adds photos to an existing album ([existingBucket]).
+ * every photo and video, like Pictures; tap or drag to pick, then move them into the folder named [name].
+ * The same screen moves photos into an existing folder ([existingBucket]).
  */
 @HiltViewModel
 class NewAlbumViewModel @Inject constructor(
@@ -117,13 +94,14 @@ class NewAlbumViewModel @Inject constructor(
     }
 
     /**
-     * Everything that can go into the album: not what is already in it, and only the kinds Android allows in its
-     * folder (no photos in Movies/, nothing in Download/). Null while loading.
+     * Everything that can go into the album: not what is already in it, not what Android keeps in an app's own folder
+     * (WhatsApp Images...: it can never be moved out), and only the kinds Android allows in its folder (no photos in
+     * Movies/, nothing in Download/). Null while loading.
      */
     val items: StateFlow<List<MediaItem>?> = combine(repo.state, folder) { state, target ->
         val all = (state as? MediaIndexState.Ready)?.items ?: return@combine null
         val path = (target as? TargetFolder.Found)?.destination?.relativePath ?: return@combine if (target == TargetFolder.Missing) emptyList() else null
-        all.filter { it.bucketId != existingBucket && folderAccepts(path, it.isVideo) }
+        all.filter { it.bucketId != existingBucket && !it.isInAppFolder && folderAccepts(path, it.isVideo) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
@@ -168,84 +146,47 @@ class NewAlbumViewModel @Inject constructor(
         return Album(id, name, 0, cover)
     }
 
-    fun copySelected() = transferActions.copyTo(target(), if (existingBucket == null) name else null)
-
     suspend fun moveRequest() = transferActions.moveRequest(target(), if (existingBucket == null) name else null)
 }
 
+/**
+ * The + inside a device folder: pick photos from anywhere and move them into that folder (a real move between
+ * folders, after Android's write confirmation). User albums use [PickForAlbumScreen] instead, which moves nothing.
+ */
 @Composable
 fun NewAlbumScreen(onClose: () -> Unit, viewModel: NewAlbumViewModel = hiltViewModel()) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
-    val selection = viewModel.selection
     val controller = viewModel.transferActions
-    val sizes: GridSizeViewModel = hiltViewModel()
-    val level by sizes.level.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(controller) { controller.messages.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() } }
-    // Done once the photos are in: back to where + was tapped, where the album now shows them.
+    // Done once the photos are in: back to where + was tapped, where the folder now shows them.
     LaunchedEffect(controller) { controller.finished.collect { if (it.done > 0) onClose() } }
-    // Back with photos picked clears the picks first, so a stray swipe doesn't lose them.
-    BackHandler(enabled = selection.ids.isNotEmpty()) { selection.clear() }
 
     // Moving needs Android's write confirmation first; the move runs once it is accepted.
     val moveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) controller.finishMove() else controller.cancelMove()
     }
 
-    val count = selection.ids.size
-    val blocked = notice?.blocked == true
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Cancel") }
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (viewModel.existingBucket == null) "New album: ${viewModel.name}" else "Add to ${viewModel.name}",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            when {
-                                count > 0 -> "$count selected"
-                                notice != null && !blocked -> notice!!.text
-                                else -> "Tap photos to add them"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                        )
-                    }
-                }
+    val current = notice
+    PhotoPickerLayout(
+        title = if (viewModel.existingBucket == null) "New folder: ${viewModel.name}" else "Move into ${viewModel.name}",
+        hint = current?.takeIf { !it.blocked }?.text ?: "Tap photos to move them here",
+        items = items,
+        selection = viewModel.selection,
+        onClose = onClose,
+        blockedText = current?.takeIf { it.blocked }?.text,
+    ) { enabled ->
+        ActionItem(GalleryIcons.FolderMove, "Move here", enabled, {
+            scope.launch {
+                // Null means nothing to start; the reason (if any) arrives as a toast.
+                val sender = viewModel.moveRequest() ?: return@launch
+                moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
             }
-            val list = items
-            when {
-                blocked -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
-                    Text(notice!!.text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-                }
-                list == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                // A tap picks a photo here (it never opens the viewer).
-                else -> level?.let { MediaTimeline(list, selection, it, sizes::setLevel, onOpenMedia = { item -> selection.toggle(item.id) }) }
-            }
-        }
-
-        if (!blocked) {
-            FloatingActionPill(Modifier.align(Alignment.BottomCenter)) {
-                ActionItem(GalleryIcons.Copy, "Copy here", count > 0, { viewModel.copySelected() }, Modifier.pillSlot())
-                ActionItem(GalleryIcons.Folder, "Move here", count > 0, {
-                    scope.launch {
-                        // Null means nothing to start; the reason (if any) arrives as a toast.
-                        val sender = viewModel.moveRequest() ?: return@launch
-                        moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
-                    }
-                }, Modifier.pillSlot())
-            }
-        }
+        }, Modifier.pillSlot())
     }
 
-    TransferProgressDialog(controller, title = "Adding to ${viewModel.name}…")
+    TransferProgressDialog(controller, title = "Moving into ${viewModel.name}…")
 }

@@ -36,7 +36,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.rohit.gallery.core.domain.albumNameError
 import com.rohit.gallery.core.model.Album
-import com.rohit.gallery.core.ui.components.MediaThumbnail
+import com.rohit.gallery.core.ui.components.AlbumCover
 
 /**
  * Bottom sheet to choose where media goes: an existing album or a new one. [onPick] gets the chosen
@@ -53,6 +53,10 @@ fun AlbumPickerSheet(
     existingNames: List<String> = albums.map { it.name },
     /** A line under the title (what else happens). */
     subtitle: String? = null,
+    /** The first row, which asks for a name: "New album", or "New folder" where a real folder is made. */
+    newLabel: String = "New album",
+    /** False when the names are user albums' (any characters allowed; see albumNameError). */
+    folderNames: Boolean = true,
 ) {
     var creating by remember { mutableStateOf(false) }
 
@@ -83,7 +87,7 @@ fun AlbumPickerSheet(
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                         contentAlignment = Alignment.Center,
                     ) { Icon(Icons.Filled.Add, contentDescription = null) }
-                    Text("New album", style = MaterialTheme.typography.bodyLarge)
+                    Text(newLabel, style = MaterialTheme.typography.bodyLarge)
                 }
             }
             items(albums, key = { it.bucketId }) { album ->
@@ -92,7 +96,9 @@ fun AlbumPickerSheet(
         }
     }
 
-    if (creating) NewAlbumDialog(existingNames, onCreate = { onPick(null, it) }, onDismiss = { creating = false })
+    if (creating) {
+        NewAlbumDialog(existingNames, onCreate = { onPick(null, it) }, onDismiss = { creating = false }, title = newLabel, folder = folderNames)
+    }
 }
 
 @Composable
@@ -106,7 +112,7 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        MediaThumbnail(album.cover, thumbPx, Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)), showBadge = false)
+        AlbumCover(album.cover, thumbPx, Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)))
         Column(Modifier.weight(1f)) {
             Text(album.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
             Text("${album.count}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -114,28 +120,39 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
     }
 }
 
-/** Asks for a new album's name. [existingNames] are taken (a match would pour the photos into that album). */
+/**
+ * Asks for an album's name. [existingNames] are taken (for a folder, a match would pour the photos into that folder).
+ * [folder] false: a user album's name (see albumNameError). [initial] and [confirmLabel] make it a Rename dialog.
+ */
 @Composable
-fun NewAlbumDialog(existingNames: List<String>, onCreate: (String) -> Unit, onDismiss: () -> Unit) {
+fun NewAlbumDialog(
+    existingNames: List<String>,
+    onCreate: (String) -> Unit,
+    onDismiss: () -> Unit,
+    title: String = "New album",
+    folder: Boolean = true,
+    initial: String = "",
+    confirmLabel: String = "Create",
+) {
     // Saveable: the typed name survives a rotation.
-    var name by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf(initial) }
     var touched by rememberSaveable { mutableStateOf(false) }
-    val error = albumNameError(name, existingNames)
+    val error = albumNameError(name, existingNames, folder)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New album") },
+        title = { Text(title) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it; touched = true },
                 singleLine = true,
-                label = { Text("Album name") },
+                label = { Text(if (folder) "Folder name" else "Album name") },
                 isError = touched && error != null,
                 supportingText = { if (touched && error != null) Text(error) },
             )
         },
         confirmButton = {
-            TextButton(enabled = error == null, onClick = { onCreate(name.trim()) }) { Text("Create") }
+            TextButton(enabled = error == null, onClick = { onCreate(name.trim()) }) { Text(confirmLabel) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

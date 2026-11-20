@@ -59,6 +59,27 @@ class SelectionState {
         if (ids.isEmpty()) isSelecting = false
     }
 
+    // What was picked in a day / month (keyed by its first id) just before its header check selected all of it, so the
+    // next tap goes back to that instead of clearing the whole group.
+    private val beforeGroup = HashMap<Long, Set<Long>>()
+
+    /**
+     * Header check of a day or month: selects all of [groupIds]; when all are selected, goes back to what was picked in
+     * the group before that (nothing, if the whole group was selected another way).
+     */
+    fun toggleGroup(groupIds: List<Long>) {
+        val key = groupIds.firstOrNull() ?: return
+        isSelecting = true
+        val remembered = if (groupSelection(groupIds, ids) == GroupSelection.All) {
+            beforeGroup.remove(key)
+        } else {
+            beforeGroup[key] = groupIds.filterTo(HashSet()) { it in ids }
+            null
+        }
+        ids = toggleGroup(groupIds, ids, remembered)
+        if (ids.isEmpty() && anchorIndex < 0) isSelecting = false
+    }
+
     fun selectAll(items: List<MediaItem>) {
         isSelecting = true
         ids = items.mapTo(HashSet(items.size)) { it.id }
@@ -72,8 +93,35 @@ class SelectionState {
     }
 
     fun clear() {
+        beforeGroup.clear()
         isSelecting = false
         ids = emptySet()
         anchorIndex = -1
     }
 }
+
+/** How much of a group of items (a day or month in the timeline) is selected. */
+enum class GroupSelection { None, Some, All }
+
+/** Whether none, some or all of [groupIds] are in [selected]. An empty group counts as [GroupSelection.None]. */
+fun groupSelection(groupIds: List<Long>, selected: Set<Long>): GroupSelection {
+    if (groupIds.isEmpty() || selected.isEmpty()) return GroupSelection.None
+    var hit = 0
+    for (id in groupIds) if (id in selected) hit++
+    return when (hit) {
+        0 -> GroupSelection.None
+        groupIds.size -> GroupSelection.All
+        else -> GroupSelection.Some
+    }
+}
+
+/**
+ * The selection after tapping a group's header check: when all of it is selected, the group goes back to [before] (what
+ * was picked in it before it was selected whole; nothing if unknown); otherwise the rest of the group is selected.
+ */
+fun toggleGroup(groupIds: List<Long>, selected: Set<Long>, before: Set<Long>? = null): Set<Long> =
+    if (groupSelection(groupIds, selected) == GroupSelection.All) {
+        selected - groupIds.toSet() + before.orEmpty()
+    } else {
+        selected + groupIds
+    }

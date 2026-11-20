@@ -184,12 +184,13 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
                 subtitle = if (back > 0) "${photoCount(back)} go back to the albums they came from. Nothing is deleted." else "Nothing is deleted.",
                 albums = all.filter { it.bucketId !in s.removedBuckets },
                 existingNames = all.map { it.name },
+                newLabel = "New folder",
                 onDismiss = { step = null },
                 onPick = { album, newName ->
                     step = null
                     scope.launch {
                         val dest = when {
-                            album != null -> transfer.destinationOf(album.cover)
+                            album != null -> album.cover?.let { transfer.destinationOf(it) }
                             newName != null -> transfer.newAlbum(newName)
                             else -> null
                         }
@@ -227,7 +228,13 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
                 val ids = albums.map { it.bucketId }.toSet()
                 val items = (repository.state.value as? MediaIndexState.Ready)?.items.orEmpty().filter { it.bucketId in ids }
                 if (items.isEmpty()) return@launch
-                val folders = albums.mapNotNull { transfer.destinationOf(it.cover)?.relativePath }.toSet()
+                // An app's own folder (WhatsApp Images...) can't be emptied: Android never lets its photos move out.
+                val appFolders = items.filter { it.isInAppFolder }.map { it.bucketName }.distinct()
+                if (appFolders.isNotEmpty()) {
+                    toast("${appFolders.joinToString()} belongs to an app, so Android doesn't let its photos move. Add them to an album instead")
+                    return@launch
+                }
+                val folders = albums.mapNotNull { a -> a.cover?.let { transfer.destinationOf(it) }?.relativePath }.toSet()
                 if (folders.size < albums.size) {
                     toast("Couldn't find that album's folder")
                     return@launch

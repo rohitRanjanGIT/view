@@ -36,6 +36,11 @@ data class MediaItem(
      * review): its URI cannot be derived from [id]. A String keeps this class framework-free.
      */
     val externalUri: String? = null,
+    /**
+     * True for a file inside an app's own media folder (`Android/media/<app>/`, e.g. WhatsApp Images). Android never
+     * lets another app move it out of there, so Move skips it; adding it to an album (a list) still works.
+     */
+    val isInAppFolder: Boolean = false,
 ) {
     /** Date used for sorting and grouping: when it was taken, else when the file was modified. */
     val sortDateMs: Long get() = if (dateTakenMs > 0) dateTakenMs else dateModifiedMs
@@ -53,3 +58,6 @@ fun mediaContentUri(id: Long, isVideo: Boolean): Uri = ContentUris.withAppendedI
     if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
     id,
 )
+
+/** Whether a MediaStore relative path is inside an app's own folder under `Android/` (see [MediaItem.isInAppFolder]). */
+fun isAppFolder(relativePath: String?): Boolean = relativePath?.trimStart('/')?.startsWith("Android/", ignoreCase = true) == true

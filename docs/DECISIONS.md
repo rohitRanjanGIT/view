@@ -692,3 +692,46 @@ Hold for 2x restores the chosen speed on release. Built in parallel in a separat
   in a `SideEffect` (after composing the new layout, before its first draw) the photo is set to the old angle
   (-90 x quarter turns, from `Display.rotation`) and old on-glass width, then springs upright; the rail / bottom chrome
   slide in. A direct 180° flip changes no configuration, so it gets no animation.
+
+## Albums are virtual; folders are "On this device" (2026-11-20)
+Decided with the owner, Google Photos model. Before, every album was a device folder, so "Copy to album" made
+duplicate files and a photo could not leave an album without moving its file.
+- **On this device** = the phone's real folders (MediaStore buckets), unchanged: `Album` / `AlbumRepository`,
+  `AlbumDetailRoute`. Every photo is in exactly one. Their actions stay: Move to folder (a real move, Android's write
+  prompt), Remove album (keep photos), Delete album (to Trash). The + inside a folder now only moves photos in
+  ("Copy here" is gone, and `MediaTransfer.copy` with it).
+- **Albums** = the user's own. Room `user_albums` (name, createdAt, coverMediaId, pinnedAt, position) and
+  `user_album_members` (albumId, mediaId, addedAt; key (albumId, mediaId), index on mediaId); DB version 4,
+  AutoMigration 3 -> 4 (new tables only). `UserAlbumRepository` resolves them against the in-memory index in one pass.
+  Adding never copies or moves a file; a photo can be in any number of albums. **Remove from album** deletes only the
+  membership row (Undo puts the rows back); **Delete album** deletes only the list (the dialog says the photos stay).
+- Members not in the index (Trash, Locked, gone) are hidden, never pruned: a photo restored from Trash keeps its
+  MediaStore id and reappears in its albums. Unlocking from Locked makes a new MediaStore entry (new id), so an
+  unlocked photo is not back in its albums. Rows of photos deleted for good stay as harmless orphans.
+- Names: `albumNameError(folder = false)`: empty / too long / another user album's name (ignoring case) are refused;
+  any characters are fine. A user album and a folder may share a name.
+- Lost if the app's data is cleared (accepted). No migration: folders the app made earlier simply show under
+  On this device.
+- UI: the Albums tab shows both sections as rows of big covers; View all opens one in place into the album grid
+  (accordion, pinch as before). Pins, sort and custom order apply to both (Edit albums has a switch for the two kinds).
+  Selection More card: Add to album (sheet of user albums + New album) and Move to folder. Inside a user album:
+  Remove, Use as album cover, and ⋮ Add photos / Rename / Delete album; the album strip lists user albums.
+
+## Select a whole day or month (2026-11-20)
+While selecting, every timeline day header (month header in month view, and the pinned one) has a round check at its
+right end (`GroupSelectionCheck`): empty ring, dash when some of the group is selected, check when all are; tapping
+selects the rest, or clears the group when all were selected. The group's ids come once from the already grouped rows
+(`remember(day)`); the none / some / all state is a `derivedStateOf` (`groupSelection`), so a header recomposes only
+when its own state changes. Pure rules `groupSelection` / `toggleGroup` live in `SelectionState.kt` with unit tests.
+Not selecting: headers are unchanged. The ring uses the outline colour (headers sit on the plain background).
+- Follow-up (owner's call): the second tap on a fully selected day / month goes back to what was picked in it before
+  the first tap (remembered per group in `SelectionState`, keyed by the group's first id, dropped on `clear()`), not to
+  nothing. A group selected whole by tapping its photos one by one has nothing remembered, so its check clears it.
+
+## App folders can't be moved out of (2026-11-20)
+Measured on the phone with test copies: moving a file out of `Android/media/<app>/` (WhatsApp Images...) fails in
+MediaProvider with "Changing ownership from ... to ... not allowed"; files in normal folders move fine. That made a
+10-photo WhatsApp move fail completely. Owner's call: leave those folders as they are. `MediaItem.isInAppFolder`
+(RELATIVE_PATH under `Android/`, read with the index) marks them; `movable()` leaves them out of Move to folder up front
+with a note pointing to albums, the "Move here" picker hides them, and Remove album refuses an app's folder. Adding
+them to an album (a list) is unaffected. The temporary MoveDebug logging is removed.

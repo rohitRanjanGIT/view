@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -40,6 +42,10 @@ val FloatingTabBarHeight = 64.dp
 private val BarBottom = 12.dp
 private val SlotWidth = 96.dp
 private val Inset = 4.dp
+private val ActionGap = 8.dp
+
+/** A round button beside the tab capsule (Settings), in the same frosted style. */
+data class FloatingTabAction(val label: String, val icon: ImageVector, val onClick: () -> Unit)
 
 /** One tab of [FloatingTabBar]: an icon and its label (the label shows only on the selected tab). */
 data class FloatingTab(val label: String, val icon: ImageVector)
@@ -58,6 +64,8 @@ fun FloatingTabBar(
     onSelect: (Int) -> Unit,
     haze: HazeState?,
     modifier: Modifier = Modifier,
+    /** Optional round button just right of the capsule; the two are centred together. */
+    action: FloatingTabAction? = null,
 ) {
     val pill = RoundedCornerShape(percent = 50)
     val indicator = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
@@ -68,6 +76,7 @@ fun FloatingTabBar(
             .padding(bottom = BarBottom),
         contentAlignment = Alignment.Center,
     ) {
+      Row(horizontalArrangement = Arrangement.spacedBy(ActionGap), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
                 .height(FloatingTabBarHeight)
@@ -89,6 +98,24 @@ fun FloatingTabBar(
                 }
             }
         }
+        action?.let { FloatingActionCircle(it, haze) }
+      }
+    }
+}
+
+/** The round button beside the capsule: same height and frosting, the icon in the middle. */
+@Composable
+private fun FloatingActionCircle(action: FloatingTabAction, haze: HazeState?) {
+    Box(
+        Modifier
+            .size(FloatingTabBarHeight)
+            .frostedChrome(haze, capsule = true, style = floatingHazeStyle())
+            .clip(CircleShape)
+            .clickable(onClick = action.onClick)
+            .semantics { role = Role.Button },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(action.icon, contentDescription = action.label, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
     }
 }
 

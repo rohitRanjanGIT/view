@@ -11,6 +11,7 @@ import android.provider.MediaStore
 import androidx.core.database.getLongOrNull
 import androidx.core.database.getStringOrNull
 import com.rohit.gallery.core.model.MediaItem
+import com.rohit.gallery.core.model.isAppFolder
 import com.rohit.gallery.core.model.MediaType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -70,6 +71,7 @@ class MediaStoreDataSource @Inject constructor(
             val favoriteCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_FAVORITE)
             val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
             val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            val pathCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
 
             val out = ArrayList<MediaItem>(it.count)
             while (it.moveToNext()) {
@@ -91,6 +93,7 @@ class MediaStoreDataSource @Inject constructor(
                     sizeBytes = it.getLongOrNull(sizeCol) ?: 0L,
                     displayName = it.getStringOrNull(nameCol).orEmpty(),
                     isTrashed = trashed,
+                    isInAppFolder = isAppFolder(it.getStringOrNull(pathCol)),
                 )
             }
             out
@@ -126,6 +129,7 @@ class MediaStoreDataSource @Inject constructor(
             MediaStore.MediaColumns.IS_FAVORITE,
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.RELATIVE_PATH,
         )
     }
 }

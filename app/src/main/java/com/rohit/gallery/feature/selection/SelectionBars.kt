@@ -47,7 +47,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
@@ -107,14 +109,18 @@ fun SelectionActionBar(
     onShare: () -> Unit,
     onFavorite: () -> Unit,
     onTrash: () -> Unit,
+    /** Inside a user album: takes the photos out of it (only the album's list changes). */
+    onRemoveFromAlbum: (() -> Unit)? = null,
+    onAddToAlbum: (() -> Unit)? = null,
     onMove: (() -> Unit)? = null,
-    onCopy: (() -> Unit)? = null,
+    onSetCover: (() -> Unit)? = null,
     onLock: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val more = buildList {
-        if (onMove != null) add(MoreAction(GalleryIcons.FolderMove, "Move to album", onMove))
-        if (onCopy != null) add(MoreAction(GalleryIcons.FolderCopy, "Copy to album", onCopy))
+        if (onAddToAlbum != null) add(MoreAction(Icons.Filled.Add, "Add to album", onAddToAlbum))
+        if (onMove != null) add(MoreAction(GalleryIcons.FolderMove, "Move to folder", onMove))
+        if (onSetCover != null) add(MoreAction(GalleryIcons.AlbumsTab, "Use as album cover", onSetCover))
         if (onLock != null) add(MoreAction(GalleryIcons.Lock, "Lock", onLock, dividerBefore = isNotEmpty()))
     }
     FloatingActionPill(modifier) {
@@ -126,6 +132,7 @@ fun SelectionActionBar(
             onFavorite,
             Modifier.pillSlot(),
         )
+        if (onRemoveFromAlbum != null) ActionItem(Icons.Filled.Clear, "Remove", enabled, onRemoveFromAlbum, Modifier.pillSlot())
         ActionItem(Icons.Filled.Delete, "Trash", enabled, onTrash, Modifier.pillSlot())
         if (more.isNotEmpty()) {
             val menu = remember { MutableTransitionState(false) }
@@ -291,4 +298,49 @@ fun copySelected(context: Context, selection: SelectionState, items: List<MediaI
     val id = selection.ids.singleOrNull() ?: return
     items?.firstOrNull { it.id == id }?.let { copyToClipboard(context, it) }
     selection.clear()
+}
+
+/**
+ * Round check at the end of a day or month header while selecting: empty ring, a dash when only some of the group
+ * is selected, a check when all of it is. Same family as [SelectionCheck] (22 dp, primary fill, check icon), but the
+ * empty ring uses the outline colour because a header sits on the plain background, not on a photo.
+ * The tap target is 48 dp.
+ */
+@Composable
+fun GroupSelectionCheck(state: GroupSelection, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier
+            .size(48.dp)
+            .clickable(
+                role = androidx.compose.ui.semantics.Role.Checkbox,
+                onClickLabel = label,
+            ) {
+                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(22.dp)
+                .then(
+                    if (state == GroupSelection.None) {
+                        Modifier.border(1.5.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                    } else {
+                        Modifier.background(primary, CircleShape)
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (state) {
+                GroupSelection.All ->
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
+                GroupSelection.Some ->
+                    Box(Modifier.size(width = 10.dp, height = 2.dp).background(MaterialTheme.colorScheme.onPrimary, RoundedCornerShape(1.dp)))
+                GroupSelection.None -> Unit
+            }
+        }
+    }
 }
