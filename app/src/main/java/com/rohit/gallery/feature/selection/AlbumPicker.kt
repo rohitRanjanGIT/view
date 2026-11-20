@@ -57,6 +57,8 @@ fun AlbumPickerSheet(
     newLabel: String = "New album",
     /** False when the names are user albums' (any characters allowed; see albumNameError). */
     folderNames: Boolean = true,
+    /** Shown under the first row when [albums] is empty, so the sheet doesn't look broken. */
+    emptyHint: String? = null,
 ) {
     var creating by remember { mutableStateOf(false) }
 
@@ -88,6 +90,16 @@ fun AlbumPickerSheet(
                         contentAlignment = Alignment.Center,
                     ) { Icon(Icons.Filled.Add, contentDescription = null) }
                     Text(newLabel, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            if (albums.isEmpty() && emptyHint != null) {
+                item(key = "empty") {
+                    Text(
+                        emptyHint,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                    )
                 }
             }
             items(albums, key = { it.bucketId }) { album ->

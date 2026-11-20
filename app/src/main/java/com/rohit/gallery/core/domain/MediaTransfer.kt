@@ -4,6 +4,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.IntentSender
 import android.provider.MediaStore
+import com.rohit.gallery.core.data.db.CreatedFolderDao
+import com.rohit.gallery.core.data.db.CreatedFolderEntity
 import com.rohit.gallery.core.data.db.MediaOriginDao
 import com.rohit.gallery.core.data.db.MediaOriginEntity
 import com.rohit.gallery.core.model.MediaItem
@@ -16,7 +18,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** Where moved media goes: a folder path relative to the storage root, like `Pictures/Trip/`. */
-data class Destination(val relativePath: String)
+/** [isNew]: this move makes the folder (from [MediaTransfer.newAlbum]); it is then remembered as one the user created. */
+data class Destination(val relativePath: String, val isNew: Boolean = false)
 
 data class TransferResult(val done: Int, val failed: Int)
 
@@ -96,6 +99,7 @@ fun movable(items: List<MediaItem>, destPath: String): Pair<List<MediaItem>, Str
 class MediaTransfer @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val origins: MediaOriginDao,
+    private val createdFolders: CreatedFolderDao,
 ) {
     private val resolver get() = context.contentResolver
 
@@ -105,7 +109,7 @@ class MediaTransfer @Inject constructor(
     }
 
     /** A new album [name] under Pictures. */
-    fun newAlbum(name: String) = Destination(normalizeRelativePath("Pictures/${name.trim()}"))
+    fun newAlbum(name: String) = Destination(normalizeRelativePath("Pictures/${name.trim()}"), isNew = true)
 
     /** System confirmation to let this app change [items] (needed before a move). */
     suspend fun writeRequest(items: List<MediaItem>): IntentSender = withContext(Dispatchers.IO) {
@@ -135,19 +139,21 @@ class MediaTransfer @Inject constructor(
         var done = 0
         val newOrigins = ArrayList<MediaOriginEntity>()
         val returned = ArrayList<Long>()
+        val created = HashSet<String>()
         val now = System.currentTimeMillis()
         for ((i, move) in moves.withIndex()) {
             ensureActive()
             val (item, destination) = move
             val from = if (rememberOrigins) currentFolder(item) else null
-            val ok = candidatePaths(item, destination).any { path ->
+            val landed = candidatePaths(item, destination).firstOrNull { path ->
                 runCatching {
                     val values = ContentValues().apply { put(MediaStore.MediaColumns.RELATIVE_PATH, path) }
                     resolver.update(item.uri, values, null, null) > 0
                 }.getOrDefault(false)
             }
-            if (ok) {
+            if (landed != null) {
                 done++
+                if (destination.isNew) created += normalizeRelativePath(landed)
                 when {
                     !rememberOrigins -> returned += item.id
                     from != null && from != normalizeRelativePath(destination.relativePath) ->
@@ -160,10 +166,16 @@ class MediaTransfer @Inject constructor(
         withContext(NonCancellable) {
             runCatching {
                 if (newOrigins.isNotEmpty()) origins.upsertAll(newOrigins)
+                if (created.isNotEmpty()) createdFolders.insertAll(created.map { CreatedFolderEntity(it, now) })
                 returned.chunked(500).forEach { origins.deleteAll(it) }
             }
         }
         TransferResult(done, moves.size - done)
+    }
+
+    /** Folders made through this app (normalised paths like `Pictures/Trip/`); empty if they can't be read. */
+    suspend fun createdFolderPaths(): Set<String> = withContext(Dispatchers.IO) {
+        runCatching { createdFolders.getAll().map { it.relativePath }.toSet() }.getOrDefault(emptySet())
     }
 
     /** Where each of [items] came from, by media id (only photos this app moved). */

@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -71,6 +72,17 @@ class SelectionActions(
     val albums: StateFlow<List<Album>> = albumRepository.organized
         .map { organized -> organized?.visible?.map { it.album }.orEmpty() }
         .stateIn(scope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * The folders Move to folder offers: only ones made through the app (see [createdFolderChoices]), still in the
+     * library, minus the folder this grid shows. Reads each folder's path once (IO), so call it when the sheet opens.
+     */
+    suspend fun createdFolderOptions(): List<Album> {
+        val created = transfer.createdFolderPaths()
+        if (created.isEmpty()) return emptyList()
+        val paths = albums.value.map { it to transfer.destinationOf(it.cover ?: return@map it to null)?.relativePath }
+        return createdFolderChoices(paths, created, currentBucket())
+    }
 
     private val _progress = MutableStateFlow<TransferProgress?>(null)
 
@@ -363,12 +375,14 @@ fun SelectionActionsBar(
     when (sheet) {
         AlbumSheet.MoveToFolder -> {
             val folders by controller.albums.collectAsStateWithLifecycle()
-            // The folder shown here is no target for its own photos.
-            val current = remember { controller.currentBucket() }
+            // Only folders made through the app, minus the one shown here (no target for its own photos).
+            val choices by produceState<List<Album>?>(null) { value = controller.createdFolderOptions() }
+            choices?.let { shown ->
             AlbumPickerSheet(
                 title = "Move to folder",
                 subtitle = "The files move to that folder on the device",
-                albums = folders.filter { it.bucketId != current },
+                albums = shown,
+                emptyHint = "Folders you create here show up here",
                 existingNames = folders.map { it.name },
                 newLabel = "New folder",
                 onDismiss = { sheet = null },
@@ -381,6 +395,7 @@ fun SelectionActionsBar(
                     }
                 },
             )
+            }
         }
         AlbumSheet.AddToAlbum -> {
             val albums by adder.repository.albums.collectAsStateWithLifecycle()

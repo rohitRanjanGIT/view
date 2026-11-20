@@ -4,6 +4,8 @@ import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
@@ -91,16 +93,32 @@ interface MediaOriginDao {
     suspend fun deleteAll(mediaIds: List<Long>)
 }
 
+/** A folder made through the app's "New folder" (the only folders Move to folder offers). [relativePath] is normalised, like `Pictures/Trip/`. */
+@Entity(tableName = "created_folders")
+data class CreatedFolderEntity(
+    @PrimaryKey val relativePath: String,
+    val createdAt: Long,
+)
+
+@Dao
+interface CreatedFolderDao {
+    @Query("SELECT * FROM created_folders")
+    suspend fun getAll(): List<CreatedFolderEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(folders: List<CreatedFolderEntity>)
+}
+
 // Version 2 added the vault table, version 3 the trash snapshots and move origins, version 4 the user albums (new
-// tables only, so Room migrates them from the exported schemas).
+// tables only, so Room migrates them from the exported schemas), version 5 the folders made through the app.
 @Database(
     entities = [
         AlbumPrefEntity::class, VaultItemEntity::class, TrashSnapshotEntity::class, MediaOriginEntity::class,
-        UserAlbumEntity::class, UserAlbumMemberEntity::class,
+        UserAlbumEntity::class, UserAlbumMemberEntity::class, CreatedFolderEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5)],
 )
 abstract class GalleryDatabase : RoomDatabase() {
     abstract fun albumPrefs(): AlbumPrefDao
@@ -112,4 +130,6 @@ abstract class GalleryDatabase : RoomDatabase() {
     abstract fun mediaOrigins(): MediaOriginDao
 
     abstract fun userAlbums(): UserAlbumDao
+
+    abstract fun createdFolders(): CreatedFolderDao
 }

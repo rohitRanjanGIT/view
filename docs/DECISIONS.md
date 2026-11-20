@@ -735,3 +735,14 @@ MediaProvider with "Changing ownership from ... to ... not allowed"; files in no
 (RELATIVE_PATH under `Android/`, read with the index) marks them; `movable()` leaves them out of Move to folder up front
 with a note pointing to albums, the "Move here" picker hides them, and Remove album refuses an app's folder. Adding
 them to an album (a list) is unaffected. The temporary MoveDebug logging is removed.
+
+## Move to folder lists only folders made through the app (2026-11-20)
+Android doesn't record who made a folder, so the app remembers its own: Room `created_folders` (normalised relative path,
+createdAt; DB version 5, AutoMigration 4 -> 5). `MediaTransfer.moveEach` writes a row when a move into a `Destination`
+with `isNew = true` (only `newAlbum(name)` sets it) lands at least one item, using the path that item really landed in
+(a video falls back to Movies/). That covers the selection "New folder", Remove album's "New folder" and the + New album
+picker. Recording is best effort inside the existing bookkeeping block: a failure never fails the move.
+The selection Move to folder sheet shows only device folders whose path (`destinationOf(cover)`, read once when the sheet
+opens) is in that table, case-insensitive (`createdFolderChoices`), minus the current folder, under "New folder"; empty
+shows a hint line. Not changed: "Move here" picker, Add to album, Remove album's own sheet (still lists all folders).
+Folders made before this update aren't remembered, so they no longer show there.
