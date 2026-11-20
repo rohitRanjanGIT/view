@@ -64,6 +64,7 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
                 startMuted = prefs[START_MUTED] ?: false,
                 motionAutoplay = prefs[MOTION_AUTOPLAY] ?: false,
                 ultraHdr = prefs[ULTRA_HDR] ?: true,
+                skipSeconds = prefs[SKIP_SECONDS]?.takeIf { it in SKIP_SECONDS_CHOICES } ?: DEFAULT_SKIP_SECONDS,
             )
         }
         .distinctUntilChanged()
@@ -76,6 +77,7 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
                 startMuted = prefs[START_MUTED] ?: false,
                 motionAutoplay = prefs[MOTION_AUTOPLAY] ?: false,
                 ultraHdr = prefs[ULTRA_HDR] ?: true,
+                skipSeconds = prefs[SKIP_SECONDS]?.takeIf { it in SKIP_SECONDS_CHOICES } ?: DEFAULT_SKIP_SECONDS,
             )
             val new = change(old)
             prefs[THEME] = new.theme.name
@@ -83,6 +85,7 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
             prefs[START_MUTED] = new.startMuted
             prefs[MOTION_AUTOPLAY] = new.motionAutoplay
             prefs[ULTRA_HDR] = new.ultraHdr
+            prefs[SKIP_SECONDS] = new.skipSeconds
         }
     }
 
@@ -144,6 +147,7 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
         val START_MUTED = booleanPreferencesKey("start_muted")
         val MOTION_AUTOPLAY = booleanPreferencesKey("motion_autoplay")
         val ULTRA_HDR = booleanPreferencesKey("ultra_hdr")
+        val SKIP_SECONDS = intPreferencesKey("skip_seconds")
         val VIDEO_POSITIONS = stringPreferencesKey("video_positions")
         val LOCK_HINT_SHOWN = booleanPreferencesKey("lock_hint_shown")
         val LOCKED_ENABLED = booleanPreferencesKey("locked_enabled")
@@ -165,7 +169,13 @@ data class AppSettings(
     val motionAutoplay: Boolean = false,
     /** Show Ultra HDR photos with their extra brightness. */
     val ultraHdr: Boolean = true,
+    /** How far a double-tap on the left or right third of a video skips, in seconds (one of [SKIP_SECONDS_CHOICES]). */
+    val skipSeconds: Int = DEFAULT_SKIP_SECONDS,
 )
+
+/** Skip lengths offered in Settings for double-tapping a video. */
+val SKIP_SECONDS_CHOICES = listOf(5, 10, 15, 30)
+const val DEFAULT_SKIP_SECONDS = 10
 
 /** Grids whose size (column count or level) is remembered across launches. */
 enum class GridSizeKey(internal val prefKey: Preferences.Key<String>) {

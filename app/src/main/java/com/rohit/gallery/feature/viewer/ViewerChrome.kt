@@ -3,6 +3,7 @@ package com.rohit.gallery.feature.viewer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -192,3 +193,29 @@ private fun ActionCircle(action: ViewerAction, container: Color, content: Color,
 
 /** Height of the bottom bar's circles and pill; the details panel leaves this much room under its text. */
 val ActionBarHeight = 56.dp
+
+/** Width of the landscape action rail (its pill and the margin around it). */
+val ActionRailWidth = 80.dp
+
+/**
+ * Landscape: the bottom bar's actions as one vertical pill on the right edge, top to bottom in the same order
+ * (left circle, middle pill, right circle), so the photo keeps the full height and the filmstrip runs under it.
+ */
+@Composable
+fun ViewerActionRail(actions: List<ViewerAction>, onPanel: Float, modifier: Modifier = Modifier) {
+    val container = lerp(Color(0xFF1C1C1C).copy(alpha = 0.85f), MaterialTheme.colorScheme.surfaceContainerHighest, onPanel)
+    val content = lerp(Color.White, MaterialTheme.colorScheme.onSurface, onPanel)
+    Column(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(container)
+            .padding(vertical = 4.dp, horizontal = 2.dp),
+    ) {
+        actions.forEach { action ->
+            // A bit smaller than the portrait bar: landscape has little height between the top bar and the filmstrip.
+            IconButton(onClick = action.onClick, modifier = Modifier.size(48.dp)) {
+                Icon(action.icon, contentDescription = action.description, tint = action.tint ?: content)
+            }
+        }
+    }
+}

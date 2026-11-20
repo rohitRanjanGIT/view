@@ -20,7 +20,9 @@
         android:theme="@style/Theme.Gallery">
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="true">
+            <!-- Rotation is handled by Compose (no rebuild): the viewer stays open and animates the turn itself. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

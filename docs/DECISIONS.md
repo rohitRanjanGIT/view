@@ -665,3 +665,30 @@ scales down. The stand-in size `aspect * 1000` stayed smaller than a portrait pa
 (looked stretched, no bars). Now `aspect * 100_000`, which always scales down to the fitted frame (base zoom 1).
 `scaledToFitAndCenterAligned` would be exact but is deprecated in 0.19.0. A fit option (Best fit / Fill) was tried and
 dropped: videos always show whole.
+
+## Double-tap a video to skip (2026-11-20)
+On a video at rest, Telephoto's `onDoubleClick` is our own listener (`videoSkipDoubleClick`): left third skips back,
+right third forward, the middle third (and anywhere while zoomed in, so zoom never gets stuck) delegates to
+`DoubleClickToZoomListener.cycle()`. Further taps on the same side within 700 ms of the last step each add a step
+(`SkipRun`, pure and unit tested). They are caught by `videoSkipTaps`, which watches in the Initial pass, decides at the
+press (so the double-tap's own second press is never a follow-up) and consumes only the lift: Telephoto never sees a
+click, so no chrome toggle and no extra double-tap, and swipes / holds starting there still pass. Seeks go from
+`player.currentPosition` (it already reports a pending seek, so quick steps add up), clamped to 0..duration. Skip
+length is a setting (5 / 10 / 15 / 30 s, default 10).
+
+## Video speed (2026-11-20)
+A speed chip on the video bar (`VideoSpeed.kt`) opens a card with 0.25-2x; picking one calls `PlaybackState.changeSpeed`.
+No persistence: `PlaybackState` (and its ExoPlayer) is created per video, so each video starts at 1x. The card is a dark
+translucent popup, not frosted: the viewer provides no haze source and a popup window cannot blur the video behind it.
+Hold for 2x restores the chosen speed on release. Built in parallel in a separate worktree (`video-speed` branch).
+
+## Edit videos, landscape viewer, rotation in place (2026-11-20)
+- Edit hands videos to Google Photos too (same read-only ACTION_EDIT as photos).
+- Landscape viewer: the actions move to a vertical rail on the right (`ViewerActionRail`, 48 dp buttons, centred between
+  the top bar and the filmstrip); the photo takes the space beside it at full height; the details panel slides in from
+  the right (40% of the width); only the filmstrip (and a video's controls row) stays at the bottom, clipped at the rail.
+- `MainActivity` handles orientation itself (`configChanges`), so a turn no longer rebuilds the activity (that closed
+  the viewer). While the viewer is open the window's rotation animation is JUMPCUT and `ViewerTurn` animates instead:
+  in a `SideEffect` (after composing the new layout, before its first draw) the photo is set to the old angle
+  (-90 x quarter turns, from `Display.rotation`) and old on-glass width, then springs upright; the rail / bottom chrome
+  slide in. A direct 180° flip changes no configuration, so it gets no animation.

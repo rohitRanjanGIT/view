@@ -35,6 +35,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -279,6 +280,9 @@ fun ViewerFilmstrip(
         modifier = modifier
             .fillMaxWidth()
             .height(with(density) { stripH.toDp() })
+            // Thumbnails are placed along the whole line; anything past the strip's own edges is cut off (in landscape the
+            // strip ends at the action rail).
+            .clipToBounds()
             .draggable(
                 state = dragState,
                 orientation = Orientation.Horizontal,

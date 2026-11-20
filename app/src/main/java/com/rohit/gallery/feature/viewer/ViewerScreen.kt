@@ -3,6 +3,14 @@ package com.rohit.gallery.feature.viewer
 import com.rohit.gallery.core.domain.copyToClipboard
 import com.rohit.gallery.core.ui.components.LocalUndoBar
 import android.provider.MediaStore
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
@@ -58,6 +66,8 @@ import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.ZoomableContentLocation
 import me.saket.telephoto.zoomable.rememberZoomableState
 import me.saket.telephoto.zoomable.zoomable
+import androidx.compose.ui.layout.onSizeChanged
+import com.rohit.gallery.core.data.prefs.DEFAULT_SKIP_SECONDS
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
@@ -152,6 +162,13 @@ private val BackLean = 24.dp
 
 /** Share of the screen height the details panel takes; the photo gets the rest. */
 private const val InfoPanelFraction = 0.46f
+
+/** Landscape: share of the width the details panel takes, from the right. */
+private const val SidePanelFraction = 0.4f
+
+/** Landscape: room the action rail leaves for the top bar above it and the filmstrip below it. */
+private val RailTopClearance = 64.dp
+private val RailBottomClearance = 96.dp
 
 /** Zoom-out before closing a zoomed photo. */
 private const val ZOOM_OUT_MS = 220
@@ -471,16 +488,15 @@ private fun ViewerContent(
                         ),
                     )
                 }
-                if (!currentItem.isVideo) {
-                    // Editing is handed to Google Photos for now (it saves a copy); our own editor comes later.
-                    add(
-                        ViewerAction(Icons.Outlined.Edit, "Edit", {
-                            if (!viewModel.openInEditor(currentItem)) {
-                                Toast.makeText(context, "No photo editor found", Toast.LENGTH_SHORT).show()
-                            }
-                        }),
-                    )
-                }
+                // Editing photos and videos is handed to Google Photos for now (it saves a copy); our own editor comes later.
+                add(
+                    ViewerAction(Icons.Outlined.Edit, "Edit", {
+                        if (!viewModel.openInEditor(currentItem)) {
+                            val kind = if (currentItem.isVideo) "video" else "photo"
+                            Toast.makeText(context, "No $kind editor found", Toast.LENGTH_SHORT).show()
+                        }
+                    }),
+                )
                 if (canWrite) add(ViewerAction(Icons.Outlined.Delete, "Move to trash", { write(trashed = currentItem) { viewModel.trashRequest(currentItem) } }))
             },
         )
@@ -519,6 +535,23 @@ private fun ViewerContent(
             throw e
         }
     }
+
+    // Landscape: the actions move to a rail on the right (beside the photo, which keeps the full height), the details
+    // panel slides in from the right, and only the filmstrip stays at the bottom, under the photo.
+    val windowSize = LocalWindowInfo.current.containerSize
+    val landscape = windowSize.width > windowSize.height
+    val endInset = WindowInsets.safeDrawing.only(WindowInsetsSides.End).asPaddingValues()
+        .calculateEndPadding(LocalLayoutDirection.current)
+    val railShown by animateFloatAsState(
+        if (landscape && (chromeVisible || showInfo)) 1f else 0f,
+        tween(GalleryMotion.FADE_MS * 2),
+        label = "rail",
+    )
+    val railSpace = (ActionRailWidth + endInset) * railShown
+    val sidePanelWidth = with(LocalDensity.current) { (windowSize.width * SidePanelFraction).toDp() }
+    // Turning the phone: the photo turns upright into its new place and the buttons slide to theirs (ViewerRotation).
+    val currentThumbnail = rememberThumbnail(currentItem)
+    val turn = rememberViewerTurn { contentAspect(currentItem, currentThumbnail) }
 
     Box(
         modifier
@@ -595,10 +628,23 @@ private fun ViewerContent(
                 key = { page -> latestItems.getOrNull(page)?.id ?: page },
                 beyondViewportPageCount = 1,
                 pageSpacing = 12.dp,
-                modifier = Modifier.layout { measurable, constraints ->
-                    // The pager gets the screen minus the panel, kept at the top.
-                    val height = (constraints.maxHeight * (1f - InfoPanelFraction * infoProgress)).roundToInt()
-                    val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                modifier = Modifier
+                    .graphicsLayer {
+                        rotationZ = turn.angle
+                        scaleX = turn.scale
+                        scaleY = turn.scale
+                    }
+                    .layout { measurable, constraints ->
+                    // The pager gets the screen minus the panel: kept at the top (portrait), or on the left beside the rail and
+                    // the side panel (landscape).
+                    val placeable = if (landscape) {
+                        val width = (constraints.maxWidth - railSpace.toPx() - sidePanelWidth.toPx() * infoProgress)
+                            .roundToInt().coerceAtLeast(1)
+                        measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                    } else {
+                        val height = (constraints.maxHeight * (1f - InfoPanelFraction * infoProgress)).roundToInt()
+                        measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                    }
                     layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
                 },
             ) { page ->
@@ -613,6 +659,7 @@ private fun ViewerContent(
                     onZoomedChange = { zoomed = it },
                     onZoomState = { state -> currentZoom.state = state },
                     onTap = { if (showInfo) showInfo = false else chromeVisible = !chromeVisible },
+                    skipSeconds = settings?.skipSeconds ?: DEFAULT_SKIP_SECONDS,
                     animateGif = isCurrent && playing,
                     motionClip = if (isCurrent && motionPlaying) {
                         { clipModifier -> MotionClip(item, muted, onEnded = { playing = false }, modifier = clipModifier) }
@@ -655,13 +702,23 @@ private fun ViewerContent(
                 },
                 onOpenFavorites = if (currentItem.isFavorite && !viewModel.isTrash) onOpenFavorites else null,
                 scrollState = infoScroll,
-                bottomSpace = ActionBarHeight + 24.dp,
-                modifier = Modifier
-                    .align(androidx.compose.ui.Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    // Stretched past open, the panel grows taller (bottom stays put) instead of leaving a gap.
-                    .fillMaxHeight(InfoPanelFraction * infoProgress.coerceAtLeast(1f))
-                    .graphicsLayer { translationY = (1f - infoProgress.coerceAtMost(1f)) * size.height }
+                bottomSpace = if (landscape) 16.dp else ActionBarHeight + 24.dp,
+                modifier = if (landscape) {
+                    // From the right, between the photo and the rail; stretched past open it grows wider.
+                    Modifier
+                        .align(androidx.compose.ui.Alignment.CenterEnd)
+                        .padding(end = railSpace)
+                        .fillMaxHeight()
+                        .width(sidePanelWidth * infoProgress.coerceAtLeast(1f))
+                        .graphicsLayer { translationX = (1f - infoProgress.coerceAtMost(1f)) * size.width }
+                } else {
+                    Modifier
+                        .align(androidx.compose.ui.Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        // Stretched past open, the panel grows taller (bottom stays put) instead of leaving a gap.
+                        .fillMaxHeight(InfoPanelFraction * infoProgress.coerceAtLeast(1f))
+                        .graphicsLayer { translationY = (1f - infoProgress.coerceAtMost(1f)) * size.height }
+                }
                     // Swiping down on the panel (when scrolled to its top) closes it and returns to the photo.
                     .verticalDismissGestures(
                         enabled = { infoScroll.value == 0 },
@@ -679,7 +736,12 @@ private fun ViewerContent(
             Modifier
                 .align(androidx.compose.ui.Alignment.BottomStart)
                 .fillMaxWidth()
-                .graphicsLayer { alpha = chromeAlpha }
+                .padding(end = railSpace)
+                .graphicsLayer {
+                    alpha = chromeAlpha * turn.chrome
+                    // After a turn of the phone, the filmstrip (and in portrait the action bar) rises into place.
+                    translationY = (1f - turn.chrome) * size.height
+                }
                 .background(
                     Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f * (1f - infoProgress)))),
                 )
@@ -720,7 +782,7 @@ private fun ViewerContent(
                     )
                 }
             }
-            AnimatedVisibility(
+            if (!landscape) AnimatedVisibility(
                 visible = chromeVisible || showInfo,
                 enter = fadeIn(tween(GalleryMotion.FADE_MS)),
                 exit = fadeOut(tween(GalleryMotion.FADE_MS)),
@@ -734,6 +796,29 @@ private fun ViewerContent(
                         { showInfo = !showInfo },
                     ),
                     onPanel = infoProgress,
+                )
+            }
+        }
+        // Composed only while visible, so a faded-out rail never takes taps.
+        if (landscape && railShown > 0f) {
+            val details = ViewerAction(if (showInfo) Icons.Filled.Info else Icons.Outlined.Info, "Details", { showInfo = !showInfo })
+            // Centred in the height left between the top bar and the filmstrip, so it never covers either.
+            Box(
+                Modifier
+                    .align(androidx.compose.ui.Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .statusBarsPadding()
+                    .padding(top = RailTopClearance, bottom = RailBottomClearance, end = endInset + 12.dp),
+                contentAlignment = androidx.compose.ui.Alignment.Center,
+            ) {
+                ViewerActionRail(
+                    actions = listOfNotNull(bottomActions.start) + bottomActions.middle + details,
+                    onPanel = infoProgress,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = railShown * chromeAlpha * turn.chrome
+                        // After a turn of the phone the rail slides in from the right edge.
+                        translationX = (1f - turn.chrome) * size.width * 1.5f
+                    },
                 )
             }
         }
@@ -864,11 +949,12 @@ private fun ViewerPage(
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableState?) -> Unit,
     onTap: () -> Unit,
+    skipSeconds: Int,
     animateGif: Boolean,
     motionClip: (@Composable (Modifier) -> Unit)?,
 ) {
     if (item.isVideo) {
-        VideoPage(item, isCurrent, playback, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap)
+        VideoPage(item, isCurrent, playback, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap, skipSeconds)
     } else {
         ImagePage(item, isCurrent, dragLayer, flightPlacement, onZoomedChange, onZoomState, onTap, animateGif, motionClip)
     }
@@ -900,6 +986,7 @@ private fun VideoPage(
     onZoomedChange: (Boolean) -> Unit,
     onZoomState: (ZoomableState?) -> Unit,
     onTap: () -> Unit,
+    skipSeconds: Int,
 ) {
     val thumbnail = rememberThumbnail(item)
     val transitionActive = rememberSharedTransitionActive()
@@ -928,6 +1015,8 @@ private fun VideoPage(
     }
     val hold = rememberVideoHoldState()
     val haptic = LocalHapticFeedback.current
+    val skip = rememberVideoSkipState()
+    val doubleClick = remember(skip, playback, skipSeconds, haptic) { videoSkipDoubleClick(skip, playback, skipSeconds, haptic) }
     val shutter: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             thumbnail?.let {
@@ -942,9 +1031,12 @@ private fun VideoPage(
             .fillMaxSize()
             .graphicsLayer { alpha = if (flightEnabled && transitionActive()) 0f else 1f }
             .then(if (dragLayer != null) Modifier.graphicsLayer { dragLayer(aspect) } else Modifier)
+            .onSizeChanged { skip.widthPx = it.width.toFloat() }
+            // Follow-up taps of a double-tap skip add steps (before zoom, so they never reach it as clicks).
+            .videoSkipTaps(playback, skip, skipSeconds, haptic)
             // Hold for 2x, hold and slide to seek (before zoom, so a hold takes the touch from it).
             .then(if (playback != null) Modifier.videoHold(playback, hold, haptic) else Modifier)
-            .zoomable(zoomState, onClick = { onTap() }),
+            .zoomable(zoomState, onClick = { onTap() }, onDoubleClick = doubleClick),
     ) {
         if (playback != null) {
             // TextureView (not SurfaceView) so the drag-to-dismiss scale, rounding and fade apply to the video.
@@ -970,6 +1062,7 @@ private fun VideoPage(
             )
         }
     }
+    if (playback != null) VideoSkipOverlay(skip)
     if (playback != null) VideoHoldOverlay(hold)
     }
 }

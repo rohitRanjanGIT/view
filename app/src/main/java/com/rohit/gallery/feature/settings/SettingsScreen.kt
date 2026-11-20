@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.rohit.gallery.core.data.prefs.SKIP_SECONDS_CHOICES
 import com.rohit.gallery.core.data.prefs.ThemeMode
 
 /**
@@ -81,6 +82,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLocked: () -> Unit, viewModel: Sett
 
             SectionTitle("Viewer")
             SwitchRow("Start videos muted", null, current.startMuted, viewModel::setStartMuted)
+            SkipLengthRow(current.skipSeconds, viewModel::setSkipSeconds)
             SwitchRow(
                 title = "Play motion photos automatically",
                 subtitle = "Play the short clip once when you open one",
@@ -190,6 +192,35 @@ private fun InfoRow(title: String, text: String, onClick: (() -> Unit)? = null) 
     ) {
         Text(title, style = MaterialTheme.typography.bodyLarge)
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Skip length for double-tapping a video's left or right third; the choices open in a small dialog. */
+@Composable
+private fun SkipLengthRow(seconds: Int, onChoose: (Int) -> Unit) {
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    InfoRow(
+        title = "Skip length when double-tapping a video",
+        text = "$seconds seconds. Double-tap the left or right of a video to skip back or forward",
+        onClick = { choosing = true },
+    )
+    if (choosing) {
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Skip length") },
+            text = {
+                Column {
+                    SKIP_SECONDS_CHOICES.forEach { choice ->
+                        RadioRow("$choice seconds", selected = choice == seconds, onSelect = {
+                            onChoose(choice)
+                            choosing = false
+                        })
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { choosing = false }) { Text("Cancel") } },
+        )
     }
 }
 

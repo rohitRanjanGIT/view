@@ -37,12 +37,12 @@ class MediaActions @Inject constructor(
     }
 
     /**
-     * Opens [item] in Google Photos' editor, or (if it is not installed) any app that edits photos. Read access
+     * Opens [item] (photo or video) in Google Photos' editor, or (if it is not installed) any app that edits it. Read access
      * only: the editor can save its result as a new copy but can never overwrite the original.
      */
     fun openInEditor(item: MediaItem): Boolean {
         fun edit() = Intent(Intent.ACTION_EDIT)
-            .setDataAndType(item.uri, item.mimeType.ifBlank { "image/*" })
+            .setDataAndType(item.uri, item.mimeType.ifBlank { if (item.isVideo) "video/*" else "image/*" })
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         val launched = runCatching { context.startActivity(edit().setPackage(GOOGLE_PHOTOS)) }.isSuccess
         if (launched) return true

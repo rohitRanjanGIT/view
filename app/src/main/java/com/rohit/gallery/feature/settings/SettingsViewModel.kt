@@ -61,6 +61,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setUltraHdr(enabled: Boolean) = change { it.copy(ultraHdr = enabled) }
 
+    fun setSkipSeconds(seconds: Int) = change { it.copy(skipSeconds = seconds) }
+
     /** Locked is turned on; null until read. */
     val lockedEnabled: StateFlow<Boolean?> = prefs.lockedEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
