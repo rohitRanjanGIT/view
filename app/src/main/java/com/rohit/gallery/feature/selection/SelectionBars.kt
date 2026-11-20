@@ -1,5 +1,8 @@
 package com.rohit.gallery.feature.selection
 
+import android.content.Context
+import com.rohit.gallery.core.domain.copyToClipboard
+import com.rohit.gallery.core.model.MediaItem
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.spring
@@ -72,6 +75,7 @@ fun SelectionTopBar(
     onClose: () -> Unit,
     onSelectAll: () -> Unit,
     modifier: Modifier = Modifier,
+    onCopy: (() -> Unit)? = null,
 ) {
     Surface(color = Color.Transparent, modifier = modifier.fillMaxWidth().frostedChrome(edgeAtTop = false)) {
         Row(
@@ -86,6 +90,10 @@ fun SelectionTopBar(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
+            // Copy to clipboard works on one photo at a time (most apps paste only the first anyway).
+            if (onCopy != null && count == 1) {
+                IconButton(onClick = onCopy) { Icon(GalleryIcons.Copy, contentDescription = "Copy to clipboard") }
+            }
             TextButton(onClick = onSelectAll) { Text("All") }
         }
     }
@@ -102,17 +110,11 @@ fun SelectionActionBar(
     onMove: (() -> Unit)? = null,
     onCopy: (() -> Unit)? = null,
     onLock: (() -> Unit)? = null,
-    /** Copy to clipboard; [clipboardEnabled] only with one photo (most apps paste only the first of several). */
-    onClipboard: (() -> Unit)? = null,
-    clipboardEnabled: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val more = buildList {
         if (onMove != null) add(MoreAction(GalleryIcons.FolderMove, "Move to album", onMove))
         if (onCopy != null) add(MoreAction(GalleryIcons.FolderCopy, "Copy to album", onCopy))
-        if (onClipboard != null) {
-            add(MoreAction(GalleryIcons.Clipboard, "Copy to clipboard", onClipboard, clipboardEnabled, hint = if (clipboardEnabled) null else "One photo at a time"))
-        }
         if (onLock != null) add(MoreAction(GalleryIcons.Lock, "Lock", onLock, dividerBefore = isNotEmpty()))
     }
     FloatingActionPill(modifier) {
@@ -179,13 +181,13 @@ private fun MoreMenuCard(state: MutableTransitionState<Boolean>, actions: List<M
             Column(
                 Modifier
                     .width(MenuWidth)
-                    .frostedChrome(style = floatingHazeStyle(), corner = 24.dp)
-                    .padding(vertical = 6.dp),
+                    .frostedChrome(style = floatingHazeStyle(), corner = 20.dp)
+                    .padding(vertical = 4.dp),
             ) {
                 actions.forEach { action ->
                     if (action.dividerBefore) {
                         HorizontalDivider(
-                            Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+                            Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant,
                         )
@@ -207,13 +209,13 @@ private fun MoreRow(action: MoreAction, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .clickable(enabled = action.enabled, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(action.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(14.dp))
+        Icon(action.icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
         Column {
-            Text(action.label, style = MaterialTheme.typography.bodyLarge, color = tint)
+            Text(action.label, style = MaterialTheme.typography.bodyMedium, color = tint)
             action.hint?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
@@ -221,7 +223,7 @@ private fun MoreRow(action: MoreAction, onClick: () -> Unit) {
     }
 }
 
-private val MenuWidth = 232.dp
+private val MenuWidth = 196.dp
 
 /**
  * Places a popup above its anchor (the More slot, as tall as the capsule) with a [gap], its right edge [endInset]
@@ -281,3 +283,12 @@ fun SelectionCheck(selected: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
+
+/**
+ * For [SelectionTopBar]'s Copy: copies the one selected item among [items] to the clipboard and ends the selection.
+ */
+fun copySelected(context: Context, selection: SelectionState, items: List<MediaItem>?) {
+    val id = selection.ids.singleOrNull() ?: return
+    items?.firstOrNull { it.id == id }?.let { copyToClipboard(context, it) }
+    selection.clear()
+}

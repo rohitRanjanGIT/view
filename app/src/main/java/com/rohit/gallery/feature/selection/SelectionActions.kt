@@ -39,7 +39,6 @@ import com.rohit.gallery.core.domain.Destination
 import com.rohit.gallery.core.domain.MediaActions
 import com.rohit.gallery.core.domain.MediaTransfer
 import com.rohit.gallery.core.domain.TransferResult
-import com.rohit.gallery.core.domain.copyToClipboard
 import com.rohit.gallery.core.model.Album
 import com.rohit.gallery.core.model.MediaItem
 import kotlinx.coroutines.CoroutineScope
@@ -374,12 +373,6 @@ fun SelectionActionsBar(
         onMove = if (allowTransfer) ({ picker = TransferKind.Move }) else null,
         onCopy = if (allowTransfer) ({ picker = TransferKind.Copy }) else null,
         onLock = if (allowTransfer && locker.enabled) ({ locker.lock(controller.selectedItems()) }) else null,
-        // One photo at a time: most apps paste only the first of several.
-        onClipboard = if (allowTransfer) ({
-            controller.selectedItems().singleOrNull()?.let { copyToClipboard(context, it) }
-            selection.clear()
-        }) else null,
-        clipboardEnabled = count == 1,
         modifier = modifier,
     )
 

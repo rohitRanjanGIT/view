@@ -90,19 +90,6 @@ object GalleryIcons {
         }
     }
 
-    /** Copy to clipboard (line icon): a clipboard with its clip and two lines of text. */
-    val Clipboard: ImageVector by lazy {
-        lineIcon("Clipboard") {
-            moveTo(9f, 4.5f); horizontalLineTo(7f); arcTo(2f, 2f, 0f, false, false, 5f, 6.5f)
-            verticalLineTo(19f); arcTo(2f, 2f, 0f, false, false, 7f, 21f)
-            horizontalLineTo(17f); arcTo(2f, 2f, 0f, false, false, 19f, 19f)
-            verticalLineTo(6.5f); arcTo(2f, 2f, 0f, false, false, 17f, 4.5f); horizontalLineTo(15f)
-            roundRect(9f, 3f, 15f, 6.5f, 1.2f)
-            moveTo(8.5f, 11f); horizontalLineTo(15.5f)
-            moveTo(8.5f, 15f); horizontalLineTo(13f)
-        }
-    }
-
     /** Lock (line icon): a closed padlock. */
     val Lock: ImageVector by lazy {
         lineIcon("Lock") {
