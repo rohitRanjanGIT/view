@@ -253,7 +253,6 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     DECISIONS "Album fixes after a review". Also not yet tried: dates kept through Trash (restore
     writes back the saved date) and Remove album (keep photos); see DECISIONS.
 - **Git:** everything pushed on 2026-11-21 (albums are folders again, Move to album with copy-and-delete fallback, dates and hearts kept through moves and Locked, other apps' folders not a destination, film strip scrub keeps playing). Push only when I say so.
-  again" work) are not pushed. Push only when I say so.
 - **Next (pick with me):**
   0. **Try on the phone, with copies only:** Move to album for a Camera photo (normal move), a WhatsApp Images photo
      (copy + verify + one delete prompt), and declining that prompt (nothing may change, no duplicate left).
