@@ -317,12 +317,16 @@ class MediaTransfer @Inject constructor(
                 resolver.openInputStream(target)?.use { b -> streamsEqual(a, b) }
             } ?: false
             check(same) { "The copy doesn't match the original" }
-            resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
-            // Carried over where Android lets an app set them (publishing re-reads the file's own date first).
-            runCatching {
-                val dates = ContentValues().apply { put(MediaStore.MediaColumns.DATE_MODIFIED, item.dateModifiedMs / 1000) }
-                resolver.update(target, dates, null, null)
+            // MediaProvider ignores any later change to the date columns (even from the app that made the row), and
+            // publishing re-reads the file's own time. So the original's file time is put on the pending file first:
+            // a WhatsApp photo (no capture date) then keeps the date it was received, not "now".
+            if (item.dateModifiedMs > 0) runCatching {
+                val path = resolver.query(target, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                }
+                if (path != null) java.io.File(path).setLastModified(item.dateModifiedMs)
             }
+            resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             if (item.isFavorite) runCatching {
                 val favorite = ContentValues().apply { put(MediaStore.MediaColumns.IS_FAVORITE, 1) }
                 resolver.update(target, favorite, null, null)

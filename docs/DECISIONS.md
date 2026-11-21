@@ -795,3 +795,11 @@ a device folder, a photo is in exactly one, and "Move to album" moves the file.
 - Origins: a copy gets its own origin row (the folder it left), so Remove album can send it back. Returning INTO an
   app folder (Android/media/...) is not possible (Android refuses new files there), so such a photo simply stays and
   Remove album reports it couldn't move.
+
+## Copied photos keep their date (2026-11-21)
+A photo moved by copy + delete (app folders such as WhatsApp) landed under "Today": the copy is a new MediaStore row and
+WhatsApp photos have no capture date, so the timeline fell back to the file time (now). MediaProvider ignores later changes
+to DATE_TAKEN / DATE_MODIFIED (logged "Ignoring mutation", even from the app that owns the row), and publishing a pending
+file re-reads the file's own time. So `copyVerified` now sets the original's modified time on the still-pending file
+(`File.setLastModified` on its DATA path) before IS_PENDING -> 0. Verified on the phone: a copy dated 14 Oct kept 14 Oct.
+Photos already moved with the older build keep the wrong date (their originals are gone).
