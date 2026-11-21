@@ -1,0 +1,1 @@
+Add a group of albums. Meaning: take multiple albums and group them into a group of albums. 
