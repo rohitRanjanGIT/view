@@ -816,3 +816,12 @@ restore, future export or edit), all its information must survive. Audit: only `
 vault rebuild media. Bytes (so EXIF / GPS) are verified identical; the date is carried by setting the file time on the
 pending file; the favourite mark was lost by Locked, so `vault_items` gets `isFavorite` (database version 7,
 AutoMigration 6 -> 7, default 0) and unlock sets it again.
+
+## Scrubbing the film strip no longer pauses the video (2026-11-21)
+Dragging inside the open video's frames called `player.pause()` on the first move and played again on release, and
+"was playing" was read from `isPlaying`, which drops to false while a seek buffers. So the video stopped for the whole
+scrub (and could stay stopped). Now the strip never pauses: it only seeks (keyframes while moving, exact on release),
+the speed is untouched, and the frame time `live` is set by the finger while scrubbing (the per-frame read of the
+player's position would fight it). "Was playing" is `scrubKeepsPlaying(playWhenReady, state)` (`VideoScrub.kt`): the
+intent, not `isPlaying`. A video sitting at its end is paused first, or the seek would restart it; a paused video stays
+paused. Hold-to-seek (`VideoHold`) is a separate gesture and unchanged. Not tried on the phone yet.

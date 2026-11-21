@@ -127,20 +127,32 @@ fun ViewerFilmstrip(
         if (!wantOpen) openIndex = null
     }
 
+    // Dragging and gliding. [video]: the finger is scrubbing the open video (the player keeps playing meanwhile);
+    // [wasPlaying]: it was playing when the scrub began.
+    val drag = remember {
+        object {
+            var video = false; var wasPlaying = false; var centred = -1; var glide: Job? = null
+            // [raw]: where the finger would put the strip; [walled]: the drag started inside an open video, which then
+            // keeps it (past its ends the strip stretches and springs back); [atEdge]: for one buzz per edge reached.
+            var raw = 0f; var walled = false; var atEdge = false
+        }
+    }
+
     // The video's time, 0..1: every frame while it plays open, otherwise from the player's periodic position.
+    // While the finger scrubs it, the finger sets it (the playing video only follows).
     var live by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(playback, playback?.isPlaying, wantOpen) {
         val p = playback ?: return@LaunchedEffect
         fun read() {
             val d = p.player.duration
-            if (d > 0) live = (p.player.currentPosition.toFloat() / d).coerceIn(0f, 1f)
+            if (d > 0 && !drag.video) live = (p.player.currentPosition.toFloat() / d).coerceIn(0f, 1f)
         }
         read()
         while (p.isPlaying && wantOpen) withFrameNanos { read() }
     }
     LaunchedEffect(playback?.positionMs) {
         val p = playback ?: return@LaunchedEffect
-        if (!p.isPlaying && p.durationMs > 0) live = (p.positionMs.toFloat() / p.durationMs).coerceIn(0f, 1f)
+        if (!p.isPlaying && p.durationMs > 0 && !drag.video) live = (p.positionMs.toFloat() / p.durationMs).coerceIn(0f, 1f)
     }
 
     // Geometry along the line, in px. The open video takes its frames' width; the items after it move along.
@@ -189,15 +201,6 @@ fun ViewerFilmstrip(
         }
     }
 
-    // Dragging and gliding.
-    val drag = remember {
-        object {
-            var video = false; var wasPlaying = false; var centred = -1; var glide: Job? = null
-            // [raw]: where the finger would put the strip; [walled]: the drag started inside an open video, which then
-            // keeps it (past its ends the strip stretches and springs back); [atEdge]: for one buzz per edge reached.
-            var raw = 0f; var walled = false; var atEdge = false
-        }
-    }
     // True only while the strip glides on its own: then a touch grabs it at once (state, as draggable reads it in composition).
     var gliding by remember { mutableStateOf(false) }
     fun inOpenVideo(x: Float): Boolean {
@@ -213,7 +216,7 @@ fun ViewerFilmstrip(
             p.seekTo((seekTo * p.durationMs).toLong())
             live = seekTo
         }
-        if (drag.wasPlaying) p.player.play()
+        // No resume needed: scrubbing never paused it (a video that was paused or at its end stays so).
     }
     // An open video's frames as a wall: inside them the finger's position, past them a stretch that resists more and
     // more (and one buzz on reaching the end).
@@ -236,8 +239,10 @@ fun ViewerFilmstrip(
         if (p != null && (drag.walled || inOpenVideo(x))) {
             if (!drag.video) {
                 drag.video = true
-                drag.wasPlaying = p.player.isPlaying
-                p.player.pause()
+                // A playing video keeps playing while scrubbed (a pause here was the bug). Only a video sitting at its
+                // end is paused first, or the seek would restart it by itself.
+                drag.wasPlaying = scrubKeepsPlaying(p.player.playWhenReady, p.player.playbackState)
+                if (p.player.playWhenReady && !drag.wasPlaying) p.player.pause()
                 // Keyframes only while moving: fast enough to follow the finger.
                 p.player.setSeekParameters(SeekParameters.CLOSEST_SYNC)
             }
