@@ -73,6 +73,7 @@ import com.rohit.gallery.feature.viewer.rememberViewerViewModelFactory
 import com.rohit.gallery.core.model.MediaItem
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
+import com.rohit.gallery.feature.motion.MotionScreen
 import com.rohit.gallery.feature.videos.VideosScreen
 import kotlinx.coroutines.launch
 
@@ -176,6 +177,7 @@ fun GalleryNavHost(
                                     onEditAlbums = { navController.navigate(EditAlbumsRoute) },
                                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
                                     onOpenVideos = { navController.navigate(VideosRoute) },
+                                    onOpenMotion = { navController.navigate(MotionRoute) },
                                     onOpenTrash = { navController.navigate(TrashRoute) },
                                     onSelectionModeChange = { selectionActive = it },
                                     contentBottomPadding = contentBottomPadding,
@@ -228,6 +230,12 @@ fun GalleryNavHost(
                         VideosScreen(
                             onBack = { navController.popBackStack() },
                             onOpenMedia = { item -> openViewer(host, item, ViewerRoute(item.id, videosOnly = true)) },
+                        )
+                    }
+                    topLevel<MotionRoute>(navController) { host ->
+                        MotionScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenMedia = { item -> openViewer(host, item, ViewerRoute(item.id, motionOnly = true)) },
                         )
                     }
                     topLevel<VaultRoute>(navController) { host ->

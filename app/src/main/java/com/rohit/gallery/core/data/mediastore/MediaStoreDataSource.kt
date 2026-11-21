@@ -53,8 +53,13 @@ class MediaStoreDataSource @Inject constructor(
                 if (trashed) MediaStore.MATCH_ONLY else MediaStore.MATCH_EXCLUDE,
             )
         }
-        val cursor = context.contentResolver.query(filesUri, PROJECTION, queryArgs, null)
-            ?: return@withContext emptyList()
+        // `_special_format` (GIF / motion photo flag) exists on API 33+ but is not in the public SDK; if a phone
+        // rejects it, load the library without it instead of failing.
+        val cursor = try {
+            context.contentResolver.query(filesUri, PROJECTION + SPECIAL_FORMAT, queryArgs, null)
+        } catch (_: IllegalArgumentException) {
+            context.contentResolver.query(filesUri, PROJECTION, queryArgs, null)
+        } ?: return@withContext emptyList()
 
         cursor.use {
             val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
@@ -70,6 +75,7 @@ class MediaStoreDataSource @Inject constructor(
             val favoriteCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_FAVORITE)
             val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
             val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            val specialCol = it.getColumnIndex(SPECIAL_FORMAT)
 
             val out = ArrayList<MediaItem>(it.count)
             while (it.moveToNext()) {
@@ -91,6 +97,7 @@ class MediaStoreDataSource @Inject constructor(
                     sizeBytes = it.getLongOrNull(sizeCol) ?: 0L,
                     displayName = it.getStringOrNull(nameCol).orEmpty(),
                     isTrashed = trashed,
+                    specialFormat = if (specialCol >= 0) it.getLongOrNull(specialCol)?.toInt() ?: 0 else 0,
                 )
             }
             out
@@ -111,6 +118,7 @@ class MediaStoreDataSource @Inject constructor(
 
     private companion object {
         const val CANCEL_CHECK_INTERVAL = 2000
+        const val SPECIAL_FORMAT = "_special_format"
 
         val PROJECTION = arrayOf(
             MediaStore.MediaColumns._ID,

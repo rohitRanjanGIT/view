@@ -29,6 +29,8 @@ const val ALBUMS_PAGE = 1
     val trashed: Boolean = false,
     val favoritesOnly: Boolean = false,
     val videosOnly: Boolean = false,
+    /** Page through the GIFs and motion photos only (the Motion and GIFs collection). */
+    val motionOnly: Boolean = false,
     /** With [bucketId]: page oldest first, matching the album screen. */
     val oldestFirst: Boolean = false,
     /** Page through the matches for this search instead (see feature/search). */
@@ -49,6 +51,9 @@ const val ALBUMS_PAGE = 1
 
 /** All videos, opened from the Menu tab. */
 @Serializable data object VideosRoute
+
+/** All GIFs and motion photos, opened from the Collections tiles. */
+@Serializable data object MotionRoute
 
 /** One album (folder), opened from the Albums tab. */
 @Serializable data class AlbumDetailRoute(val bucketId: Long)

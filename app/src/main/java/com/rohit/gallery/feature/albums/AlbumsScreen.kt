@@ -126,6 +126,7 @@ fun AlbumsScreen(
     // The Collections tiles under the albums.
     onOpenFavorites: () -> Unit,
     onOpenVideos: () -> Unit,
+    onOpenMotion: () -> Unit,
     onOpenTrash: () -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
     contentBottomPadding: Dp,
@@ -213,6 +214,7 @@ fun AlbumsScreen(
                                             enabled = !selection.isSelecting,
                                             onOpenFavorites = onOpenFavorites,
                                             onOpenVideos = onOpenVideos,
+                                            onOpenMotion = onOpenMotion,
                                             onOpenTrash = onOpenTrash,
                                         )
                                     },

@@ -36,7 +36,21 @@ data class MediaItem(
      * review): its URI cannot be derived from [id]. A String keeps this class framework-free.
      */
     val externalUri: String? = null,
+    /** MediaStore's `_special_format`: 1 GIF, 2 motion photo, 3 animated WebP, 0 none (or not reported). */
+    val specialFormat: Int = 0,
 ) {
+    /**
+     * A GIF, an animated WebP or a motion photo (a still with a short clip inside): the "Motion and GIFs"
+     * collection. MediaStore flags them; the file-name check catches Google Camera's motion photos on a phone
+     * whose scanner did not set the flag.
+     */
+    val isMotionOrGif: Boolean
+        get() = !isVideo && (
+            mimeType.equals("image/gif", ignoreCase = true) ||
+                specialFormat == SPECIAL_MOTION_PHOTO || specialFormat == SPECIAL_ANIMATED_WEBP ||
+                MOTION_NAME.containsMatchIn(displayName)
+            )
+
     /** Date used for sorting and grouping: when it was taken, else when the file was modified. */
     val sortDateMs: Long get() = if (dateTakenMs > 0) dateTakenMs else dateModifiedMs
 
@@ -48,6 +62,12 @@ data class MediaItem(
     /** True for a file from another app that is shown on its own, outside the index. */
     val isExternal: Boolean get() = externalUri != null
 }
+
+private const val SPECIAL_MOTION_PHOTO = 2
+private const val SPECIAL_ANIMATED_WEBP = 3
+
+/** "MVIMG_2020....jpg" (older Google Camera) and "PXL_2024....MP.jpg" (Pixel). */
+private val MOTION_NAME = Regex("""^MVIMG_|\.MP\.[A-Za-z]+$""")
 
 fun mediaContentUri(id: Long, isVideo: Boolean): Uri = ContentUris.withAppendedId(
     if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI,

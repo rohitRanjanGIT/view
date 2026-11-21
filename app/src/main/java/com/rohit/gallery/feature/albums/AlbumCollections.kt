@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * Under the albums: Favourites, Videos and Trash as tiles, two to a row. [enabled] false (while selecting albums)
+ * Under the albums: Favourites, Videos, Motion and GIFs, and Trash as tiles, two to a row. [enabled] false (while selecting albums)
  * dims them and ignores taps.
  */
 @Composable
@@ -34,12 +35,14 @@ fun CollectionsSection(
     enabled: Boolean,
     onOpenFavorites: () -> Unit,
     onOpenVideos: () -> Unit,
+    onOpenMotion: () -> Unit,
     onOpenTrash: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tiles = listOf(
         CollectionTileSpec(Icons.Outlined.FavoriteBorder, "Favourites", onOpenFavorites),
         CollectionTileSpec(Icons.Outlined.PlayArrow, "Videos", onOpenVideos),
+        CollectionTileSpec(Icons.Outlined.Refresh, "Motion and GIFs", onOpenMotion),
         CollectionTileSpec(Icons.Outlined.Delete, "Trash", onOpenTrash),
     )
     Column(modifier.fillMaxWidth().padding(top = 20.dp)) {

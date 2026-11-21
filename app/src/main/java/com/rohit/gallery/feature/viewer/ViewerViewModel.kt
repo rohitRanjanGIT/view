@@ -122,7 +122,7 @@ class ViewerViewModel @AssistedInject constructor(
      * the photo's decode) does not wait a background hop. Filtered views still filter off the main thread.
      */
     private fun initialIndexedItems(): List<MediaItem>? {
-        val unfiltered = !route.favoritesOnly && !route.videosOnly && route.bucketId == null && route.searchQuery == null
+        val unfiltered = !route.favoritesOnly && !route.videosOnly && !route.motionOnly && route.bucketId == null && route.searchQuery == null
         return if (unfiltered) (repository.state.value as? MediaIndexState.Ready)?.items else null
     }
 
@@ -141,6 +141,7 @@ class ViewerViewModel @AssistedInject constructor(
                             SearchIndex(state.items, ZoneId.systemDefault()).search(parseSearchNow(route.searchQuery))
                         route.favoritesOnly -> state.items.filter { it.isFavorite }
                         route.videosOnly -> state.items.filter { it.isVideo }
+                        route.motionOnly -> state.items.filter { it.isMotionOrGif }
                         route.bucketId != null -> state.items.filter { it.bucketId == route.bucketId }
                             .let { if (route.oldestFirst) it.reversed() else it }
                         else -> state.items
