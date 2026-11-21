@@ -74,7 +74,11 @@ class SelectionActions(
 ) {
     /** Device folders to offer as a move target, in the Albums tab's order (pins, sort, custom order). */
     val albums: StateFlow<List<Album>> = albumRepository.organized
-        .map { organized -> organized?.visible?.map { it.album }.orEmpty() }
+        .map { organized ->
+            // Folders owned by another app (WhatsApp Images...) take no photos, so they are not offered.
+            val owned = transfer.appOwnedBuckets()
+            organized?.visible?.map { it.album }.orEmpty().filter { it.bucketId !in owned }
+        }
         .stateIn(scope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _progress = MutableStateFlow<TransferProgress?>(null)

@@ -825,3 +825,10 @@ the speed is untouched, and the frame time `live` is set by the finger while scr
 player's position would fight it). "Was playing" is `scrubKeepsPlaying(playWhenReady, state)` (`VideoScrub.kt`): the
 intent, not `isPlaying`. A video sitting at its end is paused first, or the seek would restart it; a paused video stays
 paused. Hold-to-seek (`VideoHold`) is a separate gesture and unchanged. Not tried on the phone yet.
+
+## Folders owned by other apps are no destination (2026-11-21)
+Android only lets WhatsApp write into `Android/media/com.whatsapp/...`, so Move to album, Remove album's picker and the +
+inside an album no longer offer such folders (`MediaTransfer.appOwnedBuckets()`: buckets that have a row whose
+RELATIVE_PATH starts with `Android/`). They still show as albums and photos can still be moved OUT of them (copy and
+delete). Remove album on such a folder is refused with a message (it would empty the app's folder in one go; the owner
+left this to my judgement): select its photos and use Move to album instead.

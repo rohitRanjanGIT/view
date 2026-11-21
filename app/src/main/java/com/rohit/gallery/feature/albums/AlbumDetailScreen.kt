@@ -39,6 +39,7 @@ fun AlbumDetailScreen(
     val oldestFirst by viewModel.oldestFirst.collectAsStateWithLifecycle()
     val bucketId by viewModel.currentBucket.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle()
+    val appOwned by viewModel.appOwned.collectAsStateWithLifecycle()
     // Delete album: everything in it goes to Trash, then back to Albums (the album is gone).
     val deleter = rememberAlbumDeleter(onDeleted = onBack)
     // Remove album: the album goes, its photos stay (moved back where they came from); then back to Albums.
@@ -57,8 +58,10 @@ fun AlbumDetailScreen(
         titleActions = {
             // Move photos from anywhere in the library into this album (a real move of the files).
             // Only once the album is loaded, so the picker knows the album's real name.
-            IconButton(onClick = { onAddPhotos(bucketId, title) }, enabled = !items.isNullOrEmpty()) {
-                Icon(Icons.Filled.Add, contentDescription = "Move photos here")
+            if (bucketId !in appOwned) {
+                IconButton(onClick = { onAddPhotos(bucketId, title) }, enabled = !items.isNullOrEmpty()) {
+                    Icon(Icons.Filled.Add, contentDescription = "Move photos here")
+                }
             }
             OrderMenu(
                 oldestFirst = oldestFirst,

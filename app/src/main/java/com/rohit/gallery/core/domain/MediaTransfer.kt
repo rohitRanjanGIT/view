@@ -124,6 +124,24 @@ class MediaTransfer @Inject constructor(
         currentFolder(sample)?.let(::Destination)
     }
 
+    /**
+     * Ids of the folders that belong to another app (`Android/media/...`, e.g. WhatsApp Images). Android never lets
+     * photos in or out by an in-place move there, so they are no target to offer: only WhatsApp itself may write there.
+     */
+    suspend fun appOwnedBuckets(): Set<Long> = withContext(Dispatchers.IO) {
+        runCatching {
+            val ids = HashSet<Long>()
+            resolver.query(
+                MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                arrayOf(MediaStore.MediaColumns.BUCKET_ID),
+                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+                arrayOf("Android/%"),
+                null,
+            )?.use { while (it.moveToNext()) ids += it.getLong(0) }
+            ids
+        }.getOrDefault(emptySet())
+    }
+
     /** A new album [name] under Pictures. */
     fun newAlbum(name: String) = Destination(normalizeRelativePath("Pictures/${name.trim()}"))
 

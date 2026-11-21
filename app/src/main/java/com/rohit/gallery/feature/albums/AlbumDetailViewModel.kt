@@ -52,6 +52,11 @@ class AlbumDetailViewModel @Inject constructor(
         .map { organized -> organized?.visible?.map { it.album }.orEmpty() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Folders owned by another app (WhatsApp Images...): photos can not be moved into them, so no + there. */
+    val appOwned: StateFlow<Set<Long>> = albumRepository.organized
+        .map { transfer.appOwnedBuckets() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     /** Shows album [id] here instead (no new screen, so Back still goes to the Albums tab). */
     fun switchTo(id: Long) {
         selection.clear()

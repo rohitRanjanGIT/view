@@ -211,8 +211,13 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
             dismissButton = { TextButton(onClick = { step = null }) { Text("Cancel") } },
         )
         is RemoveStep.Pick -> {
-            val all by remember(albumRepository) { albumRepository.organized.map { o -> o?.visible?.map { it.album }.orEmpty() } }
-                .collectAsStateWithLifecycle(emptyList())
+            // Folders owned by another app (WhatsApp Images...) take no photos, so they are not offered.
+            val all by remember(albumRepository) {
+                albumRepository.organized.map { o ->
+                    val owned = transfer.appOwnedBuckets()
+                    o?.visible?.map { it.album }.orEmpty().filter { it.bucketId !in owned }
+                }
+            }.collectAsStateWithLifecycle(emptyList())
             val back = s.plan.back.size
             AlbumPickerSheet(
                 title = "Remove ${titleOf(s.albums)}: where should ${if (back == 0) "its" else "the other"} ${photoCount(s.plan.others.size)} go?",
@@ -262,6 +267,14 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
                 val ids = albums.map { it.bucketId }.toSet()
                 val items = (repository.state.value as? MediaIndexState.Ready)?.items.orEmpty().filter { it.bucketId in ids }
                 if (items.isEmpty()) return@launch
+                // Removing would empty an app's own folder (WhatsApp Images...) in one go: not offered. Photos can
+                // still be moved out one selection at a time (Move to album).
+                val owned = transfer.appOwnedBuckets()
+                val appFolders = albums.filter { it.bucketId in owned }.map { it.name }
+                if (appFolders.isNotEmpty()) {
+                    toast("${appFolders.joinToString()} belongs to another app, so it can't be removed as a whole. Select its photos and use Move to album")
+                    return@launch
+                }
                 val folders = albums.mapNotNull { transfer.destinationOf(it.cover)?.relativePath }.toSet()
                 if (folders.size < albums.size) {
                     toast("Couldn't find that album's folder")
