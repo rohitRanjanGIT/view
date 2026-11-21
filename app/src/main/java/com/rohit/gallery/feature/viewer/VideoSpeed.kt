@@ -12,19 +12,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -98,8 +91,8 @@ fun VideoSpeedChip(playback: PlaybackState, modifier: Modifier = Modifier) {
 }
 
 /**
- * The speed card: springs up out of the chip and sits just above it, one 48 dp row per speed with the current one
- * ticked. Picking a speed applies it and closes the card; a tap outside or Back closes it too.
+ * The speed card: springs up out of the chip and sits just above it, one row of speeds with the current one
+ * lit. Picking a speed applies it and closes the card; a tap outside or Back closes it too.
  *
  * The viewer has no frosted-bar source (and a popup is its own window, so it could not blur the video anyway), so
  * the card is a dark translucent rounded card that matches the viewer's chrome rather than the app's frosted menus.
@@ -115,23 +108,23 @@ private fun SpeedCard(state: MutableTransitionState<Boolean>, current: Float, on
     val close = { state.targetState = false }
     // Grows from the chip: the card's bottom right.
     val origin = TransformOrigin(0.85f, 1f)
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(percent = 50)
     Popup(popupPositionProvider = position, onDismissRequest = close, properties = PopupProperties(focusable = true)) {
         AnimatedVisibility(
             visibleState = state,
             enter = fadeIn(tween(110)) + scaleIn(spring(dampingRatio = 0.78f, stiffness = 520f), initialScale = 0.6f, transformOrigin = origin),
             exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.85f, transformOrigin = origin),
         ) {
-            Column(
+            Row(
                 Modifier
-                    .width(CardWidth)
                     .clip(shape)
                     .background(CardColor, shape)
                     .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
-                    .padding(vertical = 4.dp),
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Speeds.forEach { speed ->
-                    SpeedRow(speed, selected = speed == current) {
+                    SpeedOption(speed, selected = speed == current) {
                         onPick(speed)
                         close()
                     }
@@ -141,30 +134,30 @@ private fun SpeedCard(state: MutableTransitionState<Boolean>, current: Float, on
     }
 }
 
+/** One speed in the row: the chosen one sits in a lighter pill. 44 dp tall, as wide as its label plus a little. */
 @Composable
-private fun SpeedRow(speed: Float, selected: Boolean, onClick: () -> Unit) {
-    Row(
+private fun SpeedOption(speed: Float, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(percent = 50)
+    Box(
         Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .height(44.dp)
+            .widthIn(min = 40.dp)
+            .clip(shape)
+            .background(Color.White.copy(alpha = if (selected) 0.2f else 0f), shape)
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .semantics { contentDescription = "${speedLabel(speed)} speed" }
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-            if (selected) Icon(Icons.Filled.Check, contentDescription = "Current", tint = Color.White, modifier = Modifier.size(18.dp))
-        }
-        Spacer(Modifier.width(12.dp))
         Text(
             speedLabel(speed),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (selected) Color.White else Color.White.copy(alpha = 0.85f),
         )
     }
 }
 
-private val CardWidth = 132.dp
 private val CardColor = Color(0xFF202124).copy(alpha = 0.92f)
 
 /** Places a popup above its anchor (the chip) with a [gap], right-aligned with it, kept [margin] inside the window. */
