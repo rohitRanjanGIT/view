@@ -19,6 +19,9 @@ safety beat feature count. Every feature must feel instant on a library of
    Edits are always saved as new copies.
    *Approved exception (2026-11-19):* locking into Locked deletes the original via `createDeleteRequest`,
    but only after the vault copy is verified byte for byte (see DECISIONS "Locked").
+   *Approved exception (2026-11-21):* Move to album, when Android refuses an in-place move (photos in another app's
+   folder, e.g. WhatsApp Images), copies the photo, verifies it byte for byte, then deletes the original with
+   `createDeleteRequest` (no Trash), by the owner's decision (see DECISIONS "Albums are folders again").
 2. **Offline and private.** Do NOT declare the `INTERNET` permission. No
    analytics, no cloud, no third-party SDKs that phone home.
 3. **Original work only.** Take inspiration from One UI's layout and behavior,
@@ -200,13 +203,13 @@ the Phase 0 task list and wait for my confirmation before changing anything.
 
 ## 11. Status and handoff (update this at the end of every work session)
 
-Last updated: 2026-11-19. Read this section first in a new session, then `docs/DECISIONS.md` (newest entries at the
+Last updated: 2026-11-21. Read this section first in a new session, then `docs/DECISIONS.md` (newest entries at the
 bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/main`; push only when I ask).
 `README.md` describes the project for GitHub; keep its Features / Status sections in step when a phase finishes.
 
 ### Where we are
 - **Phases 0-2 done and verified on my phone. Phase 3 nearly done** (only the own editor is left, deferred by me).
-  66 unit tests pass. Merged manifests contain no `INTERNET` (re-check each build).
+  103 unit tests pass. Merged manifests contain no `INTERNET` (re-check each build).
 - **Phase 3 done and verified on my phone:** pinch density, album timelines, album organisation, Albums tab pinch,
   oldest-first albums, search, own back-gesture animations, Edit hand-off to Google Photos, GIF / motion photo /
   Ultra HDR, Settings, the viewer redesign, favourite hearts, tabs that slide with the finger.
@@ -229,14 +232,25 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     measured live).
   - Copy to clipboard (viewer top bar; selection bar with one item; not Trash / Locked). Three-finger screenshot no
     longer zooms grids. Selection mode ends when the last item is deselected. Delete album (to Trash).
-  - **New album:** Albums tab + asks a name, then a picker (tap to pick, Copy here / Move here). Verified by Claude on
-    the phone (made "Test album" with one copied screenshot; still there, delete it with ⋮ > Delete album).
-    **+ inside an album** (add photos to an existing album): committed, not yet tried by anyone. Album review fixes
+  - **Albums are the phone's own folders again (2026-11-21, not yet tried by me):** the in-app "user albums" (Room
+    lists, "On this device" / "Albums" sections, Add to album, Remove from album) are gone; DB version 6 drops their
+    tables. The Albums tab is one grid of folders (about 3 per row by default). **Move to album** (selection More menu)
+    lists every folder except the current one, with New album first, and moves the files. Photos Android won't move in
+    place (another app's folder, e.g. WhatsApp Images) are copied, checked byte for byte, and the originals deleted
+    with one Android confirmation (no Trash); declining leaves everything unchanged (copies removed). See DECISIONS
+    "Albums are folders again". Kept from the redesign: Settings circle beside the tab pill + swipe-right back in
+    Settings, select a whole day / month from its header.
+  - **New album:** Albums tab + asks a name, then a picker (tap to pick, Move here). Verified by Claude on
+    the phone earlier (with Copy here, which is gone now).
+    **+ inside an album** ("Move photos here"): committed, not yet tried by anyone. Album review fixes
     (2026-11-19, not yet tried on the phone): folder rules, double-tap guard, Stop, name clash, picker order; see
     DECISIONS "Album fixes after a review". Also not yet tried: dates kept through Trash (restore
     writes back the saved date) and Remove album (keep photos); see DECISIONS.
-- **Git:** everything pushed up to `1bc4bab` (albums redesign, Move to folder) on 2026-11-20. Push only when I say so.
+- **Git:** pushed up to `1bc4bab` on 2026-11-20; later local commits (decisions, the 2026-11-21 "albums are folders
+  again" work) are not pushed. Push only when I say so.
 - **Next (pick with me):**
+  0. **Try on the phone, with copies only:** Move to album for a Camera photo (normal move), a WhatsApp Images photo
+     (copy + verify + one delete prompt), and declining that prompt (nothing may change, no duplicate left).
   1. **No Menu** (built 2026-11-20, not yet tried by me): bottom bar is Pictures + Albums. Favourites, Videos, Trash are
      "Collections" tiles at the end of the Albums grid; Settings: swipe left past Albums and hold 0.6 s. iOS-style swipe-right back in
      Favourites, Videos, Trash (`swipeBack`).
@@ -274,7 +288,8 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
     aperture / focal box (`ExposureValues`); album row (opens the album) and Favourites row (opens Favourites).
   - Video (Media3: scrubber, mute, keep-screen-on, resume saved across launches), Ultra HDR window mode.
 - **Selection** (`feature/selection/`): long-press + drag-select with edge auto-scroll; Share, Favourite, Trash,
-  More (Move / Copy to album, Lock), Copy to clipboard with one item; ends at zero selected.
+  More (Move to album, Lock), Copy to clipboard with one item; ends at zero selected. Day / month headers have a
+  round check while selecting (`GroupSelectionCheck`).
   Secondary grids (album, Favourites, Videos, Trash) use `MediaListScreen` /
   `SelectableMediaGrid`.
 - **Albums, Favourites, Videos, Trash** (restore / delete forever with confirmation). UI text spells "Favourite"
@@ -282,9 +297,12 @@ bottom). Repo: https://github.com/rohitRanjanGIT/view (`main` tracks `origin/mai
 - **External intents:** `ACTION_VIEW` + camera `REVIEW` open straight into the viewer, works without media permission.
 - **Pinch density:** `GridZoom.kt` / `PinchToZoom.kt` / `GridZoomAnchor.kt`. Pictures 2/4/6 + month; album lists
   share one size; Trash a flat 2/4/6 grid. All remembered across launches (`GridSizeKey` in `AppPreferences`).
-- **Albums tab:** + New album (`NewAlbumScreen`, `NewAlbumRoute(name, bucketId?)` also used by the + inside an album),
-  Search, ⋮ (sort, Edit albums); selection: Pin, Lock, Delete (`AlbumDelete.kt`, to Trash). Push past the last album and hold 1.2 s to open Locked.
-- **Album organisation:** Room `gallery.db` (`AlbumPrefEntity`: hidden, pinnedAt, position; schema in `app/schemas/`),
+- **Albums tab:** one grid of device folders (default 3 per row, pinch 2 / 3 / 4), + New album (`NewAlbumScreen`,
+  `NewAlbumRoute(name, bucketId?)` also used by the + inside an album), Search, ⋮ (sort, Edit albums); selection: Pin,
+  Lock, Remove album, Delete (`AlbumDelete.kt`, to Trash). Collections tiles (Favourites, Videos, Trash) at the end. Push
+  past the end and hold 1.2 s to open Locked; the round Settings button sits beside the tab pill. Moves go through
+  `MediaTransfer.moveEach` (in place first, else copy + verify + delete, see `TransferFallback.kt`).
+- **Album organisation:** Room `gallery.db` version 6 (`AlbumPrefEntity`: hidden, pinnedAt, position; schemas in `app/schemas/`),
   DataStore `AppPreferences` (album sort, albums per row, oldest-first). Edit albums screen (pin, reorder).
   Hidden albums were removed (the `hidden` column stays in Room, unused).
 - **Search:** `feature/search/` (`parseSearch` / `SearchIndex` / suggestions, recent searches in DataStore).

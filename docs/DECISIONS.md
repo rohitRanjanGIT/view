@@ -753,3 +753,45 @@ could only be in one album, and app folders (WhatsApp...) could join only as cop
 lists (a photo can be in many; nothing moves on disk), device folders stay fully editable (+ moves in, Remove album,
 Delete album to Trash for clearing out e.g. extracted zips, Lock, Pin; no Rename). Also considered and dropped: making
 device folders read-only, and protecting Camera / Screenshots from Delete album.
+
+## Albums are folders again; Move to album copies when Android refuses (2026-11-21)
+Owner's call, reversing "Albums are virtual" (2026-11-20, and its follow-ups "App folders can't be moved out of", "Move
+to folder lists only folders made through the app", "Albums stay lists"). One concept is easier than two: an album is
+a device folder, a photo is in exactly one, and "Move to album" moves the file.
+- **Removed:** Room `user_albums`, `user_album_members` and `created_folders` (DB version 6, `AutoMigration(5, 6)` with
+  the `DropUserAlbums` spec that deletes the three tables; schema `6.json` exported; a phone with v5 data migrates in
+  place, the old lists are simply gone), `UserAlbumRepository`, the user album screens, Add to album, Remove from album
+  + Undo, covers / rename / pins of user albums, the "On this device" / "Albums" sections and View all. The Albums tab
+  is one grid of device folders again (pins, sort, custom order, pinch 2 / 3 / 4 per row, Collections tiles, hold past
+  the end for Locked, + New album). Its default is now 3 per row (the owner liked the smaller cover cards); a size the
+  owner already chose is kept. `MediaTransfer.copy` ("Copy here") stays gone: photos move, they are not duplicated.
+- **Kept from the redesign:** the Settings circle beside the tab pill and swipe-right back in Settings, selecting a
+  whole day / month from its header.
+- **Move to album:** the sheet lists every device folder except the one the photos are in, "New album" first (a real
+  folder under Pictures/<name>, or Movies/<name> for videos). The "Move photos here" + inside an album and Remove
+  album's pickers list all folders again.
+- **The fallback.** Android refuses `RELATIVE_PATH` updates for files another app owns (`Android/media/<app>/...`:
+  "Changing ownership ... not allowed"), but Google Photos moves such photos, by copying and deleting. So
+  `MediaTransfer.moveEach` goes item by item: (A) try the normal in-place move after the write request, exactly as
+  before; (B) if that fails, insert a new MediaStore row in the destination (IS_PENDING = 1, same MIME type, the same
+  display name or `name (1).ext` if taken, found by `uniqueDisplayName`), stream the bytes, and **verify byte for
+  byte** by reading the original and the copy again and comparing chunk by chunk (`streamsEqual`), before anything is
+  published; then publish (IS_PENDING = 0) and carry over DATE_TAKEN (on insert), DATE_MODIFIED and the favourite mark
+  (best effort afterwards: Android may keep its own values). A copy that fails to verify, or any error, or Stop, is
+  deleted at once: no half-written file stays. All of it runs on Dispatchers.IO.
+- **Deleting the originals.** Only verified copies count. After the loop, one `createDeleteRequest` for all those
+  originals (one system prompt; silent with "Skip confirmation pop-ups"). The owner said to delete for good, not send
+  to Trash: the verified copy is in the new folder, so Trash would only keep a duplicate. This is the second approved
+  exception to "never delete without Trash", and like Locked it rests on the byte check (CLAUDE.md hard rule 1).
+- **Declined or failed delete.** After the prompt is answered (whichever way) `finishFallback` looks at each original:
+  if it is gone, the move is final; if it is certainly still there, the copy made for it is deleted (we own it), so no
+  duplicate is left, and the toast says "Not moved: the delete wasn't allowed, so nothing changed" (or "Moved 2, 3 not
+  moved ..."). A copy is never removed on a doubt (when the check itself fails it is kept), so media is never lost. If
+  the app dies between the copy and the delete, the copies and originals both exist (a duplicate, never a loss).
+- **Cost.** A photo from another app's folder needs two Android prompts (write access for the in-place try, then the
+  delete). With the in-place try refused the write access is wasted but harmless. Not tried on the phone yet.
+- `isInAppFolder` / `isAppFolder` are gone: nothing needs to know in advance, a refused move falls back by itself.
+  `movable()` only applies the folder rule again (photos not into Movies/, nothing into Download/).
+- Origins: a copy gets its own origin row (the folder it left), so Remove album can send it back. Returning INTO an
+  app folder (Android/media/...) is not possible (Android refuses new files there), so such a photo simply stays and
+  Remove album reports it couldn't move.

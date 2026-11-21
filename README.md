@@ -23,13 +23,13 @@ Smoothness and data safety come before feature count: every screen is meant to f
   panel (date, path, size, resolution, EXIF, location text). The tapped photo starts decoding on tap, so it is
   usually sharp by the time the viewer opens.
 - **Video**: Media3 ExoPlayer with a scrubber, mute, keep-screen-on and resume position.
-- **Albums**: album list and album detail; pin, custom order, delete (to Trash), new album and add photos to an
-  album; a side strip in an album to jump between albums.
+- **Albums**: album list and album detail; pin, custom order, delete (to Trash), new album and move photos into an
+  album (the phone's own folders); a side strip in an album to jump between albums.
 - **Locked**: a private folder only this app can open (fingerprint or screen lock), opened by a hidden gesture or
   from Settings; turning it off moves everything back.
 - **One-handed reach**: pull any grid down to bring its top rows within thumb reach; the title glides with it.
-- **Selection**: long-press, then drag to select a range with auto-scroll at the edges; share, favorite, move or
-  copy to an album, lock, copy to clipboard, and trash (with Undo).
+- **Selection**: long-press, then drag to select a range with auto-scroll at the edges; share, favorite, move to an
+  album, lock, copy to clipboard, and trash (with Undo).
 - **Favorites, Videos and Trash** pages. Trash supports restore and permanent delete.
 - **Opens files from other apps**: `ACTION_VIEW` and camera review intents for images and videos, including
   when the app has no media permission.
