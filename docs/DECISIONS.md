@@ -803,3 +803,9 @@ to DATE_TAKEN / DATE_MODIFIED (logged "Ignoring mutation", even from the app tha
 file re-reads the file's own time. So `copyVerified` now sets the original's modified time on the still-pending file
 (`File.setLastModified` on its DATA path) before IS_PENDING -> 0. Verified on the phone: a copy dated 14 Oct kept 14 Oct.
 Photos already moved with the older build keep the wrong date (their originals are gone).
+
+## Unlocking from Locked keeps the photo's date (2026-11-21)
+Same cause and fix as "Copied photos keep their date": the vault row already stores the original's modified time, but
+`restoreTo` published a new MediaStore file without it, so a photo without a capture date (WhatsApp) came back dated
+"now". The original modified time is now set on the pending file (`File.setLastModified` on its DATA path) before
+IS_PENDING -> 0. The favourite mark is not stored in the vault, so it is not restored (not changed here).

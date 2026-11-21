@@ -250,6 +250,15 @@ class VaultRepository @Inject constructor(
             }
             val written = (resolver.openInputStream(target) ?: error("no input")).use(VaultStorage::sha256)
             if (written != row.sha256) error("The restored copy doesn't match")
+            // MediaProvider ignores later changes to the date columns and re-reads the file's own time when the file
+            // is published, so the original time goes on the pending file first (a WhatsApp photo, which has no
+            // capture date, would otherwise come back dated "now").
+            if (row.dateModifiedMs > 0) runCatching {
+                val path = resolver.query(target, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                }
+                if (path != null) File(path).setLastModified(row.dateModifiedMs)
+            }
             resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             return true
         } catch (e: Exception) {
