@@ -47,8 +47,20 @@ class SettingsViewModel @Inject constructor(
         context.packageManager.getPackageInfo(context.packageName, 0).versionName
     }.getOrNull().orEmpty()
 
+    private val _iconStyle = MutableStateFlow<AppIconStyle?>(null)
+
+    /** The launcher icon colour in use (read from the system, which is where it is stored); null until read. */
+    val iconStyle: StateFlow<AppIconStyle?> = _iconStyle.asStateFlow()
+
     init {
         refreshManageMedia()
+        viewModelScope.launch(Dispatchers.IO) { _iconStyle.value = currentIconStyle(context) }
+    }
+
+    fun setIconStyle(style: AppIconStyle) {
+        if (_iconStyle.value == style) return
+        _iconStyle.value = style
+        viewModelScope.launch(Dispatchers.IO) { applyIconStyle(context, style) }
     }
 
     fun setTheme(theme: ThemeMode) = change { it.copy(theme = theme) }

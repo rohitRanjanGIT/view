@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- For the white icon: the sun is a violet-to-orange gradient, the water lines are coloured too. -->
+    <path android:pathData="M34,53A20,20 0 0 1 74,53Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="34"
+                android:startY="33"
+                android:endX="74"
+                android:endY="53"
+                android:type="linear">
+                <item android:color="#FF5E3A9E" android:offset="0.0" />
+                <item android:color="#FFC0467D" android:offset="0.55" />
+                <item android:color="#FFFF9A52" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FFD9558A"
+        android:pathData="M34.5,60h39a2.5,2.5 0 0 1 0,5h-39a2.5,2.5 0 0 1 0,-5z" />
+    <path
+        android:fillColor="#FFFFA866"
+        android:pathData="M42.5,69h23a2.5,2.5 0 0 1 0,5h-23a2.5,2.5 0 0 1 0,-5z" />
+</vector>

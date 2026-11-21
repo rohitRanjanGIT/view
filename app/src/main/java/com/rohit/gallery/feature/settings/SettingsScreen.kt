@@ -79,6 +79,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLocked: () -> Unit, viewModel: Sett
                 checked = current.wallpaperColors,
                 onCheckedChange = viewModel::setWallpaperColors,
             )
+            val iconStyle by viewModel.iconStyle.collectAsStateWithLifecycle()
+            iconStyle?.let { AppIconRow(it, viewModel::setIconStyle) }
 
             SectionTitle("Viewer")
             SwitchRow("Start videos muted", null, current.startMuted, viewModel::setStartMuted)
