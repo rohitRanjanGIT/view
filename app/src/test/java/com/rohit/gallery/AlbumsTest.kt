@@ -27,7 +27,7 @@ class AlbumsTest {
         val albums = buildAlbums(items)
         assertEquals(listOf("Trip", "Camera"), albums.map { it.name })
         assertEquals(listOf(2, 3), albums.map { it.count })
-        assertEquals(5L, albums[0].cover?.id)
+        assertEquals(5L, albums[0].cover.id)
     }
 
     @Test

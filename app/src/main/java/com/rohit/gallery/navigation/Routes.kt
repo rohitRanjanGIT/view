@@ -39,8 +39,6 @@ const val ALBUMS_PAGE = 1
     val vault: Boolean = false,
     /** With [vault]: only the photos locked from this album. */
     val vaultAlbum: String? = null,
-    /** Page through this user album (see UserAlbumRepository) instead; [oldestFirst] applies as for a folder. */
-    val userAlbumId: Long? = null,
 )
 
 /** The recycle bin, opened from the Menu tab. */
@@ -52,11 +50,8 @@ const val ALBUMS_PAGE = 1
 /** All videos, opened from the Menu tab. */
 @Serializable data object VideosRoute
 
-/** One device folder, opened from the Albums tab's "On this device". */
+/** One album (folder), opened from the Albums tab. */
 @Serializable data class AlbumDetailRoute(val bucketId: Long)
-
-/** One user album (a list kept by the app, not a folder), opened from the Albums tab's "Albums". */
-@Serializable data class UserAlbumRoute(val albumId: Long)
 
 /** Search the library, opened from the Pictures tab. */
 @Serializable data object SearchRoute
@@ -73,12 +68,7 @@ const val ALBUMS_PAGE = 1
 @Serializable data object EditAlbumsRoute
 
 /**
- * Picking photos to move into the existing device folder [bucketId] (the + inside a folder). [name] is the folder's name.
+ * Picking photos to put in an album: a new one named [name] (Albums tab, +), or the existing album [bucketId] (the +
+ * inside an album).
  */
 @Serializable data class NewAlbumRoute(val name: String, val bucketId: Long? = null)
-
-/**
- * Picking photos for a user album: a new one named [name] (made when Add is tapped, so Cancel leaves nothing behind;
- * Albums tab, +), or the existing album [albumId] (Add photos inside it). Only memberships change, never files.
- */
-@Serializable data class PickForAlbumRoute(val name: String, val albumId: Long? = null)

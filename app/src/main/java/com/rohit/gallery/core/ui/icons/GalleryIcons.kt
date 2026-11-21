@@ -62,7 +62,7 @@ object GalleryIcons {
         }
     }
 
-    /** Move to folder (line icon): a folder with an arrow going in. */
+    /** Move to album (line icon): a folder with an arrow going in. */
     val FolderMove: ImageVector by lazy {
         lineIcon("FolderMove") {
             folderOutline()

@@ -193,14 +193,15 @@ private fun AlbumStrip(albums: List<Album>, currentId: Long?, onPick: (Album) ->
                     .clip(CoverShape)
                     .clickable { if (!current) onPick(album) },
             ) {
-                AlbumCover(
-                    cover = album.cover,
+                MediaThumbnail(
+                    item = album.cover,
                     cellSizePx = coverPx,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(CoverShape)
                         .then(if (current) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CoverShape) else Modifier),
+                    showBadge = false,
                 )
                 Text(
                     album.name,

@@ -55,7 +55,7 @@ fun AlbumDetailScreen(
         onBack = onBack,
         onOpenMedia = { onOpenMedia(it, bucketId, oldestFirst) },
         titleActions = {
-            // Move photos from anywhere in the library into this folder (a real move; user albums add without one).
+            // Move photos from anywhere in the library into this album (a real move of the files).
             // Only once the album is loaded, so the picker knows the album's real name.
             IconButton(onClick = { onAddPhotos(bucketId, title) }, enabled = !items.isNullOrEmpty()) {
                 Icon(Icons.Filled.Add, contentDescription = "Move photos here")

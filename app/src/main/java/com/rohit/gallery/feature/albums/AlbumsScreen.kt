@@ -95,7 +95,7 @@ import com.rohit.gallery.core.permissions.MediaAccessGate
 import com.rohit.gallery.core.ui.components.GridGeometry
 import com.rohit.gallery.core.ui.components.GridZoomState
 import com.rohit.gallery.core.ui.components.KeepGridZoomAnchor
-import com.rohit.gallery.core.ui.components.AlbumCover
+import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.ZoomAnchorCell
 import com.rohit.gallery.core.ui.components.ZoomOverlay
 import com.rohit.gallery.core.ui.components.pinchToZoom
@@ -113,19 +113,15 @@ private val CardPlacement = spring(stiffness = Spring.StiffnessMediumLow, visibi
 private val ALBUM_GAP = 12.dp
 
 /**
- * The Albums tab: "On this device" (the phone's folders) and "Albums" (the user's own, which hold photos without
- * moving them), each a row of covers that View all opens in place into a grid; then Collections. Long-press selects
- * albums of one section to pin, lock, remove or delete. Pushing up past the end and holding for 1.2 s opens Locked
- * (its only way in).
+ * The Albums tab: pinned albums first (in pin order), then the rest in the chosen sort. Long-press
+ * selects albums to pin / unpin or lock. Pushing up past the last album and holding for 1.2 s opens Locked (its only way in).
  */
 @Composable
 fun AlbumsScreen(
     onOpenAlbum: (Album) -> Unit,
-    onOpenUserAlbum: (albumId: Long) -> Unit,
     onEditAlbums: () -> Unit,
     onOpenLocked: () -> Unit,
     onOpenSearch: () -> Unit,
-    /** + : a new user album called [name]; photos are picked next. */
     onCreateAlbum: (name: String) -> Unit,
     // The Collections tiles under the albums.
     onOpenFavorites: () -> Unit,
@@ -139,38 +135,27 @@ fun AlbumsScreen(
     MediaAccessGate(modifier.fillMaxSize()) {
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
         val organized by viewModel.organized.collectAsStateWithLifecycle()
-        val userAlbums by viewModel.userAlbums.collectAsStateWithLifecycle()
         val columns by viewModel.columns.collectAsStateWithLifecycle()
         val current = organized
-        val deviceSelection = rememberAlbumSelection()
-        val userSelection = rememberAlbumSelection()
-        val selecting = deviceSelection.isSelecting || userSelection.isSelecting
-        val clearSelection = {
-            deviceSelection.clear()
-            userSelection.clear()
-        }
+        val selection = rememberAlbumSelection()
 
         // The nav host hides its bottom bar while selecting; this screen shows its own action bar instead.
-        LaunchedEffect(selecting) { onSelectionModeChange(selecting) }
+        LaunchedEffect(selection.isSelecting) { onSelectionModeChange(selection.isSelecting) }
         DisposableEffect(Unit) { onDispose { onSelectionModeChange(false) } }
-        BackHandler(enabled = selecting) { clearSelection() }
+        BackHandler(enabled = selection.isSelecting) { selection.clear() }
 
         val haze = rememberChromeHaze()
         // Also says whether Locked is turned on (Settings): off, there is no Lock action and no hold to open it.
-        val locker = rememberVaultLocker(onLocked = { if (it > 0) clearSelection() })
-        // Delete (folders): everything in them goes to Trash; the folders then disappear.
-        val deleter = rememberAlbumDeleter(onDeleted = { clearSelection() })
-        // Remove (folders): the folders go, their photos stay (moved back where they came from, or where you pick).
-        val remover = rememberAlbumRemover(onRemoved = { clearSelection() })
-        val device = current?.visible
-        val user = remember(userAlbums) { userAlbums?.map { it.asEntry() } }
-        // Which section is open in place (one at a time); kept across process death.
-        var expanded by rememberSaveable { mutableStateOf<AlbumSection?>(null) }
+        val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
+        // Delete: everything in the albums goes to Trash; the albums then disappear.
+        val deleter = rememberAlbumDeleter(onDeleted = { selection.clear() })
+        // Remove: the albums go, their photos stay (moved back where they came from, or where you pick).
+        val remover = rememberAlbumRemover(onRemoved = { selection.clear() })
+        val list = current?.visible
         // Held here so the header's small title can fade out while the big one shows (grid pulled down).
         val reach = rememberReachState()
         // New album (+), Search and the ⋮ menu: in the header, and riding above the grid while it is pulled down.
         var naming by rememberSaveable { mutableStateOf(false) }
-        var confirmDelete by rememberSaveable { mutableStateOf(false) }
         val icons: @Composable RowScope.() -> Unit = {
             IconButton(onClick = { naming = true }) { Icon(Icons.Filled.Add, contentDescription = "New album") }
             IconButton(onClick = onOpenSearch) { Icon(Icons.Filled.Search, contentDescription = "Search") }
@@ -178,8 +163,7 @@ fun AlbumsScreen(
         }
         if (naming) {
             NewAlbumDialog(
-                existingNames = userAlbums?.map { it.name }.orEmpty(),
-                folder = false,
+                existingNames = list?.map { it.album.name }.orEmpty(),
                 onCreate = { name ->
                     naming = false
                     onCreateAlbum(name)
@@ -187,28 +171,13 @@ fun AlbumsScreen(
                 onDismiss = { naming = false },
             )
         }
-        val selectedUser = userAlbums.orEmpty().filter { it.id in userSelection.ids }
-        if (confirmDelete && selectedUser.isNotEmpty()) {
-            DeleteUserAlbumsDialog(
-                albums = selectedUser,
-                onDismiss = { confirmDelete = false },
-                onConfirm = {
-                    confirmDelete = false
-                    viewModel.deleteUserAlbums(selectedUser.map { it.id })
-                    clearSelection()
-                },
-            )
-        }
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().hazeSource(haze)) {
-                if (selecting) {
-                    val userActive = userSelection.isSelecting
+                if (selection.isSelecting) {
                     SelectionTopBar(
-                        count = if (userActive) userSelection.ids.size else deviceSelection.ids.size,
-                        onClose = clearSelection,
-                        onSelectAll = {
-                            if (userActive) user?.let(userSelection::selectAll) else device?.let(deviceSelection::selectAll)
-                        },
+                        count = selection.ids.size,
+                        onClose = selection::clear,
+                        onSelectAll = { list?.let(selection::selectAll) },
                     )
                 } else {
                     AlbumsHeader(
@@ -217,72 +186,55 @@ fun AlbumsScreen(
                         modifier = Modifier.statusBarsPadding(),
                     )
                 }
-                val cols = columns
-                if (device == null || user == null || cols == null) {
-                    Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                } else {
-                    // Pull down at the top to bring the albums into thumb reach.
-                    ReachDown(
-                        title = "Albums",
-                        subtitle = albumCountLabel(device.size + user.size),
-                        state = reach,
-                        actions = icons,
-                    ) {
-                        // Locked has no button anywhere: push up past the end and hold for 1.2 seconds.
-                        Box(Modifier.holdPastEnd(if (locker.enabled && !selecting) onOpenLocked else null)) {
-                            SectionedAlbums(
-                                device = device,
-                                user = user,
-                                expanded = expanded,
-                                onExpand = { expanded = it },
-                                columns = cols,
-                                deviceSelection = deviceSelection,
-                                userSelection = userSelection,
-                                contentBottomPadding = contentBottomPadding,
-                                onOpenDevice = onOpenAlbum,
-                                onOpenUser = onOpenUserAlbum,
-                                onNewAlbum = { naming = true },
-                                onColumnsChange = viewModel::setColumns,
-                                footer = {
-                                    CollectionsSection(
-                                        enabled = !selecting,
-                                        onOpenFavorites = onOpenFavorites,
-                                        onOpenVideos = onOpenVideos,
-                                        onOpenTrash = onOpenTrash,
-                                    )
-                                },
-                            )
+                when {
+                    list == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                    list.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        Text("No albums yet", style = MaterialTheme.typography.titleMedium)
+                    }
+                    else -> columns?.let { cols ->
+                        // Pull down at the top to bring the albums into thumb reach.
+                        ReachDown(
+                            title = "Albums",
+                            subtitle = albumCountLabel(list.size),
+                            state = reach,
+                            actions = icons,
+                        ) {
+                            // Locked has no button anywhere: push up past the last album and hold for 1.2 seconds.
+                            Box(Modifier.holdPastEnd(if (locker.enabled && !selection.isSelecting) onOpenLocked else null)) {
+                                AlbumGrid(
+                                    list = list,
+                                    columns = cols,
+                                    selection = selection,
+                                    contentBottomPadding = contentBottomPadding,
+                                    onOpenAlbum = onOpenAlbum,
+                                    onColumnsChange = viewModel::setColumns,
+                                    footer = {
+                                        CollectionsSection(
+                                            enabled = !selection.isSelecting,
+                                            onOpenFavorites = onOpenFavorites,
+                                            onOpenVideos = onOpenVideos,
+                                            onOpenTrash = onOpenTrash,
+                                        )
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
-            if (selecting && device != null && user != null) CompositionLocalProvider(LocalChromeHaze provides haze) {
-                val barModifier = Modifier.align(Alignment.BottomCenter)
-                if (userSelection.isSelecting) {
-                    // User albums are only lists: Pin, and Delete (the list; the photos stay). No Lock or Remove.
-                    AlbumSelectionBar(
-                        entries = user.filter { it.album.bucketId in userSelection.ids },
-                        onPin = { ids, pinned ->
-                            viewModel.setUserPinned(ids, pinned)
-                            clearSelection()
-                        },
-                        onDelete = { confirmDelete = true },
-                        modifier = barModifier,
-                    )
-                } else {
-                    AlbumSelectionBar(
-                        entries = device.filter { it.album.bucketId in deviceSelection.ids },
-                        onPin = { ids, pinned ->
-                            viewModel.setPinned(ids, pinned)
-                            clearSelection()
-                        },
-                        // The whole folder moves into Locked; it disappears once the originals are deleted.
-                        onLock = if (locker.enabled) { ids -> locker.lock(viewModel.itemsIn(ids)) } else null,
-                        onRemove = { ids -> remover.remove(device.filter { it.album.bucketId in ids }.map { it.album }) },
-                        onDelete = { ids -> deleter.delete(viewModel.itemsIn(ids), albums = ids.size) },
-                        modifier = barModifier,
-                    )
-                }
+            if (selection.isSelecting && list != null) CompositionLocalProvider(LocalChromeHaze provides haze) {
+                AlbumSelectionBar(
+                    entries = list.filter { it.album.bucketId in selection.ids },
+                    onPin = { ids, pinned ->
+                        viewModel.setPinned(ids, pinned)
+                        selection.clear()
+                    },
+                    // The whole album moves into Locked; it disappears from Albums once the originals are deleted.
+                    onLock = if (locker.enabled) { ids -> locker.lock(viewModel.itemsIn(ids)) } else null,
+                    onRemove = { ids -> remover.remove(list.filter { it.album.bucketId in ids }.map { it.album }) },
+                    onDelete = { ids -> deleter.delete(viewModel.itemsIn(ids), albums = ids.size) },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
     }
@@ -477,7 +429,7 @@ private fun AlbumsMenu(sort: AlbumSort, onSort: (AlbumSort) -> Unit, onEditAlbum
 /** An album card. While selecting it shows a check badge and shrinks a little when selected. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun AlbumCard(
+private fun AlbumCard(
     entry: AlbumEntry,
     cellPx: Int,
     selecting: Boolean,
@@ -501,10 +453,11 @@ internal fun AlbumCard(
             ),
     ) {
         Box(Modifier.graphicsLayer { scaleX = scale; scaleY = scale }) {
-            AlbumCover(
-                cover = album.cover,
+            MediaThumbnail(
+                item = album.cover,
                 cellSizePx = cellPx,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)),
+                showBadge = false,
             )
             if (entry.pinned) PinBadge(Modifier.align(Alignment.TopEnd).padding(8.dp))
             if (selecting) SelectionCheck(selected, Modifier.align(Alignment.TopStart).padding(8.dp))
@@ -526,7 +479,7 @@ internal fun AlbumCard(
 }
 
 @Composable
-internal fun PinBadge(modifier: Modifier = Modifier) {
+private fun PinBadge(modifier: Modifier = Modifier) {
     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = modifier) {
         Icon(
             OrganizeIcons.Pin,

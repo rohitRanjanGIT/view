@@ -13,7 +13,6 @@ import com.rohit.gallery.core.data.mediastore.MediaStoreDataSource
 import com.rohit.gallery.core.data.mediastore.mediaStoreIdOf
 import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
-import com.rohit.gallery.core.data.repository.UserAlbumRepository
 import com.rohit.gallery.core.domain.MediaActions
 import com.rohit.gallery.core.data.vault.VaultRepository
 import com.rohit.gallery.core.model.MediaItem
@@ -74,7 +73,6 @@ class ViewerViewModel @AssistedInject constructor(
     private val infoLoader: MediaInfoLoader,
     private val externalResolver: ExternalMediaResolver,
     private val vault: VaultRepository,
-    private val userAlbums: UserAlbumRepository,
     val playbackPositions: PlaybackPositionStore,
 ) : ViewModel() {
 
@@ -107,16 +105,6 @@ class ViewerViewModel @AssistedInject constructor(
                 .map { list -> list?.filter { it.bucketName == album } }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
         } ?: vault.items
-        // A user album: its members that are in the library (newest first, like the album screen unless oldest first).
-        route.userAlbumId != null -> userAlbums.albums
-            .map { albums ->
-                albums?.let { list ->
-                    val items = list.firstOrNull { it.id == route.userAlbumId }?.items.orEmpty()
-                    if (route.oldestFirst) items.reversed() else items
-                }
-            }
-            .flowOn(Dispatchers.Default)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
         route.externalUri != null -> externalTarget
             .flatMapLatest { target ->
                 when (target) {

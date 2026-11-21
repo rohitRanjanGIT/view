@@ -23,13 +23,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,8 +35,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -56,7 +50,7 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rohit.gallery.core.model.AlbumEntry
-import com.rohit.gallery.core.ui.components.AlbumCover
+import com.rohit.gallery.core.ui.components.MediaThumbnail
 import com.rohit.gallery.core.ui.components.OrganizeIcons
 import com.rohit.gallery.feature.selection.SelectionCheck
 import com.rohit.gallery.feature.selection.SelectionTopBar
@@ -66,23 +60,16 @@ private const val PINNED_HEADER = "pinned-header"
 private const val OTHERS_HEADER = "others-header"
 
 /**
- * Edit albums: the device folders or the user's own albums (a switch at the top picks which). Pin / unpin each one;
- * drag the unpinned ones by their handle to set a custom order (which switches the sort to Custom, for both kinds).
+ * Edit albums: every album. Pin / unpin each one; drag the
+ * unpinned albums by their handle to set a custom order (which switches the sort to Custom).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditAlbumsScreen(onBack: () -> Unit, viewModel: AlbumsViewModel = hiltViewModel()) {
     val organized by viewModel.organized.collectAsStateWithLifecycle()
-    val userAlbums by viewModel.userAlbums.collectAsStateWithLifecycle()
-    var section by rememberSaveable { mutableStateOf(AlbumSection.Device) }
+    val current = organized
     val selection = rememberAlbumSelection()
     BackHandler(enabled = selection.isSelecting) { selection.clear() }
-    val device = organized?.let { it.pinned to it.others }
-    val user = userAlbums?.map { it.asEntry() }?.partition { it.pinned }
-    val shown = if (section == AlbumSection.Device) device else user
-    val all = shown?.let { it.first + it.second }.orEmpty()
-    val setPinned: (List<Long>, Boolean) -> Unit =
-        if (section == AlbumSection.Device) viewModel::setPinned else viewModel::setUserPinned
+    val all = current?.let { it.pinned + it.others }.orEmpty()
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -90,46 +77,29 @@ fun EditAlbumsScreen(onBack: () -> Unit, viewModel: AlbumsViewModel = hiltViewMo
                 SelectionTopBar(count = selection.ids.size, onClose = selection::clear, onSelectAll = { selection.selectAll(all) })
             } else {
                 Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.statusBarsPadding()) {
-                        Row(Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                            }
-                            Text("Edit albums", style = MaterialTheme.typography.titleMedium)
+                    Row(Modifier.statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
-                            AlbumSection.entries.forEachIndexed { i, option ->
-                                SegmentedButton(
-                                    selected = section == option,
-                                    onClick = {
-                                        selection.clear()
-                                        section = option
-                                    },
-                                    shape = SegmentedButtonDefaults.itemShape(i, AlbumSection.entries.size),
-                                ) { Text(if (option == AlbumSection.Device) "On this device" else "Albums") }
-                            }
-                        }
+                        Text("Edit albums", style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
-            if (shown != null) {
-                // A fresh list per kind (ids of folders and user albums are unrelated).
-                key(section) {
-                    AlbumEditList(
-                        pinned = shown.first,
-                        others = shown.second,
-                        selection = selection,
-                        onTogglePin = { setPinned(listOf(it.album.bucketId), !it.pinned) },
-                        onReorder = if (section == AlbumSection.Device) viewModel::saveCustomOrder else viewModel::saveUserOrder,
-                    )
-                }
+            if (current != null) {
+                AlbumEditList(
+                    pinned = current.pinned,
+                    others = current.others,
+                    selection = selection,
+                    onTogglePin = { viewModel.setPinned(listOf(it.album.bucketId), !it.pinned) },
+                    onReorder = viewModel::saveCustomOrder,
+                )
             }
         }
         if (selection.isSelecting) {
             AlbumSelectionBar(
                 entries = all.filter { it.album.bucketId in selection.ids },
                 onPin = { ids, pinned ->
-                    setPinned(ids, pinned)
+                    viewModel.setPinned(ids, pinned)
                     selection.clear()
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -286,10 +256,11 @@ private fun AlbumEditRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (selecting) SelectionCheck(id in selection.ids)
-            AlbumCover(
-                cover = entry.album.cover,
+            MediaThumbnail(
+                item = entry.album.cover,
                 cellSizePx = thumbPx,
                 modifier = Modifier.size(RowThumb).clip(RoundedCornerShape(10.dp)),
+                showBadge = false,
             )
             Column(Modifier.weight(1f)) {
                 Text(entry.album.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

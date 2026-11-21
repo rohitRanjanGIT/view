@@ -47,9 +47,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
@@ -109,18 +107,12 @@ fun SelectionActionBar(
     onShare: () -> Unit,
     onFavorite: () -> Unit,
     onTrash: () -> Unit,
-    /** Inside a user album: takes the photos out of it (only the album's list changes). */
-    onRemoveFromAlbum: (() -> Unit)? = null,
-    onAddToAlbum: (() -> Unit)? = null,
     onMove: (() -> Unit)? = null,
-    onSetCover: (() -> Unit)? = null,
     onLock: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val more = buildList {
-        if (onAddToAlbum != null) add(MoreAction(Icons.Filled.Add, "Add to album", onAddToAlbum))
-        if (onMove != null) add(MoreAction(GalleryIcons.FolderMove, "Move to folder", onMove))
-        if (onSetCover != null) add(MoreAction(GalleryIcons.AlbumsTab, "Use as album cover", onSetCover))
+        if (onMove != null) add(MoreAction(GalleryIcons.FolderMove, "Move to album", onMove))
         if (onLock != null) add(MoreAction(GalleryIcons.Lock, "Lock", onLock, dividerBefore = isNotEmpty()))
     }
     FloatingActionPill(modifier) {
@@ -132,7 +124,6 @@ fun SelectionActionBar(
             onFavorite,
             Modifier.pillSlot(),
         )
-        if (onRemoveFromAlbum != null) ActionItem(Icons.Filled.Clear, "Remove", enabled, onRemoveFromAlbum, Modifier.pillSlot())
         ActionItem(Icons.Filled.Delete, "Trash", enabled, onTrash, Modifier.pillSlot())
         if (more.isNotEmpty()) {
             val menu = remember { MutableTransitionState(false) }

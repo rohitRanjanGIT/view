@@ -19,6 +19,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.unit.dp
+import com.rohit.gallery.core.domain.FallbackBatch
+import com.rohit.gallery.core.domain.MoveOutcome
+import com.rohit.gallery.core.domain.moveSummary
 import com.rohit.gallery.core.domain.movable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.map
@@ -52,8 +55,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * What the selection action bar does with the selected items: share, favorite, trash, and move to another device
- * folder (a real move of the files; adding to a user album is [AlbumAdder], which moves nothing). Owned by a screen's ViewModel, so the same bar works on every grid.
+ * What the selection action bar does with the selected items: share, favorite, trash, and move to another album (a
+ * device folder; see [MediaTransfer] for the copy-verify-delete fallback). Owned by a screen's ViewModel, so the same
+ * bar works on every grid.
  *
  * [allItems] returns the items the selection ids refer to.
  */
@@ -72,17 +76,6 @@ class SelectionActions(
     val albums: StateFlow<List<Album>> = albumRepository.organized
         .map { organized -> organized?.visible?.map { it.album }.orEmpty() }
         .stateIn(scope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /**
-     * The folders Move to folder offers: only ones made through the app (see [createdFolderChoices]), still in the
-     * library, minus the folder this grid shows. Reads each folder's path once (IO), so call it when the sheet opens.
-     */
-    suspend fun createdFolderOptions(): List<Album> {
-        val created = transfer.createdFolderPaths()
-        if (created.isEmpty()) return emptyList()
-        val paths = albums.value.map { it to transfer.destinationOf(it.cover ?: return@map it to null)?.relativePath }
-        return createdFolderChoices(paths, created, currentBucket())
-    }
 
     private val _progress = MutableStateFlow<TransferProgress?>(null)
 
@@ -135,7 +128,7 @@ class SelectionActions(
 
     private suspend fun destination(album: Album?, newName: String?): Destination? =
         when {
-            album != null -> album.cover?.let { transfer.destinationOf(it) }
+            album != null -> transfer.destinationOf(album.cover)
             newName != null -> transfer.newAlbum(newName)
             else -> null
         } ?: run {
@@ -144,8 +137,8 @@ class SelectionActions(
         }
 
     /**
-     * The selected items that can move into [dest], plus a note on the rest (see [movable]: app folders like WhatsApp's,
-     * or a folder that refuses the type). Null, with a message, when none of them can.
+     * The selected items that can move into [dest], plus a note on the rest (see [movable]: a folder that refuses
+     * the type). Null, with a message, when none of them can.
      */
     private fun allowedIn(items: List<MediaItem>, dest: Destination): Pair<List<MediaItem>, String?>? {
         val (ok, note) = movable(items, dest.relativePath)
@@ -196,7 +189,7 @@ class SelectionActions(
         working = false
     }
 
-    /** Stops the running move after the current item. */
+    /** Stops the running move after the current item (a copy stops mid-file, and its half-written file goes). */
     fun stop() {
         stopped = true
         job?.cancel()
@@ -207,36 +200,83 @@ class SelectionActions(
     /** Each finished move (for a screen that closes once its photos are in place). Not sent when stopped. */
     val finished: SharedFlow<TransferResult> = _finished.asSharedFlow()
 
+    private val _deleteRequests = MutableSharedFlow<IntentSender>(extraBufferCapacity = 1)
+
+    /**
+     * Android's confirmation to delete the originals of photos that had to move by copy (see [MediaTransfer]). The
+     * screen launches it and calls [finishFallback] when it is answered, whichever the answer.
+     */
+    val deleteRequests: SharedFlow<IntentSender> = _deleteRequests.asSharedFlow()
+
+    private var pendingFallback: PendingFallback? = null
+
+    /**
+     * The delete confirmation was answered (accepted or declined): originals that are gone make their moves final,
+     * and for the ones still there the copy is removed again, so a decline leaves nothing changed.
+     */
+    fun finishFallback() {
+        val pending = pendingFallback ?: return
+        pendingFallback = null
+        scope.launch {
+            val result = transfer.finishFallback(pending.batch)
+            working = false
+            selection.clear()
+            repository.refresh()
+            val moved = pending.done + result.moved
+            val failed = pending.failed + result.notMoved
+            _finished.tryEmit(TransferResult(moved, failed))
+            _messages.tryEmit(moveSummary(pending.verb, pending.total, moved, pending.failed, result.notMoved, pending.note))
+        }
+    }
+
     private fun runTransfer(
         verb: String,
         items: List<MediaItem>,
         note: String?,
-        work: suspend (onProgress: (handled: Int, done: Int) -> Unit) -> TransferResult,
+        work: suspend (onProgress: (handled: Int, done: Int) -> Unit) -> MoveOutcome,
     ) {
         stopped = false
         var done = 0
         _progress.value = TransferProgress(verb, 0, items.size)
         job = scope.launch {
             var result: TransferResult? = null
+            // True while Android's delete confirmation is up: the move is not over, and the selection stays.
+            var waiting = false
             try {
-                result = work { handled, ok ->
+                var outcome = work { handled, ok ->
                     done = ok
                     _progress.value = TransferProgress(verb, handled, items.size)
                 }
+                val batch = outcome.fallback
+                if (batch != null) {
+                    // Every copy is verified; only now may the originals go, in one confirmation.
+                    val sender = runCatching { transfer.deleteRequest(batch) }.getOrNull()
+                    if (sender == null) {
+                        transfer.discard(batch)
+                        outcome = MoveOutcome(outcome.done, outcome.failed + batch.copies.size, null)
+                    } else {
+                        pendingFallback = PendingFallback(batch, verb, items.size, outcome.done, outcome.failed, note)
+                        waiting = true
+                        _deleteRequests.tryEmit(sender)
+                    }
+                }
+                result = TransferResult(outcome.done, outcome.failed)
             } finally {
                 _progress.value = null
                 job = null
-                working = false
-                selection.clear()
                 repository.refresh()
-                val r = result
-                when {
-                    r != null -> {
-                        _finished.tryEmit(r)
-                        _messages.tryEmit(transferMessage(verb, items.size, r, note))
+                if (!waiting) {
+                    working = false
+                    selection.clear()
+                    val r = result
+                    when {
+                        r != null -> {
+                            _finished.tryEmit(r)
+                            _messages.tryEmit(transferMessage(verb, items.size, r, note))
+                        }
+                        stopped -> _messages.tryEmit("Stopped. $verb $done of ${items.size}")
+                        else -> _messages.tryEmit("Couldn't complete that")
                     }
-                    stopped -> _messages.tryEmit("Stopped. $verb $done of ${items.size}")
-                    else -> _messages.tryEmit("Couldn't complete that")
                 }
             }
         }
@@ -248,15 +288,19 @@ data class TransferProgress(val verb: String, val handled: Int, val total: Int)
 
 private class PendingMove(val items: List<MediaItem>, val destination: Destination, val note: String?)
 
+/** A move that waits for the delete confirmation of the originals of [batch]; [done] moved in place, [failed] didn't. */
+private class PendingFallback(
+    val batch: FallbackBatch,
+    val verb: String,
+    val total: Int,
+    val done: Int,
+    val failed: Int,
+    val note: String?,
+)
+
 /** The toast after a move. [note] says what was skipped before it started, if anything. */
-internal fun transferMessage(verb: String, count: Int, result: TransferResult, note: String?): String {
-    val main = when {
-        result.failed == 0 -> "$verb $count ${if (count == 1) "item" else "items"}"
-        result.done == 0 -> "Couldn't complete that"
-        else -> "$verb ${result.done}, ${result.failed} failed"
-    }
-    return if (note == null) main else "$main. $note"
-}
+internal fun transferMessage(verb: String, count: Int, result: TransferResult, note: String?): String =
+    moveSummary(verb, count, result.done, result.failed, declined = 0, note = note)
 
 /**
  * The progress dialog for a running move, with a count and Stop. Back can't dismiss it (a half-done
@@ -284,13 +328,9 @@ fun TransferProgressDialog(controller: SelectionActions, title: String? = null) 
     )
 }
 
-/** Which album sheet the More card opened. */
-private enum class AlbumSheet { MoveToFolder, AddToAlbum }
-
 /**
- * The bottom action bar for a selection, with everything it opens: system confirmations, the album and folder
- * sheets, the progress dialog and result toasts. Inside a user album, [currentUserAlbum] is it (no target for its
- * own photos), [onRemoveFromAlbum] adds Remove (from the album only) and [onSetCover] "Use as cover".
+ * The bottom action bar for a selection, with everything it opens: system confirmations, the album picker, the
+ * progress dialog and result toasts.
  */
 @Composable
 fun SelectionActionsBar(
@@ -299,9 +339,6 @@ fun SelectionActionsBar(
     modifier: Modifier = Modifier,
     allFavorite: Boolean,
     allowTransfer: Boolean = true,
-    currentUserAlbum: Long? = null,
-    onRemoveFromAlbum: (() -> Unit)? = null,
-    onSetCover: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -327,6 +364,10 @@ fun SelectionActionsBar(
     val moveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) controller.finishMove() else controller.cancelMove()
     }
+    // A photo Android won't move in place is copied, checked, and its original deleted: the delete is confirmed here.
+    val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { _ ->
+        controller.finishFallback()
+    }
 
     fun launch(launcher: androidx.activity.result.ActivityResultLauncher<IntentSenderRequest>, request: suspend () -> IntentSender?) {
         scope.launch {
@@ -341,8 +382,10 @@ fun SelectionActionsBar(
 
     // Lock: copies into Locked, then Android confirms deleting the originals.
     val locker = rememberVaultLocker(onLocked = { if (it > 0) selection.clear() })
-    val adder = rememberAlbumAdder()
-    var sheet by remember { mutableStateOf<AlbumSheet?>(null) }
+    var picking by remember { mutableStateOf(false) }
+    LaunchedEffect(controller) {
+        controller.deleteRequests.collect { deleteLauncher.launch(IntentSenderRequest.Builder(it).build()) }
+    }
     LaunchedEffect(controller) {
         controller.messages.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
@@ -364,57 +407,29 @@ fun SelectionActionsBar(
             trashed.items = controller.selectedItems()
             launch(trashLauncher) { controller.trashRequest() }
         },
-        onRemoveFromAlbum = onRemoveFromAlbum,
-        onAddToAlbum = if (allowTransfer) ({ sheet = AlbumSheet.AddToAlbum }) else null,
-        onMove = if (allowTransfer) ({ sheet = AlbumSheet.MoveToFolder }) else null,
-        onSetCover = onSetCover?.takeIf { count == 1 },
+        onMove = if (allowTransfer) ({ picking = true }) else null,
         onLock = if (allowTransfer && locker.enabled) ({ locker.lock(controller.selectedItems()) }) else null,
         modifier = modifier,
     )
 
-    when (sheet) {
-        AlbumSheet.MoveToFolder -> {
-            val folders by controller.albums.collectAsStateWithLifecycle()
-            // Only folders made through the app, minus the one shown here (no target for its own photos).
-            val choices by produceState<List<Album>?>(null) { value = controller.createdFolderOptions() }
-            choices?.let { shown ->
-            AlbumPickerSheet(
-                title = "Move to folder",
-                subtitle = "The files move to that folder on the device",
-                albums = shown,
-                emptyHint = "Folders you create here show up here",
-                existingNames = folders.map { it.name },
-                newLabel = "New folder",
-                onDismiss = { sheet = null },
-                onPick = { folder, newName ->
-                    sheet = null
-                    // Failures explain themselves in a toast (controller.messages).
-                    scope.launch {
-                        val sender = controller.moveRequest(folder, newName) ?: return@launch
-                        moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
-                    }
-                },
-            )
-            }
-        }
-        AlbumSheet.AddToAlbum -> {
-            val albums by adder.repository.albums.collectAsStateWithLifecycle()
-            val all = albums.orEmpty()
-            AlbumPickerSheet(
-                title = "Add to album",
-                subtitle = "Nothing is copied or moved",
-                albums = all.filter { it.id != currentUserAlbum }.map { it.asAlbum() },
-                existingNames = all.map { it.name },
-                folderNames = false,
-                onDismiss = { sheet = null },
-                onPick = { album, newName ->
-                    sheet = null
-                    adder.add(controller.selectedItems(), album?.bucketId, album?.name ?: newName.orEmpty())
-                    selection.clear()
-                },
-            )
-        }
-        null -> Unit
+    if (picking) {
+        val albums by controller.albums.collectAsStateWithLifecycle()
+        // The album shown here is no target for its own photos.
+        val current = remember { controller.currentBucket() }
+        AlbumPickerSheet(
+            title = "Move to album",
+            albums = albums.filter { it.bucketId != current },
+            existingNames = albums.map { it.name },
+            onDismiss = { picking = false },
+            onPick = { album, newName ->
+                picking = false
+                // Failures explain themselves in a toast (controller.messages).
+                scope.launch {
+                    val sender = controller.moveRequest(album, newName) ?: return@launch
+                    moveLauncher.launch(IntentSenderRequest.Builder(sender).build())
+                }
+            },
+        )
     }
     TransferProgressDialog(controller)
 }

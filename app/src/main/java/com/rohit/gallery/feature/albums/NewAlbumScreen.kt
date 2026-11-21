@@ -57,8 +57,8 @@ private sealed interface TargetFolder {
 
 /**
  * A new album is made by putting photos in it (Android only knows a folder as an album once something is in it):
- * every photo and video, like Pictures; tap or drag to pick, then move them into the folder named [name].
- * The same screen moves photos into an existing folder ([existingBucket]).
+ * every photo and video, like Pictures; tap or drag to pick, then move them into the album named [name].
+ * The same screen moves photos into an existing album ([existingBucket]).
  */
 @HiltViewModel
 class NewAlbumViewModel @Inject constructor(
@@ -94,14 +94,13 @@ class NewAlbumViewModel @Inject constructor(
     }
 
     /**
-     * Everything that can go into the album: not what is already in it, not what Android keeps in an app's own folder
-     * (WhatsApp Images...: it can never be moved out), and only the kinds Android allows in its folder (no photos in
-     * Movies/, nothing in Download/). Null while loading.
+     * Everything that can go into the album: not what is already in it, and only the kinds Android allows in its folder
+     * (no photos in Movies/, nothing in Download/). Null while loading.
      */
     val items: StateFlow<List<MediaItem>?> = combine(repo.state, folder) { state, target ->
         val all = (state as? MediaIndexState.Ready)?.items ?: return@combine null
         val path = (target as? TargetFolder.Found)?.destination?.relativePath ?: return@combine if (target == TargetFolder.Missing) emptyList() else null
-        all.filter { it.bucketId != existingBucket && !it.isInAppFolder && folderAccepts(path, it.isVideo) }
+        all.filter { it.bucketId != existingBucket && folderAccepts(path, it.isVideo) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
@@ -150,8 +149,8 @@ class NewAlbumViewModel @Inject constructor(
 }
 
 /**
- * The + inside a device folder: pick photos from anywhere and move them into that folder (a real move between
- * folders, after Android's write confirmation). User albums use [PickForAlbumScreen] instead, which moves nothing.
+ * Pick photos from anywhere and move them into an album: a new one (Albums tab, +) or the one the + inside an album was
+ * tapped in. A real move between folders, after Android's write confirmation.
  */
 @Composable
 fun NewAlbumScreen(onClose: () -> Unit, viewModel: NewAlbumViewModel = hiltViewModel()) {
@@ -162,17 +161,24 @@ fun NewAlbumScreen(onClose: () -> Unit, viewModel: NewAlbumViewModel = hiltViewM
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(controller) { controller.messages.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() } }
-    // Done once the photos are in: back to where + was tapped, where the folder now shows them.
+    // Done once the photos are in: back to where + was tapped, where the album now shows them.
     LaunchedEffect(controller) { controller.finished.collect { if (it.done > 0) onClose() } }
 
     // Moving needs Android's write confirmation first; the move runs once it is accepted.
     val moveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) controller.finishMove() else controller.cancelMove()
     }
+    // Photos Android won't move in place are copied and checked first; their originals are deleted after this confirmation.
+    val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { _ ->
+        controller.finishFallback()
+    }
+    LaunchedEffect(controller) {
+        controller.deleteRequests.collect { deleteLauncher.launch(IntentSenderRequest.Builder(it).build()) }
+    }
 
     val current = notice
     PhotoPickerLayout(
-        title = if (viewModel.existingBucket == null) "New folder: ${viewModel.name}" else "Move into ${viewModel.name}",
+        title = if (viewModel.existingBucket == null) "New album: ${viewModel.name}" else "Move into ${viewModel.name}",
         hint = current?.takeIf { !it.blocked }?.text ?: "Tap photos to move them here",
         items = items,
         selection = viewModel.selection,

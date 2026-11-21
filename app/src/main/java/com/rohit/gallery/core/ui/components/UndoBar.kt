@@ -39,8 +39,6 @@ class UndoRequest internal constructor(
     val message: String,
     val undo: suspend () -> IntentSender?,
     val onUndone: () -> Unit,
-    /** Set for an app-only change (taken out of a user album): reversed directly, with no system request. */
-    val direct: (suspend () -> Unit)? = null,
 )
 
 @Stable
@@ -49,11 +47,6 @@ class UndoBarState {
 
     fun show(message: String, undo: suspend () -> IntentSender?, onUndone: () -> Unit) {
         current = UndoRequest(message, undo, onUndone)
-    }
-
-    /** For a change only the app's own data saw (no system request): Undo runs [undo] itself. */
-    fun show(message: String, undo: suspend () -> Unit) {
-        current = UndoRequest(message, undo = { null }, onUndone = {}, direct = undo)
     }
 }
 
@@ -95,10 +88,6 @@ fun UndoBarHost(state: UndoBarState, modifier: Modifier = Modifier) {
                 TextButton(onClick = {
                     state.current = null
                     scope.launch {
-                        r.direct?.let { direct ->
-                            direct()
-                            return@launch
-                        }
                         val sender = runCatching { r.undo() }.getOrNull()
                         if (sender == null) {
                             Toast.makeText(context, "Couldn't undo; it's in Trash", Toast.LENGTH_SHORT).show()

@@ -29,6 +29,7 @@ import com.rohit.gallery.core.data.repository.AlbumRepository
 import com.rohit.gallery.core.data.repository.MediaIndexState
 import com.rohit.gallery.core.data.repository.MediaRepository
 import com.rohit.gallery.core.domain.Destination
+import com.rohit.gallery.core.domain.FallbackBatch
 import com.rohit.gallery.core.domain.MediaTransfer
 import com.rohit.gallery.core.domain.folderAccepts
 import com.rohit.gallery.core.domain.normalizeRelativePath
@@ -118,6 +119,31 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
 
     fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
 
+    /** The toast after the moves are over; the albums go only when every photo moved. */
+    fun report(albums: List<Album>, done: Int, failed: Int, skipped: Int) {
+        val name = if (albums.size == 1) albums.first().name else "${albums.size} albums"
+        if (failed == 0 && skipped == 0) {
+            albumRepository.forgetAsync(albums.map { it.bucketId })
+            toast("Removed $name. ${photoCount(done)} kept")
+            latestOnRemoved()
+        } else {
+            toast("Moved $done; ${failed + skipped} couldn't move, so $name stays")
+        }
+    }
+
+    // Photos Android won't move in place (another app's folder) are copied and checked first; their originals are
+    // deleted after this confirmation, whichever way it is answered.
+    val waiting = remember { object { var batch: FallbackBatch? = null; var albums: List<Album> = emptyList(); var done = 0; var failed = 0; var skipped = 0 } }
+    val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { _ ->
+        val batch = waiting.batch ?: return@rememberLauncherForActivityResult
+        waiting.batch = null
+        scope.launch {
+            val result = transfer.finishFallback(batch)
+            repository.refresh()
+            report(waiting.albums, waiting.done + result.moved, waiting.failed + result.notMoved, waiting.skipped)
+        }
+    }
+
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         val moves = pending.moves
         val albums = pending.albums
@@ -132,13 +158,22 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
                 progress = null
                 repository.refresh()
             }
-            val name = if (albums.size == 1) albums.first().name else "${albums.size} albums"
-            if (outcome.failed == 0 && skipped == 0) {
-                albumRepository.forgetAsync(albums.map { it.bucketId })
-                toast("Removed $name. ${photoCount(outcome.done)} kept")
-                latestOnRemoved()
+            val batch = outcome.fallback
+            if (batch != null) {
+                val sender = runCatching { transfer.deleteRequest(batch) }.getOrNull()
+                if (sender != null) {
+                    waiting.batch = batch
+                    waiting.albums = albums
+                    waiting.done = outcome.done
+                    waiting.failed = outcome.failed
+                    waiting.skipped = skipped
+                    deleteLauncher.launch(IntentSenderRequest.Builder(sender).build())
+                    return@launch
+                }
+                transfer.discard(batch)
+                report(albums, outcome.done, outcome.failed + batch.copies.size, skipped)
             } else {
-                toast("Moved ${outcome.done}; ${outcome.failed + skipped} couldn't move, so $name stays")
+                report(albums, outcome.done, outcome.failed, skipped)
             }
         }
     }
@@ -184,13 +219,12 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
                 subtitle = if (back > 0) "${photoCount(back)} go back to the albums they came from. Nothing is deleted." else "Nothing is deleted.",
                 albums = all.filter { it.bucketId !in s.removedBuckets },
                 existingNames = all.map { it.name },
-                newLabel = "New folder",
                 onDismiss = { step = null },
                 onPick = { album, newName ->
                     step = null
                     scope.launch {
                         val dest = when {
-                            album != null -> album.cover?.let { transfer.destinationOf(it) }
+                            album != null -> transfer.destinationOf(album.cover)
                             newName != null -> transfer.newAlbum(newName)
                             else -> null
                         }
@@ -228,13 +262,7 @@ fun rememberAlbumRemover(onRemoved: () -> Unit = {}): AlbumRemover {
                 val ids = albums.map { it.bucketId }.toSet()
                 val items = (repository.state.value as? MediaIndexState.Ready)?.items.orEmpty().filter { it.bucketId in ids }
                 if (items.isEmpty()) return@launch
-                // An app's own folder (WhatsApp Images...) can't be emptied: Android never lets its photos move out.
-                val appFolders = items.filter { it.isInAppFolder }.map { it.bucketName }.distinct()
-                if (appFolders.isNotEmpty()) {
-                    toast("${appFolders.joinToString()} belongs to an app, so Android doesn't let its photos move. Add them to an album instead")
-                    return@launch
-                }
-                val folders = albums.mapNotNull { a -> a.cover?.let { transfer.destinationOf(it) }?.relativePath }.toSet()
+                val folders = albums.mapNotNull { transfer.destinationOf(it.cover)?.relativePath }.toSet()
                 if (folders.size < albums.size) {
                     toast("Couldn't find that album's folder")
                     return@launch

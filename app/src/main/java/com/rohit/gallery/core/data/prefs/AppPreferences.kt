@@ -32,7 +32,7 @@ class AppPreferences @Inject constructor(@param:ApplicationContext private val c
 
     /** Albums per row in the Albums tab (2, 3 or 4). */
     val albumColumns: Flow<Int> = context.dataStore.data
-        .map { prefs -> prefs[ALBUM_COLUMNS] ?: 2 }
+        .map { prefs -> prefs[ALBUM_COLUMNS] ?: 3 }
         .distinctUntilChanged()
 
     /** Searches the user ran, newest first (at most [MAX_RECENT_SEARCHES]). */

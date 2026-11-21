@@ -151,23 +151,3 @@ private fun DurationBadge(durationMs: Long, showDuration: Boolean, modifier: Mod
 
 /** The red of every favourite heart (grid badge, viewer button, details row). */
 val FavoriteHeartRed = Color(0xFFFF4D6D)
-
-/**
- * An album's cover: its [cover] photo, or, for a user album that shows nothing yet (empty, or all of it in Trash),
- * a plain tile with the albums icon.
- */
-@Composable
-fun AlbumCover(cover: MediaItem?, cellSizePx: Int, modifier: Modifier = Modifier) {
-    if (cover != null) {
-        MediaThumbnail(cover, cellSizePx, modifier, showBadge = false)
-    } else {
-        Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-            Icon(
-                com.rohit.gallery.core.ui.icons.GalleryIcons.AlbumsTab,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(32.dp),
-            )
-        }
-    }
-}

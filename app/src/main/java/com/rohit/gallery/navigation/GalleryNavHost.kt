@@ -60,8 +60,6 @@ import com.rohit.gallery.feature.albums.AlbumDetailScreen
 import com.rohit.gallery.feature.albums.AlbumsScreen
 import com.rohit.gallery.feature.albums.EditAlbumsScreen
 import com.rohit.gallery.feature.albums.NewAlbumScreen
-import com.rohit.gallery.feature.albums.PickForAlbumScreen
-import com.rohit.gallery.feature.albums.UserAlbumScreen
 import com.rohit.gallery.feature.favorites.FavoritesScreen
 import com.rohit.gallery.feature.search.SearchScreen
 import com.rohit.gallery.feature.settings.SettingsScreen
@@ -171,11 +169,10 @@ fun GalleryNavHost(
                                 )
                                 ALBUMS_PAGE -> AlbumsScreen(
                                     onOpenAlbum = { navController.navigate(AlbumDetailRoute(it.bucketId)) },
-                                    onOpenUserAlbum = { navController.navigate(UserAlbumRoute(it)) },
                                     // The hidden way in: push up past the last album and hold for 1.2 seconds.
                                     onOpenLocked = { navController.navigate(VaultRoute) },
                                     onOpenSearch = { navController.navigate(SearchRoute) },
-                                    onCreateAlbum = { name -> navController.navigate(PickForAlbumRoute(name)) },
+                                    onCreateAlbum = { name -> navController.navigate(NewAlbumRoute(name)) },
                                     onEditAlbums = { navController.navigate(EditAlbumsRoute) },
                                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
                                     onOpenVideos = { navController.navigate(VideosRoute) },
@@ -209,15 +206,6 @@ fun GalleryNavHost(
                     composable<NewAlbumRoute> {
                         NewAlbumScreen(onClose = { navController.popBackStack() })
                     }
-                    composable<PickForAlbumRoute> {
-                        PickForAlbumScreen(
-                            onClose = { navController.popBackStack() },
-                            // A new album opens once made; Back from it goes to where + was tapped.
-                            onCreated = { id ->
-                                navController.navigate(UserAlbumRoute(id)) { popUpTo<PickForAlbumRoute> { inclusive = true } }
-                            },
-                        )
-                    }
                     topLevel<EditAlbumsRoute>(navController) {
                         EditAlbumsScreen(onBack = { navController.popBackStack() })
                     }
@@ -228,15 +216,6 @@ fun GalleryNavHost(
                                 openViewer(host, item, ViewerRoute(item.id, bucketId = bucketId, oldestFirst = oldestFirst))
                             },
                             onAddPhotos = { bucketId, name -> navController.navigate(NewAlbumRoute(name, bucketId)) },
-                        )
-                    }
-                    topLevel<UserAlbumRoute>(navController) { host ->
-                        UserAlbumScreen(
-                            onBack = { navController.popBackStack() },
-                            onOpenMedia = { item, albumId, oldestFirst ->
-                                openViewer(host, item, ViewerRoute(item.id, userAlbumId = albumId, oldestFirst = oldestFirst))
-                            },
-                            onAddPhotos = { albumId, name -> navController.navigate(PickForAlbumRoute(name, albumId)) },
                         )
                     }
                     topLevel<FavoritesRoute>(navController) { host ->
