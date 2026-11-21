@@ -809,3 +809,10 @@ Same cause and fix as "Copied photos keep their date": the vault row already sto
 `restoreTo` published a new MediaStore file without it, so a photo without a capture date (WhatsApp) came back dated
 "now". The original modified time is now set on the pending file (`File.setLastModified` on its DATA path) before
 IS_PENDING -> 0. The favourite mark is not stored in the vault, so it is not restored (not changed here).
+
+## Rule: metadata stays with the media; Locked remembers the heart (2026-11-21)
+Owner's rule (now in CLAUDE.md hard rule 1): wherever media is rebuilt (copy-and-delete moves, Locked / unlock, Trash
+restore, future export or edit), all its information must survive. Audit: only `MediaTransfer.copyVerified` and the
+vault rebuild media. Bytes (so EXIF / GPS) are verified identical; the date is carried by setting the file time on the
+pending file; the favourite mark was lost by Locked, so `vault_items` gets `isFavorite` (database version 7,
+AutoMigration 6 -> 7, default 0) and unlock sets it again.

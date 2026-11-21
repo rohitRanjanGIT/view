@@ -22,6 +22,12 @@ safety beat feature count. Every feature must feel instant on a library of
    *Approved exception (2026-11-21):* Move to album, when Android refuses an in-place move (photos in another app's
    folder, e.g. WhatsApp Images), copies the photo, verifies it byte for byte, then deletes the original with
    `createDeleteRequest` (no Trash), by the owner's decision (see DECISIONS "Albums are folders again").
+   **Metadata stays with the media (owner's rule, 2026-11-21).** Wherever the app takes a photo or video apart and
+   puts it back together (copy-and-delete moves, Locked / unlock, Trash restore, any future export or edit), every
+   piece of its information must come back unchanged: the file's bytes (so EXIF and GPS), its date (the original
+   file time, so it never jumps to "now"; MediaProvider ignores date changes after publishing, so set the file time
+   on the pending file first), name, type, favourite mark and folder. Before finishing such a change, list what
+   metadata the old and the new item have and check each one on the phone with a test copy.
 2. **Offline and private.** Do NOT declare the `INTERNET` permission. No
    analytics, no cloud, no third-party SDKs that phone home.
 3. **Original work only.** Take inspiration from One UI's layout and behavior,

@@ -1,5 +1,6 @@
 package com.rohit.gallery.core.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -32,6 +33,8 @@ data class VaultItemEntity(
     val originalMediaId: Long,
     val lockedAtMs: Long,
     val pending: Boolean,
+    /** The Favourite heart at lock time; unlocking puts it back (added in database version 7). */
+    @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
 )
 
 @Dao

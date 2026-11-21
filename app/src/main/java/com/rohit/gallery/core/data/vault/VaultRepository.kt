@@ -183,6 +183,7 @@ class VaultRepository @Inject constructor(
                 albumName = item.bucketName,
                 originalMediaId = item.id,
                 lockedAtMs = System.currentTimeMillis(),
+                isFavorite = item.isFavorite,
                 pending = true,
             ),
         )
@@ -260,6 +261,10 @@ class VaultRepository @Inject constructor(
                 if (path != null) File(path).setLastModified(row.dateModifiedMs)
             }
             resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+            // Best effort: the heart is a nicety, never a reason to fail an unlock.
+            if (row.isFavorite) runCatching {
+                resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_FAVORITE, 1) }, null, null)
+            }
             return true
         } catch (e: Exception) {
             // Never leave a half-written file behind; the vault copy is untouched.
